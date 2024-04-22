@@ -3,7 +3,6 @@
 OGRE drives many of its features through scripts in order to make it easier to set up. The scripts are simply plain text files which can be edited in any standard text editor, and modifying them immediately takes effect on your OGRE-based applications, without any need to recompile. This makes prototyping a lot faster. Here are the items that OGRE lets you script:
 
 - @subpage Material-Scripts
-- @subpage High-level-Programs
 - @subpage Compositor-Scripts
 - @subpage Particle-Scripts
 - @subpage Overlay-Scripts
@@ -13,17 +12,7 @@ OGRE drives many of its features through scripts in order to make it easier to s
 
 # Loading scripts
 
-Scripts are loaded when resource groups are initialised: OGRE looks in all resource locations associated with the group (see Ogre::ResourceGroupManager::addResourceLocation) for files with the respective extension (e.g. ’.material’, ’.compositor’, ..) and parses them. If you want to parse files manually, use Ogre::ScriptCompilerManager::parseScript.
-
-The file extension does not actually restrict the items that can be specified inside the file; e.g. %Ogre is perfectly fine with loading a particle-system from a ’.compositor’ file - but it will lead you straight to maintenance-hell if you do that.
-The extensions, however, do specify the order in which the scripts are parsed, which is as follows:
-
-1. "*.program"
-2. "*.material"
-3. "*.particle"
-4. "*.compositor"
-5. "*.os"
-6. "*.overlay"
+Scripts are loaded when resource groups are initialised: OGRE looks in all resource locations associated with the group (see Ogre::ResourceGroupManager::addResourceLocation) for files with the respective extension (e.g. ’.material’, ’.compositor’, ..) and parses them. If you want to parse files manually, use the `parseScript` method of the according manager.
 
 # Format {#Format}
 
@@ -51,7 +40,7 @@ An script object can inherit from a previously defined object by using a *colon*
 
 ## Script Inheritance {#Script-Inheritance}
 
-When creating new script objects that are only slight variations of another object, it’s good to avoid copying and pasting between scripts. Script inheritance lets you do this; in this section we’ll use material scripts as an example, but this applies to all scripts parsed with the script compilers in %Ogre 1.6 onwards.
+When creating new script objects that are only slight variations of another object, it’s good to avoid copying and pasting between scripts. Script inheritance lets you do this; in this section we’ll use material scripts as an example, but this applies to all scripts parsed with the script compilers in Ogre 1.6 onwards.
 
 For example, to make a new material that is based on one previously defined, add a *colon* ’:’ after the new material name followed by the name of the material that is to be copied.
 
@@ -60,7 +49,7 @@ Example
 material <NewUniqueChildName> : <ReferenceParentMaterial>
 ```
 
-The only caveat is that a parent material must have been defined/parsed prior to the child material script being parsed. The easiest way to achieve this is to either place parents at the beginning of the material script file, or to use the @ref Script-Import-Directive. Note that inheritance is actually a copy - after scripts are loaded into Ogre, objects no longer maintain their copy inheritance structure. If a parent material is modified through code at runtime, the changes have no effect on child materials that were copied from it in the script.
+The only caveat is that a parent material must have been defined/parsed prior to the child material script being parsed. The easiest way to achieve this is to either place parents at the beginning of the material script file, or to use the ’import’ directive (See @ref Script-Import-Directive). Note that inheritance is actually a copy - after scripts are loaded into Ogre, objects no longer maintain their copy inheritance structure. If a parent material is modified through code at runtime, the changes have no effect on child materials that were copied from it in the script.
 
 Material copying within the script alleviates some drudgery from copy/paste but having the ability to identify specific techniques, passes, and texture units to modify makes material copying easier. Techniques, passes, texture units can be identified directly in the child material without having to layout previous techniques, passes, texture units by associating a name with them, Techniques and passes can take a name and texture units can be numbered within the material script. You can also use variables, See @ref Script-Variables.
 
@@ -215,7 +204,7 @@ import Parent from "parent.material"
 
 If there were other definitions in the parent.material file, they would not be imported.
 
-@note Importing does not actually cause objects in the imported script to be fully parsed & created, it just makes the definitions available for inheritance. This has a specific ramification for vertex / fragment program definitions, which must be loaded before any parameters can be specified. You should continue to put common program definitions in .program files to ensure they are fully parsed before being referenced in multiple .material files. The ’import’ command just makes sure you can resolve dependencies between equivalent script definitions (e.g. material to material).
+Note, however that importing does not actually cause objects in the imported script to be fully parsed & created, it just makes the definitions available for inheritance. This has a specific ramification for vertex / fragment program definitions, which must be loaded before any parameters can be specified. You should continue to put common program definitions in .program files to ensure they are fully parsed before being referenced in multiple .material files. The ’import’ command just makes sure you can resolve dependencies between equivalent script definitions (e.g. material to material).
 
 # Custom Translators {#custom-translators}
 Writing a custom translators allows you to extend Ogre's standard compilers with completely new functionality. The same scripting interfaces can be used to define application-specific functionality. Here's how you do it.
@@ -263,28 +252,27 @@ Definition of a rendering pipeline that can be applied to a user viewport. This 
 
 </dd> <dt>Compositor Instance</dt> <dd>
 
-An instance of a compositor as applied to a single viewport. You create these based on compositor definitions, See @ref Applying-a-Compositor.
+An instance of a compositor as applied to a single viewport. You create these based on compositor definitions, See [Applying a Compositor](#Applying-a-Compositor).
 
 </dd> <dt>Compositor Chain</dt> <dd>
 
-It is possible to enable more than one compositor instance on a viewport at the same time, with one compositor taking the results of the previous one as input. This is known as a compositor chain. Every viewport which has at least one compositor attached to it has a compositor chain. See @ref Applying-a-Compositor
+It is possible to enable more than one compositor instance on a viewport at the same time, with one compositor taking the results of the previous one as input. This is known as a compositor chain. Every viewport which has at least one compositor attached to it has a compositor chain. See [Applying a Compositor](#Applying-a-Compositor)
 
 </dd> <dt>Target</dt> <dd>
 
-This is a Ogre::RenderTarget, i.e. the canvas where the result of a series of render operations is sent. A target may be the final output (e.g. your Ogre::RenderWindow), or it may be an intermediate render texture, which you declare in your script with the @ref compositor-texture line. A target which is not the output target has a size and pixel format which you can define inside the compositor script.
+This is a RenderTarget, i.e. the place where the result of a series of render operations is sent. A target may be the final output (and this is implicit, you don’t have to declare it), or it may be an intermediate render texture, which you declare in your script with the [texture line](#compositor_005ftexture). A target which is not the output target has a defined size and pixel format which you can control.
 
 </dd> <dt>Output Target</dt> <dd>
 
-As Target, but this is the single final result of all operations. The size and pixel format of this target cannot be controlled by the compositor since it is defined by the application using it, thus you don’t declare it in your script. However, you do declare a Target Section for it, see below.
+As Target, but this is the single final result of all operations. The size and pixel format of this target cannot be controlled by the compositor since it is defined by the application using it, thus you don’t declare it in your script. However, you do declare a Target Pass for it, see below.
 
-</dd> <dt>Target Section</dt> <dd>
+</dd> <dt>Target Pass</dt> <dd>
 
-A Target may be rendered to many times in the course of a composition effect. In particular if you ’ping pong’ a convolution between a couple of textures, you will have more than one Target Sections per Target. Target Sections are declared in the script using a [target or target\_output line](#Compositor-Target-Passes), the latter being the final output of which there can be only one.
-@note Internally this is referred to as Ogre::CompositionTargetPass
+A Target may be rendered to many times in the course of a composition effect. In particular if you ’ping pong’ a convolution between a couple of textures, you will have more than one Target Pass per Target. Target passes are declared in the script using a [target or target\_output line](#Compositor-Target-Passes), the latter being the final output target pass, of which there can be only one.
 
 </dd> <dt>Pass</dt> <dd>
 
-Within a Target Section, there are one or more individual @ref Compositor-Passes, which perform a very specific action, such as rendering the original scene (or pulling the result from the previous compositor in the chain), rendering a fullscreen quad, or clearing one or more buffers. Typically within a single target section you will use the either a `render_scene` pass or a `render_quad` pass, not both. Clear can be used with either type.
+Within a Target Pass, there are one or more individual [passes](#Compositor-Passes), which perform a very specific action, such as rendering the original scene (or pulling the result from the previous compositor in the chain), rendering a fullscreen quad, or clearing one or more buffers. Typically within a single target pass you will use the either a ’render scene’ pass or a ’render quad’ pass, not both. Clear can be used with either type.
 
 </dd> </dl>
 
@@ -299,11 +287,11 @@ A compositor technique is much like a [material technique](@ref Techniques) in t
 <dl compact="compact">
 <dt>Material support</dt> <dd>
 
-All @ref Compositor-Passes that render a fullscreen quad use a material; for the technique to be supported, all of the materials referenced must have at least one supported material technique. If they don’t, the compositor technique is marked as unsupported and won’t be used.
+All [passes](#Compositor-Passes) that render a fullscreen quad use a material; for the technique to be supported, all of the materials referenced must have at least one supported material technique. If they don’t, the compositor technique is marked as unsupported and won’t be used.
 
 </dd> <dt>Texture format support</dt> <dd>
 
-This one is slightly more complicated. When you request a @ref compositor-texture in your technique, you request a pixel format. Not all formats are natively supported by hardware, especially the floating point formats. However, in this case the hardware will typically downgrade the texture format requested to one that the hardware does support - with compositor effects though, you might want to use a different approach if this is the case. So, when evaluating techniques, the compositor will first look for native support for the exact pixel format you’ve asked for, and will skip onto the next technique if it is not supported, thus allowing you to define other techniques with simpler pixel formats which use a different approach. If it doesn’t find any techniques which are natively supported, it tries again, this time allowing the hardware to downgrade the texture format and thus should find at least some support for what you’ve asked for.
+This one is slightly more complicated. When you request a [texture](#compositor_005ftexture) in your technique, you request a pixel format. Not all formats are natively supported by hardware, especially the floating point formats. However, in this case the hardware will typically downgrade the texture format requested to one that the hardware does support - with compositor effects though, you might want to use a different approach if this is the case. So, when evaluating techniques, the compositor will first look for native support for the exact pixel format you’ve asked for, and will skip onto the next technique if it is not supported, thus allowing you to define other techniques with simpler pixel formats which use a different approach. If it doesn’t find any techniques which are natively supported, it tries again, this time allowing the hardware to downgrade the texture format and thus should find at least some support for what you’ve asked for.
 
 </dd> </dl>
 
@@ -314,7 +302,7 @@ Format: technique { }
 
 Techniques can have the following nested elements:
 
--   [texture](#compositor-texture)
+-   [texture](#compositor_005ftexture)
 -   [texture\_ref](#compositor_005ftexture_005fref)
 -   [scheme](#compositor_005fscheme)
 -   [compositor\_logic](#compositor_005flogic)
@@ -325,28 +313,25 @@ Techniques can have the following nested elements:
 
 ## texture {#compositor-texture}
 
-This declares a render texture for use in subsequent @ref Compositor-Target-Passes.
+This declares a render texture for use in subsequent [target passes](#Compositor-Target-Passes).
 @par
-Format: texture &lt;name&gt; &lt;width&gt; &lt;height&gt; &lt;PixelFormat&gt; \[&lt;MRT Pixel_Format2&gt;\] \[&lt;MRT Pixel_FormatN&gt;\] \[pooled\] \[gamma\] \[no\_fsaa\] \[depth\_pool &lt;poolId&gt;\] \[&lt;scope&gt;\] \[&lt;cubic&gt;\]
+Format: texture &lt;Name&gt; &lt;Width&gt; &lt;Height&gt; &lt;Pixel_Format&gt; \[&lt;MRT Pixel_Format2&gt;\] \[&lt;MRT Pixel_FormatN&gt;\] \[pooled\] \[gamma\] \[no\_fsaa\] \[depth\_pool &lt;poolId&gt;\] \[&lt;scope&gt;\]
 
-@param name
-A name to give the render texture, which must be unique within this compositor. This name is used to reference the texture in @ref Compositor-Target-Passes, when the texture is rendered to, and in @ref Compositor-Passes, when the texture is used as input to a material rendering a fullscreen quad.
+@param Name
+A name to give the render texture, which must be unique within this compositor. This name is used to reference the texture in [target passes](#Compositor-Target-Passes), when the texture is rendered to, and in [passes](#Compositor-Passes), when the texture is used as input to a material rendering a fullscreen quad.
 
-@param width
-@param height
+@param Width
+@param Height 
 @parblock
 The dimensions of the render texture. You can either specify a fixed width and height, or you can request that the texture is based on the physical dimensions of the viewport to which the compositor is attached. The options for the latter are either of
-<ul>
-<li> @c target_width and @c target_height
-<li> @c target_width_scaled &lt;factor&gt; and @c target_height_scaled &lt;factor&gt;
-</ul>
-where &lt;factor&gt; is the amount by which you wish to multiply the size of the main target to derive the dimensions.
-@endparblock
-@param PixelFormat
-The Ogre::PixelFormat of the render texture. This affects how much memory it will take, what colour channels will be available, and what precision you will have within those channels.
-You can in fact repeat this element if you wish. If you do so, that means that this render texture becomes a Multiple Render Target (MRT), when the GPU writes to multiple textures at once.
-If you use a depth format here, the texture will be used as the depth attachment instead of the depth-buffer. Use the MRT format to specify both the depth and the colour attachments.
+- @c target_width and @c target_height
+- @c target_width_scaled &lt;factor&gt; and @c target_height_scaled &lt;factor&gt;
 
+where ’factor’ is the amount by which you wish to multiply the size of the main target to derive the dimensions.
+@endparblock
+@param Pixel_Format
+The pixel format of the render texture. This affects how much memory it will take, what colour channels will be available, and what precision you will have within those channels.
+See Ogre::PixelFormat. You can in fact repeat this element if you wish. If you do so, that means that this render texture becomes a Multiple Render Target (MRT), when the GPU writes to multiple textures at once.
 
 @param pooled
 If present, this directive makes this texture ’pooled’ among compositor instances, which can save some memory.
@@ -366,9 +351,6 @@ If present, this directive sets the scope for the texture for being accessed by 
 1. @c local_scope (which is also the default) means that only the compositor defining the texture can access it. 
 2. @c chain_scope means that the compositors after this compositor in the chain can reference its textures, and 
 3. @c global_scope means that the entire application can access the texture. This directive also affects the creation of the textures (global textures are created once and thus can’t be used with the pooled directive, and can’t rely on viewport size).
-
-@param cubic
-This texture is of type Ogre::TEX_TYPE_CUBE_MAP - i.e. made up of 6 2D textures which are pasted around the inside of a cube.
 
 @par
 Example: texture rt0 512 512 PF\_R8G8B8A8
@@ -391,7 +373,7 @@ This declares a reference of a texture from another compositor to be used in thi
 Format: texture\_ref &lt;Local_Name&gt; &lt;Reference_Compositor&gt; &lt;Reference_Texture_Name&gt;
 
 @param Local_Name
-A name to give the referenced texture, which must be unique within this compositor. This name is used to reference the texture in @ref Compositor-Target-Passes, when the texture is rendered to, and in @ref Compositor-Passes, when the texture is used as input to a material rendering a fullscreen quad.
+A name to give the referenced texture, which must be unique within this compositor. This name is used to reference the texture in [target passes](#Compositor-Target-Passes), when the texture is rendered to, and in [passes](#Compositor-Passes), when the texture is used as input to a material rendering a fullscreen quad.
 
 @param Reference_Compositor
 The name of the compositor that we are referencing a texture from
@@ -424,14 +406,14 @@ Format: compositor\_logic &lt;Name&gt;
 
 Registration of compositor logics is done by name through Ogre::CompositorManager::registerCompositorLogic.
 
-# Target Sections {#Compositor-Target-Passes}
+# Target Passes {#Compositor-Target-Passes}
 
-A target section defines the rendering of either a render texture or the final output. You can update the same target multiple times by adding more than one target section to your compositor script - this is very useful for ’ping pong’ renders between a couple of render textures to perform complex convolutions that cannot be done in a single render, such as blurring.
+A target pass is the action of rendering to a given target, either a render texture or the final output. You can update the same render texture multiple times by adding more than one target pass to your compositor script - this is very useful for ’ping pong’ renders between a couple of render textures to perform complex convolutions that cannot be done in a single render, such as blurring.
 
-There are two types of target sections, the sort that updates a render texture
+There are two types of target pass, the sort that updates a render texture
 
 @par
-Format: target &lt;Name&gt; [&lt;slice&gt;] { }
+Format: target &lt;Name&gt; { }
 
 and the sort that defines the final output render
 
@@ -439,8 +421,6 @@ and the sort that defines the final output render
 Format: target\_output { }
 
 The contents of both are identical, the only real difference is that you can only have a single target\_output entry, whilst you can have many target entries. 
-
-Note, the target entry can refer to @ref Cube-map-textures. Therefore, it takes an optional _decimal_ slice parameter that specifies which face you want to render on. The default is 0, hence +X.
 
 Here are the attributes you can use in a ’target’ or ’target\_output’ section of a .compositor script:
 
@@ -450,6 +430,11 @@ Here are the attributes you can use in a ’target’ or ’target\_output’ se
 -   [lod\_bias](#compositor_005flod_005fbias)
 -   [material_scheme](#material_005fscheme)
 -   [shadows](#compositor_005fshadows)
+-   [pass](#Compositor-Passes)
+
+<a name="Attribute-Descriptions-2"></a>
+
+## Attribute Descriptions
 
 <a name="compositor_005ftarget_005finput"></a><a name="input"></a>
 
@@ -483,11 +468,11 @@ Default: only\_initial off
 
 ## visibility\_mask
 
-Sets the visibility mask for any render\_scene passes performed in this target pass. This is a bitmask (specified as decimal or hex) and maps to Ogre::Viewport::setVisibilityMask.
+Sets the visibility mask for any render\_scene passes performed in this target pass. This is a bitmask (although it must be specified as decimal, not hex) and maps to Ogre::Viewport::setVisibilityMask.
 @par
 Format: visibility\_mask &lt;mask&gt;
 @par
-Default: visibility\_mask 0xFFFFFFFF
+Default: visibility\_mask 4294967295
 
 <a name="compositor_005flod_005fbias"></a><a name="lod_005fbias"></a>
 
@@ -521,11 +506,11 @@ Format: material\_scheme &lt;scheme name&gt;
 @par
 Default: None
 
-# Passes {#Compositor-Passes}
+# Compositor Passes {#Compositor-Passes}
 
-A pass is a single rendering action to be performed in a target section.
+A pass is a single rendering action to be performed in a target pass.  
 @par
-Format: pass &lt;type&gt; \[custom name\] { }
+Format: ’pass’ (render\_quad | clear | stencil | render\_scene | render\_custom) \[custom name\] { }
 
 There are the following types of a pass:
 
@@ -556,74 +541,37 @@ This kind of pass is just a callback to user code for the composition pass speci
 
 </dd> </dl>
 
-## render_quad & compute
+Here are the attributes you can use in a ’pass’ section of a .compositor script:
 
-Here are the attributes you can use in the @c render_quad and @c compute sections of a .compositor script:
+<a name="Available-Pass-Attributes"></a>
+
+## Available Pass Attributes
 
 -   [material](#material)
+-   [thread_groups](#thread_groups)
 -   [input](#compositor_005fpass_005finput)
 -   [identifier](#compositor_005fpass_005fidentifier)
--   [thread_groups](#thread_groups)
--   [quad_normals](#quad_normals)
+-   [first\_render\_queue](#first_005frender_005fqueue)
+-   [last\_render\_queue](#last_005frender_005fqueue)
+-   [material\_scheme](#compositor_005fpass_005fmaterial_005fscheme)
+-   [clear](#compositor_005fclear)
+-   [stencil](#compositor_005fstencil)
 
 <a name="material"></a><a name="material-1"></a>
 
-### material
+## material
 
-Sets the material to be used. With `compute` passes only the compute shader is used and only global auto parameter can be accessed.
+For passes of type `render_quad` and `compute`, sets the material to be used. With `compute` passes only the compute shader is used and pnly global auto parameter can be accessed.
 For `render_quad` you will want to use shaders in this material to perform fullscreen effects, and use the [input](#compositor_005fpass_005finput) attribute to map other texture targets into the texture bindings needed by this material. 
 
 @par
 Format: material &lt;Name&gt;
 
-<a name="compositor_005fpass_005finput"></a><a name="input-1"></a>
-
-### input
-
-This is how you map one or more local @ref compositor-texture into the material you’re using to render. To bind more than one texture, repeat this attribute with different texUnit indices.
-
-@par
-Format: input &lt;texUnit&gt; &lt;name&gt; \[&lt;mrtIndex&gt;\]
-
-@param texUnit
-The index of the target texture unit, must be a number in the range \[0, OGRE\_MAX\_TEXTURE\_LAYERS-1\].
-@param name
-The name of the local render texture to bind, as declared by @ref compositor-texture and rendered to in one or more @ref Compositor-Target-Passes.
-@param mrtIndex
-If the local texture that you’re referencing is a Multiple Render Target (MRT), this identifies the surface from the MRT that you wish to reference (0 is the first surface, 1 the second etc).
-
-@par
-Example: input 0 rt0
-
-<a name="compositor_005fpass_005fidentifier"></a><a name="identifier"></a>
-
-### identifier
-
-Associates a numeric identifier with a pass involving a material. This is useful for registering a listener with Ogre::CompositorInstance::addListener, and being able to identify which pass it is that’s being processed, so that material parameters can be varied. Numbers between 0 and 2^32 - 1 are allowed.
-
-@par
-Format: identifier &lt;number&gt; 
-@par
-Example: identifier 99945
-@par
-Default: identifier 0
-
-<a name="quad_normals"></a>
-
-### quad_normals
-
-Pass the camera Frustum far corner vectors in the quad normals for passes of type `quad`. This is particularly useful for efficiently reconstructing position using only the depth and the corners.
-
-@par
-Format: quad_normals &lt;camera_far_corners_world_space|camera_far_corners_view_space&gt;
-@par
-Default: None
-
 <a name="thread_groups"></a>
 
-### thread_groups
+## thread_groups
 
-Passes of type `compute` operate on an abstract "compute space". This space is typically divided into threads and thread groups (work groups). The size of a thread group is defined inside the compute shader itself. This defines how many groups should be launched.
+Passes of type `compute` operate on an absract "compute space". This space is typically diveded into threads and thread groups (work groups). The size of a thread group is defined inside the compute shader itself. This defines how many groups should be launched.
 
 @par
 Example: if you want to process a 256x256px image and have a thread group size of 16x16x1, you want to specify `16 16 1` here as well.
@@ -631,59 +579,67 @@ Example: if you want to process a 256x256px image and have a thread group size o
 @par
 Format: thread_groups &lt;groups_x&gt; &lt;groups_y&gt; &lt;groups_z&gt;
 
-## render_scene
+<a name="compositor_005fpass_005finput"></a><a name="input-1"></a>
 
-Here are the attributes you can use in a @c render_scene section of a .compositor script:
+## input
 
--   [first\_render\_queue](#first_005frender_005fqueue)
--   [last\_render\_queue](#last_005frender_005fqueue)
--   [material\_scheme](#compositor_005fpass_005fmaterial_005fscheme)
--   [camera](#camera)
+For passes of type ’render\_quad’, this is how you map one or more local render textures (See [compositor\_texture](#compositor_005ftexture)) into the material you’re using to render the fullscreen quad. To bind more than one texture, repeat this attribute with different sampler indexes.
+
+@par
+Format: input &lt;sampler&gt; &lt;Name&gt; \[&lt;MRTIndex&gt;\]
+
+@param sampler
+The texture sampler to set, must be a number in the range \[0, OGRE\_MAX\_TEXTURE\_LAYERS-1\].
+@param Name
+The name of the local render texture to bind, as declared in [compositor\_texture](#compositor_005ftexture) and rendered to in one or more [target pass](#Compositor-Target-Passes).
+@param MRTIndex
+If the local texture that you’re referencing is a Multiple Render Target (MRT), this identifies the surface from the MRT that you wish to reference (0 is the first surface, 1 the second etc).
+
+@par
+Example: input 0 rt0
+
+<a name="compositor_005fpass_005fidentifier"></a><a name="identifier"></a>
+
+## identifier
+
+Associates a numeric identifier with the pass. This is useful for registering a listener with Ogre::CompositorInstance::addListener, and being able to identify which pass it is that’s being processed when you get events regarding it. Numbers between 0 and 2^32 are allowed.
+
+@par
+Format: identifier &lt;number&gt; 
+@par
+Example: identifier 99945 Default: identifier 0
 
 <a name="first_005frender_005fqueue"></a><a name="first_005frender_005fqueue-1"></a>
 
-### first\_render\_queue
+## first\_render\_queue
 
 For passes of type ’render\_scene’, this sets the first render queue id that is included in the render. Defaults to the value of Ogre::RENDER_QUEUE_BACKGROUND.
 @par
-Format: first\_render\_queue &lt;id&gt;
+Format: first\_render\_queue &lt;id&gt; 
 @par
 Default: first\_render\_queue 0
 
 <a name="last_005frender_005fqueue"></a><a name="last_005frender_005fqueue-1"></a>
 
-### last\_render\_queue
+## last\_render\_queue
 
 For passes of type ’render\_scene’, this sets the last render queue id that is included in the render. Defaults to the value of Ogre::RENDER_QUEUE_SKIES_LATE.
 @par
-Format: last\_render\_queue &lt;id&gt;
+Format: last\_render\_queue &lt;id&gt; 
 @par
 Default: last\_render\_queue 95
 
-<a name="compositor_005fpass_005fmaterial_005fscheme">
+<a name="compositor_005fpass_005fmaterial_005fscheme"></a><a name="material_005fscheme-2"></a>
 
-### material\_scheme
+## material\_scheme
 
-If set, indicates the material scheme to use for this pass only. Useful for performing special-case rendering effects. This will overwrite any scheme set in the parent @ref Compositor-Target-Passes.
+If set, indicates the material scheme to use for this pass only. Useful for performing special-case rendering effects. This will overwrite the scheme if set at the target scope as well. 
 @par
-Format: material\_scheme &lt;scheme name&gt;
-@par
-Default: None
-
-<a name="camera"></a>
-
-### camera
-
-Use a camera different from the output Viewport for rendering the scene into this target. Very useful for reflection effects like mirrors or water. The camera will be searched by name in the currently active scene and must be created prior to activating the compositor.
-
-The optional parameter @c align_to_face automatically rotates the camera towards the target cubemap face, when rendering to a cubic texture.
-
-@par
-Format: camera &lt;name&gt; [&lt;align_to_face&gt;]
+Format: material\_scheme &lt;scheme name&gt; 
 @par
 Default: None
 
-## clear {#Clear-Section}
+## Clear Section {#Clear-Section}
 
 For passes of type ’clear’, this section defines the buffer clearing parameters.  
 
@@ -697,7 +653,7 @@ Here are the attributes you can use in a ’clear’ section of a .compositor sc
 -   [depth\_value](#compositor_005fclear_005fdepth_005fvalue)
 -   [stencil\_value](#compositor_005fclear_005fstencil_005fvalue) <a name="compositor_005fclear_005fbuffers"></a><a name="buffers"></a>
 
-    ### buffers
+    ## buffers
 
     Sets the buffers cleared by this pass.
 
@@ -708,21 +664,19 @@ Here are the attributes you can use in a ’clear’ section of a .compositor sc
 
     <a name="compositor_005fclear_005fcolour_005fvalue"></a><a name="colour_005fvalue"></a>
 
-    ### colour\_value
+    ## colour\_value
 
-    Set the colour used to fill the colour buffer by this pass, if the colour buffer is being cleared
+    Set the colour used to fill the colour buffer by this pass, if the colour buffer is being cleared ([buffers](#compositor_005fclear_005fbuffers)).
     @par
-    Format: colour\_value (&lt;red&gt; &lt;green&gt; &lt;blue&gt; &lt;alpha&gt; | auto)
+    Format: colour\_value &lt;red&gt; &lt;green&gt; &lt;blue&gt; &lt;alpha&gt; 
     @par
     Default: colour\_value 0 0 0 0
 
-    If set to `auto` the background colour of the viewport is used, to which the parent compositor is attached to.
-
     <a name="compositor_005fclear_005fdepth_005fvalue"></a><a name="depth_005fvalue"></a>
 
-    ### depth\_value
+    ## depth\_value
 
-    Set the depth value used to fill the depth buffer by this pass, if the depth buffer is being cleared
+    Set the depth value used to fill the depth buffer by this pass, if the depth buffer is being cleared ([buffers](#compositor_005fclear_005fbuffers)).  
     @par
     Format: depth\_value &lt;depth&gt; 
     @par
@@ -730,22 +684,20 @@ Here are the attributes you can use in a ’clear’ section of a .compositor sc
 
     <a name="compositor_005fclear_005fstencil_005fvalue"></a><a name="stencil_005fvalue"></a>
 
-    ### stencil\_value
+    ## stencil\_value
 
-    Set the stencil value used to fill the stencil buffer by this pass, if the stencil buffer is being cleared
+    Set the stencil value used to fill the stencil buffer by this pass, if the stencil buffer is being cleared ([buffers](#compositor_005fclear_005fbuffers)).  
     @par
     Format: stencil\_value &lt;value&gt; 
     @par
     Default: stencil\_value 0.0
 
-## stencil {#Stencil-Section}
+## Stencil Section {#Stencil-Section}
 
 For passes of type ’stencil’, this section defines the stencil operation parameters. 
 
 @par
 Format: pass stencil { }
-
-@copydetails Ogre::StencilState
 
 Here are the attributes you can use in a ’stencil’ section of a .compositor script:
 
@@ -758,31 +710,29 @@ Here are the attributes you can use in a ’stencil’ section of a .compositor 
 -   [pass\_op](#compositor_005fstencil_005fpass_005fop)
 -   [two\_sided](#compositor_005fstencil_005ftwo_005fsided) <a name="compositor_005fstencil_005fcheck"></a><a name="check"></a>
 
-    ### check
+    ## check
 
-    Enables or disables the stencil check. The rest of the options in this section do nothing if the stencil check is off.
+    Enables or disables the stencil check, thus enabling the use of the rest of the features in this section. The rest of the options in this section do nothing if the stencil check is off. 
     @par
     Format: check (on | off)
 
     <a name="compositor_005fstencil_005fcomp_005ffunc"></a><a name="comp_005ffunc"></a>
 
-    ### comp\_func
+    ## comp\_func
 
-    @copybrief Ogre::StencilState::compareOp
+    Sets the function used to perform the following comparison: (ref\_value & mask) comp\_func (Stencil Buffer Value & mask)
 
+    What happens as a result of this comparison will be one of 3 actions on the stencil buffer, depending on whether the test fails, succeeds but with the depth buffer check still failing, or succeeds with the depth buffer check passing too. You set the actions in the [fail\_op](#compositor_005fstencil_005ffail_005fop), [depth\_fail\_op](#compositor_005fstencil_005fdepth_005ffail_005fop) and [pass\_op](#compositor_005fstencil_005fpass_005fop) respectively. If the stencil check fails, no colour or depth are written to the frame buffer. 
     @par
-    Format: comp\_func &lt;func&gt;
+    Format: comp\_func (always\_fail | always\_pass | less | less\_equal | not\_equal | greater\_equal | greater)
     @par
     Default: comp\_func always\_pass
 
-    @param func one of Ogre::CompareFunction without the `CMPF_` prefix. E.g. `CMPF_LESS_EQUAL` becomes `less_equal`.
-
     <a name="compositor_005fstencil_005fref_005fvalue"></a><a name="ref_005fvalue"></a>
 
-    ### ref\_value
+    ## ref\_value
 
-    @copybrief Ogre::StencilState::referenceValue
-
+    Sets the reference value used to compare with the stencil buffer as described in [comp\_func](#compositor_005fstencil_005fcomp_005ffunc). 
     @par
     Format: ref\_value &lt;value&gt; 
     @par
@@ -790,10 +740,9 @@ Here are the attributes you can use in a ’stencil’ section of a .compositor 
 
     <a name="compositor_005fstencil_005fmask"></a><a name="mask"></a>
 
-    ### mask
+    ## mask
 
-    @copybrief Ogre::StencilState::compareMask
-
+    Sets the mask used to compare with the stencil buffer as described in [comp\_func](#compositor_005fstencil_005fcomp_005ffunc). 
     @par
     Format: mask &lt;value&gt; 
     @par
@@ -801,49 +750,73 @@ Here are the attributes you can use in a ’stencil’ section of a .compositor 
 
     <a name="compositor_005fstencil_005ffail_005fop"></a><a name="fail_005fop"></a>
 
-    ### fail\_op
+    ## fail\_op
 
-    @copybrief Ogre::StencilState::stencilFailOp
+    Sets what to do with the stencil buffer value if the result of the stencil comparison ([comp\_func](#compositor_005fstencil_005fcomp_005ffunc)) and depth comparison is that both fail. 
+    @par
+    Format: fail\_op (keep | zero | replace | increment | decrement | increment\_wrap | decrement\_wrap | invert)
+    @par
+    Default: depth\_fail\_op keep These actions mean:
+
+    <dl compact="compact">
+    <dt>keep</dt> <dd>
+
+    Leave the stencil buffer unchanged.
+
+    </dd> <dt>zero</dt> <dd>
+
+    Set the stencil value to zero.
+
+    </dd> <dt>replace</dt> <dd>
+
+    Set the stencil value to the reference value.
+
+    </dd> <dt>increment</dt> <dd>
+
+    Add one to the stencil value, clamping at the maximum value.
+
+    </dd> <dt>decrement</dt> <dd>
+
+    Subtract one from the stencil value, clamping at 0.
+
+    </dd> <dt>increment\_wrap</dt> <dd>
+
+    Add one to the stencil value, wrapping back to 0 at the maximum.
+
+    </dd> <dt>decrement\_wrap</dt> <dd>
+
+    Subtract one from the stencil value, wrapping to the maximum below 0.
+
+    </dd> <dt>invert</dt> <dd>
+
+    invert the stencil value.
+
+    </dd> </dl> <a name="compositor_005fstencil_005fdepth_005ffail_005fop"></a><a name="depth_005ffail_005fop"></a>
+
+    ## depth\_fail\_op
+
+    Sets what to do with the stencil buffer value if the result of the stencil comparison ([comp\_func](#compositor_005fstencil_005fcomp_005ffunc)) passes but the depth comparison fails. 
 
     @par
-    Format: fail\_op &lt;op&gt;
-    @par
-    Default: fail\_op keep
-
-    @param op one of Ogre::StencilOperation without the `SOP_` prefix. E.g. `SOP_INCREMENT_WRAP` becomes `increment_wrap`.
-
-    <a name="compositor_005fstencil_005fdepth_005ffail_005fop"></a><a name="depth_005ffail_005fop"></a>
-
-    ### depth\_fail\_op
-
-    @copybrief Ogre::StencilState::depthFailOp
-
-    @par
-    Format: depth\_fail\_op &lt;op&gt;
+    Format: depth\_fail\_op (keep | zero | replace | increment | decrement | increment\_wrap | decrement\_wrap | invert)
     @par
     Default: depth\_fail\_op keep
 
-    @param op one of Ogre::StencilOperation without the `SOP_` prefix. E.g. `SOP_INCREMENT_WRAP` becomes `increment_wrap`.
-
     <a name="compositor_005fstencil_005fpass_005fop"></a><a name="pass_005fop"></a>
 
-    ### pass\_op
+    ## pass\_op
 
-    @copybrief Ogre::StencilState::depthStencilPassOp
-
+    Sets what to do with the stencil buffer value if the result of the stencil comparison ([comp\_func](#compositor_005fstencil_005fcomp_005ffunc)) and the depth comparison pass.  
     @par
-    Format: pass\_op &lt;op&gt;
+    Format: pass\_op (keep | zero | replace | increment | decrement | increment\_wrap | decrement\_wrap | invert)
     @par
     Default: pass\_op keep
 
-    @param op one of Ogre::StencilOperation without the `SOP_` prefix. E.g. `SOP_INCREMENT_WRAP` becomes `increment_wrap`.
-
     <a name="compositor_005fstencil_005ftwo_005fsided"></a><a name="two_005fsided"></a>
 
-    ### two\_sided
+    ## two\_sided
 
-    @copybrief Ogre::StencilState::twoSidedOperation
-
+    Enables or disables two-sided stencil operations, which means the inverse of the operations applies to back-facing polygons.
     @par
     Format: two\_sided (on | off)
     @par
@@ -866,42 +839,11 @@ Where viewport is a pointer to your viewport, and compositorName is the name of 
 Ogre::CompositorManager::getSingleton().setCompositorEnabled(viewport, compositorName, enabledOrDisabled);
 ```
 
-For more information on defining and using compositors, see @c Sample_Compositor in the Samples area, together with the Examples.compositor script in the media area.
-
-# Programmatic creation {#Compositor-API}
-
-In case you need to create Compositors programmatically, see the following example for how the script is mapped to the API.
-
-@snippet Samples/Media/materials/scripts/Examples.compositor glass_script
-
-becomes
-```cpp
-using namespace Ogre;
-CompositorPtr glass = CompositorManager::getSingleton().create("Glass", RGN_DEFAULT);
-
-CompositionTechnique *t = glass->createTechnique();
-auto td = t->createTextureDefinition("rt0");
-td->width = 0;
-td->height = 0;
-td->format = PF_BYTE_RGB;
-
-CompositionTargetPass *tp = t->createTargetPass();
-tp->setInputMode(CompositionTargetPass::IM_PREVIOUS);
-tp->setOutputName("rt0");
-
-CompositionTargetPass *tp = t->getOutputTargetPass();
-tp->setInputMode(CompositionTargetPass::IM_NONE);
-
-CompositionPass *pass = tp->createPass(CompositionPass::PT_RENDERQUAD)
-pass->setMaterialName("Ogre/Compositor/GlassPass");
-pass->setInput(0, "rt0");
-```
+For more information on defining and using compositors, see Demo\_Compositor in the Samples area, together with the Examples.compositor script in the media area.
 
 @page Overlay-Scripts Overlay Scripts
 
 Overlay scripts offer you the ability to define overlays in a script which can be reused easily. Whilst you could set up all overlays for a scene in code using the methods of the SceneManager, Overlay and OverlayElement classes, in practice it’s a bit unwieldy. Instead you can store overlay definitions in text files which can then be loaded whenever required.
-
-To use overlays defined in `.overlay` scripts, see [Overlays](@ref Overlays).
 
 @tableofcontents
 
@@ -1110,7 +1052,7 @@ Default: vert\_align top<br>
 
 ## left
 
-Sets the horizontal position of the element relative to its parent.
+Sets the horizontal position of the element relative to it’s parent.
 @par
 Format: left &lt;value&gt;<br> Example: left 0.5
 
@@ -1122,7 +1064,7 @@ Default: left 0<br>
 
 ## top
 
-Sets the vertical position of the element relative to its parent.
+Sets the vertical position of the element relative to it’s parent.
 @par
 Format: top &lt;value&gt;<br> Example: top 0.5
 
@@ -1202,7 +1144,7 @@ This section describes how you define their custom attributes in an .overlay scr
 
 This is the most bog-standard container you can use. It is a rectangular area which can contain other elements (or containers) and may or may not have a background, which can be tiled however you like. The background material is determined by the material attribute, but is only displayed if transparency is off.
 
-@param transparent <b>&lt;true | false&gt;</b> If set to ’true’ the panel is transparent and is not rendered itself, it is just used as a grouping level for its children.
+@param transparent <b>&lt;true | false&gt;</b> If set to ’true’ the panel is transparent and is not rendered itself, it is just used as a grouping level for it’s children.
 
 @param tiling <b>&lt;layer&gt; &lt;x\_tile&gt; &lt;y\_tile&gt;</b> Sets the number of times the texture(s) of the material are tiled across the panel in the x and y direction. &lt;layer&gt; is the texture layer, from 0 to the number of texture layers in the material minus one. By setting tiling per layer you can create some nice multitextured backdrops for your panels, this works especially well when you animate one of the layers.
 
@@ -1291,6 +1233,10 @@ Here are the attributes you need to supply:
 
 @param resolution <b>&lt;dpi&gt;</b> The resolution in dots per inch, which is used in conjunction with the point size to determine the final texture size. Typical values are 72 / 96 dpi. This should match the dpi of the screen, given that the glyps occupy `size` points after projection (i.e. in screen-space).
 
-@param code\_points <b>nn-nn \[nn-nn\] ..</b> This directive allows you to specify which unicode code points should be generated as glyphs into the font texture. If you don’t specify this, code points 32-126 will be generated by default which covers the ASCII glyphs. If you use this flag, you should specify a space-separated list of inclusive code point ranges of the form ’start-end’. Numbers must be decimal.
+@param antialias\_colour <b>&lt;true|false&gt;</b> This is an optional flag, which defaults to `false`. The generator will antialias the font by default using the alpha component of the texture, which will look fine if you use alpha blending to render your text (this is the default assumed by TextAreaOverlayElement for example). If, however you wish to use a colour based blend like add or modulate in your own code, you should set this to `true` so the colour values are anti-aliased too. If you set this to true and use alpha blending, you’ll find the edges of your font are antialiased too quickly resulting in a *thin* look to your fonts, because not only is the alpha blending the edges, the colour is fading too. Leave this option at the default if in doubt.
+
+@param code\_points <b>nn-nn \[nn-nn\] ..</b> This directive allows you to specify which unicode code points should be generated as glyphs into the font texture. If you don’t specify this, code points 33-126 will be generated by default which covers the ASCII glyphs. If you use this flag, you should specify a space-separated list of inclusive code point ranges of the form ’start-end’. Numbers must be decimal.
+
+@param character\_spacer <b>&lt;spacing\_in\_points&gt;</b> This option can be useful for fonts that are atypically wide, e.g. calligraphy fonts, where you may see artifacts from characters overlapping. The default value is 5.
 
 You can also create new fonts at runtime by using the FontManager if you wish.

@@ -56,15 +56,15 @@ namespace Ogre {
     {   
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer: reading XML data from " + filename + "...");
 
-        pugi::xml_document mXMLDoc;
-        mXMLDoc.load_file(filename.c_str());
+        mXMLDoc = new TiXmlDocument(filename);
+        mXMLDoc->LoadFile();
 
-        pugi::xml_node elem;
+        TiXmlElement* elem;
 
-        pugi::xml_node rootElem = mXMLDoc.document_element();
+        TiXmlElement* rootElem = mXMLDoc->RootElement();
         
         // Optional blend mode
-        const char* blendModeStr = rootElem.attribute("blendmode").as_string(NULL);
+        const char* blendModeStr = rootElem->Attribute("blendmode");
         if (blendModeStr)
         {
             if (String(blendModeStr) == "cumulative")
@@ -76,25 +76,25 @@ namespace Ogre {
         
 
         // Bones
-        elem = rootElem.child("bones");
+        elem = rootElem->FirstChildElement("bones");
         if (elem)
         {
             readBones(pSkeleton, elem);         
-            elem = rootElem.child("bonehierarchy");
+            elem = rootElem->FirstChildElement("bonehierarchy");
 
             if (elem)
             {
                 createHierarchy(pSkeleton, elem) ;
-                elem = rootElem.child("bones");
+                elem = rootElem->FirstChildElement("bones");
                 if (elem)
                 {
                     readBones2(pSkeleton, elem);
-                    elem = rootElem.child("animations");
+                    elem = rootElem->FirstChildElement("animations");
                     if (elem)
                     {
                         readAnimations(pSkeleton, elem);
                     }
-                    elem = rootElem.child("animationlinks");
+                    elem = rootElem->FirstChildElement("animationlinks");
                     if (elem)
                     {
                         readSkeletonAnimationLinks(pSkeleton, elem);
@@ -108,64 +108,60 @@ namespace Ogre {
 
     //---------------------------------------------------------------------
     // sets names
-    void XMLSkeletonSerializer::readBones(Skeleton* skel, pugi::xml_node& mBonesNode)
+    void XMLSkeletonSerializer::readBones(Skeleton* skel, TiXmlElement* mBonesNode)
     {
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer: Reading Bones name...");
         
         Quaternion quat ;
 
-        int max_id = -1;
-
-        for (pugi::xml_node& bonElem : mBonesNode.children())
+        for (TiXmlElement* bonElem = mBonesNode->FirstChildElement();
+            bonElem != 0; bonElem = bonElem->NextSiblingElement())
         {
-            String name = bonElem.attribute("name").value();
-            int id = StringConverter::parseInt(bonElem.attribute("id").value());
+            String name = bonElem->Attribute("name");
+            int id = StringConverter::parseInt(bonElem->Attribute("id"));               
             skel->createBone(name,id) ;
-
-            max_id = std::max(id, max_id);
         }
-
-        OgreAssert(size_t(max_id + 1) == skel->getBones().size(), "Bone ids must be consecutive in range [0; N)");
     }
     // ---------------------------------------------------------
     // set positions and orientations.
-    void XMLSkeletonSerializer::readBones2(Skeleton* skel, pugi::xml_node& mBonesNode)
+    void XMLSkeletonSerializer::readBones2(Skeleton* skel, TiXmlElement* mBonesNode)
     {
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer: Reading Bones data...");
         
         Bone* btmp ;
         Quaternion quat ;
 
-        for (pugi::xml_node& bonElem : mBonesNode.children())
+        for (TiXmlElement* bonElem = mBonesNode->FirstChildElement();
+            bonElem != 0; bonElem = bonElem->NextSiblingElement())
         {
-            String name = bonElem.attribute("name").value();
-//          int id = StringConverter::parseInt(bonElem.attribute("id").c_str();
+            String name = bonElem->Attribute("name");
+//          int id = StringConverter::parseInt(bonElem->Attribute("id"));
 
-            pugi::xml_node posElem = bonElem.child("position");
-            pugi::xml_node rotElem = bonElem.child("rotation");
-            pugi::xml_node axisElem = rotElem.child("axis");
-            pugi::xml_node scaleElem = bonElem.child("scale");
+            TiXmlElement* posElem = bonElem->FirstChildElement("position");
+            TiXmlElement* rotElem = bonElem->FirstChildElement("rotation");
+            TiXmlElement* axisElem = rotElem->FirstChildElement("axis");
+            TiXmlElement* scaleElem = bonElem->FirstChildElement("scale");
             
             Vector3 pos;
             Vector3 axis;
             Radian angle ;
             Vector3 scale;
 
-            pos.x = StringConverter::parseReal(posElem.attribute("x").value());
-            pos.y = StringConverter::parseReal(posElem.attribute("y").value());
-            pos.z = StringConverter::parseReal(posElem.attribute("z").value());
+            pos.x = StringConverter::parseReal(posElem->Attribute("x"));
+            pos.y = StringConverter::parseReal(posElem->Attribute("y"));
+            pos.z = StringConverter::parseReal(posElem->Attribute("z"));
             
-            angle = Radian(StringConverter::parseReal(rotElem.attribute("angle").value()));
+            angle = Radian(StringConverter::parseReal(rotElem->Attribute("angle")));
 
-            axis.x = StringConverter::parseReal(axisElem.attribute("x").value());
-            axis.y = StringConverter::parseReal(axisElem.attribute("y").value());
-            axis.z = StringConverter::parseReal(axisElem.attribute("z").value());
+            axis.x = StringConverter::parseReal(axisElem->Attribute("x"));
+            axis.y = StringConverter::parseReal(axisElem->Attribute("y"));
+            axis.z = StringConverter::parseReal(axisElem->Attribute("z"));
             
             // Optional scale
             if (scaleElem)
             {
                 // Uniform scale or per axis?
-                const char* factorAttrib = scaleElem.attribute("factor").as_string(NULL);
+                const char* factorAttrib = scaleElem->Attribute("factor");
                 if (factorAttrib)
                 {
                     // Uniform scale
@@ -176,17 +172,17 @@ namespace Ogre {
                 {
                     // axis scale
                     scale = Vector3::UNIT_SCALE;
-                    const char* factorString = scaleElem.attribute("x").as_string(NULL);
+                    const char* factorString = scaleElem->Attribute("x");
                     if (factorString)
                     {
                         scale.x = StringConverter::parseReal(factorString);
                     }
-                    factorString = scaleElem.attribute("y").value();
+                    factorString = scaleElem->Attribute("y");
                     if (factorString)
                     {
                         scale.y = StringConverter::parseReal(factorString);
                     }
-                    factorString = scaleElem.attribute("z").value();
+                    factorString = scaleElem->Attribute("z");
                     if (factorString)
                     {
                         scale.z = StringConverter::parseReal(factorString);
@@ -214,7 +210,7 @@ namespace Ogre {
         } // bones
     }
     //-------------------------------------------------------------------
-    void XMLSkeletonSerializer::createHierarchy(Skeleton* skel, pugi::xml_node& mHierNode) {
+    void XMLSkeletonSerializer::createHierarchy(Skeleton* skel, TiXmlElement* mHierNode) {
         
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer: Reading Hierarchy data...");
         
@@ -223,57 +219,56 @@ namespace Ogre {
         String boneName ;
         String parentName ;
 
-        for (pugi::xml_node& hierElem : mHierNode.children())
+        for (TiXmlElement* hierElem = mHierNode->FirstChildElement() ; hierElem != 0; hierElem = hierElem->NextSiblingElement())
         {
-            boneName = hierElem.attribute("bone").value();
-            parentName = hierElem.attribute("parent").value();
+            boneName = hierElem->Attribute("bone");
+            parentName = hierElem->Attribute("parent");
             bone = skel->getBone(boneName);
             parent = skel->getBone(parentName);
             parent ->addChild(bone) ;
-            //LogManager::getSingleton().logMessage("XMLSkeletonSerialiser: lien: " + parent->getName() + "->" + bone->getName().c_str();
+            //LogManager::getSingleton().logMessage("XMLSkeletonSerialiser: lien: " + parent->getName() + "->" + bone->getName());
             
         }
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::readAnimations(Skeleton* skel, pugi::xml_node& mAnimNode) {
+    void XMLSkeletonSerializer::readAnimations(Skeleton* skel, TiXmlElement* mAnimNode) {
         
         Animation * anim ;
         NodeAnimationTrack * track ;
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer: Reading Animations data...");
 
-        for (pugi::xml_node& animElem : mAnimNode.children("animation"))
+        for (TiXmlElement* animElem = mAnimNode->FirstChildElement("animation"); animElem != 0; animElem = animElem->NextSiblingElement())
         {
-            String name = animElem.attribute("name").value();
-            Real length = StringConverter::parseReal(animElem.attribute("length").value());
+            String name = animElem->Attribute("name");
+            Real length = StringConverter::parseReal(animElem->Attribute("length"));
             anim = skel->createAnimation(name,length);
             anim->setInterpolationMode(Animation::IM_LINEAR) ;
 
             
             //LogManager::getSingleton().logMessage("Animation: nom: " + name + " et longueur: "
             //  + StringConverter::toString(length) );
-            pugi::xml_node baseInfoNode = animElem.child("baseinfo");
+            TiXmlElement* baseInfoNode = animElem->FirstChildElement("baseinfo");
             if (baseInfoNode)
             {
-                String baseName = baseInfoNode.attribute("baseanimationname").value();
-                Real baseTime = StringConverter::parseReal(baseInfoNode.attribute("basekeyframetime").value());
+                String baseName = baseInfoNode->Attribute("baseanimationname");
+                Real baseTime = StringConverter::parseReal(baseInfoNode->Attribute("basekeyframetime"));
                 anim->setUseBaseKeyFrame(true, baseTime, baseName);
             }
             
             
             
             // lecture des tracks
-            pugi::xml_node tracksNode = animElem.child("tracks");
+            int trackIndex = 0;
+            TiXmlElement* tracksNode = animElem->FirstChildElement("tracks");
             
-            for (pugi::xml_node& trackElem : tracksNode.children("track"))
+            for (TiXmlElement* trackElem = tracksNode->FirstChildElement("track"); trackElem != 0; trackElem = trackElem->NextSiblingElement())
             {
-                String boneName = trackElem.attribute("bone").value();
-                Bone * bone = skel->getBone(boneName);
-                unsigned short handle = bone->getHandle();
+                String boneName = trackElem->Attribute("bone");
 
                 //LogManager::getSingleton().logMessage("Track sur le bone: " + boneName );
 
-                track = anim->createNodeTrack(handle, bone);
-                readKeyFrames(track, trackElem.child("keyframes"));
+                track = anim->createNodeTrack(trackIndex++,skel->getBone(boneName));
+                readKeyFrames(track, trackElem->FirstChildElement("keyframes"));
             }
             
         }
@@ -281,12 +276,12 @@ namespace Ogre {
 
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::readKeyFrames(NodeAnimationTrack* track, const pugi::xml_node& mKeyfNode) {
+    void XMLSkeletonSerializer::readKeyFrames(NodeAnimationTrack* track, TiXmlElement* mKeyfNode) {
         
         TransformKeyFrame* kf ;
         Quaternion q ;
 
-        for (pugi::xml_node& keyfElem : mKeyfNode.children("keyframe"))
+        for (TiXmlElement* keyfElem = mKeyfNode->FirstChildElement("keyframe"); keyfElem != 0; keyfElem = keyfElem->NextSiblingElement())
         {
             Vector3 trans;
             Vector3 axis;
@@ -294,43 +289,43 @@ namespace Ogre {
             Real time;
 
             // Get time and create keyframe
-            time = StringConverter::parseReal(keyfElem.attribute("time").value());
+            time = StringConverter::parseReal(keyfElem->Attribute("time"));
             kf = track->createNodeKeyFrame(time);
             // Optional translate
-            pugi::xml_node transElem = keyfElem.child("translate");
+            TiXmlElement* transElem = keyfElem->FirstChildElement("translate");
             if (transElem)
             {
-                trans.x = StringConverter::parseReal(transElem.attribute("x").value());
-                trans.y = StringConverter::parseReal(transElem.attribute("y").value());
-                trans.z = StringConverter::parseReal(transElem.attribute("z").value());
+                trans.x = StringConverter::parseReal(transElem->Attribute("x"));
+                trans.y = StringConverter::parseReal(transElem->Attribute("y"));
+                trans.z = StringConverter::parseReal(transElem->Attribute("z"));
                 kf->setTranslate(trans) ;
             }
             // Optional rotate
-            pugi::xml_node rotElem = keyfElem.child("rotate");
+            TiXmlElement* rotElem = keyfElem->FirstChildElement("rotate");
             if (rotElem)
             {
-                pugi::xml_node axisElem = rotElem.child("axis");
+                TiXmlElement* axisElem = rotElem->FirstChildElement("axis");
                 if (!axisElem)
                 {
                     OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, "Missing 'axis' element "
                     "expected under parent 'rotate'", "MXLSkeletonSerializer::readKeyFrames");
                 }
-                angle = Radian(StringConverter::parseReal(rotElem.attribute("angle").value()));
+                angle = Radian(StringConverter::parseReal(rotElem->Attribute("angle")));
 
-                axis.x = StringConverter::parseReal(axisElem.attribute("x").value());
-                axis.y = StringConverter::parseReal(axisElem.attribute("y").value());
-                axis.z = StringConverter::parseReal(axisElem.attribute("z").value());
+                axis.x = StringConverter::parseReal(axisElem->Attribute("x"));
+                axis.y = StringConverter::parseReal(axisElem->Attribute("y"));
+                axis.z = StringConverter::parseReal(axisElem->Attribute("z"));
 
                 q.FromAngleAxis(angle,axis);
                 kf->setRotation(q) ;
 
             }
             // Optional scale
-            pugi::xml_node scaleElem = keyfElem.child("scale");
+            TiXmlElement* scaleElem = keyfElem->FirstChildElement("scale");
             if (scaleElem)
             {
                 // Uniform scale or per axis?
-                const char* factorAttrib = scaleElem.attribute("factor").as_string(NULL);
+                const char* factorAttrib = scaleElem->Attribute("factor");
                 if (factorAttrib)
                 {
                     // Uniform scale
@@ -341,17 +336,17 @@ namespace Ogre {
                 {
                     // axis scale
                     Real xs = 1.0f, ys = 1.0f, zs=1.0f;
-                    const char* factorString = scaleElem.attribute("x").as_string(NULL);
+                    const char* factorString = scaleElem->Attribute("x");
                     if(factorString)
                     {
                         xs = StringConverter::parseReal(factorString);
                     }
-                    factorString = scaleElem.attribute("y").value();
+                    factorString = scaleElem->Attribute("y");
                     if(factorString)
                     {
                         ys = StringConverter::parseReal(factorString);
                     }
-                    factorString = scaleElem.attribute("z").value();
+                    factorString = scaleElem->Attribute("z");
                     if(factorString)
                     {
                         zs = StringConverter::parseReal(factorString);
@@ -381,15 +376,16 @@ namespace Ogre {
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer writing "
             " skeleton data to " + filename + "...");
 
-        pugi::xml_document mXMLDoc;
-        pugi::xml_node rootNode = mXMLDoc.append_child("skeleton");
+        mXMLDoc = new TiXmlDocument();
+        mXMLDoc->InsertEndChild(TiXmlElement("skeleton"));
+        TiXmlElement* rootNode = mXMLDoc->RootElement();
 
         LogManager::getSingleton().logMessage("Populating DOM...");
 
 
         // Write main skeleton data
         LogManager::getSingleton().logMessage("Exporting bones..");
-        writeSkeleton(pSkeleton, rootNode);
+        writeSkeleton(pSkeleton);
         LogManager::getSingleton().logMessage("Bones exported.");
         
         // Write all animations
@@ -397,8 +393,9 @@ namespace Ogre {
         String msg = "Exporting animations, count=" + StringConverter::toString(numAnims);
         LogManager::getSingleton().logMessage(msg);
 
-        pugi::xml_node animsNode = rootNode.append_child("animations");
-
+        TiXmlElement* animsNode = 
+            rootNode->InsertEndChild(TiXmlElement("animations"))->ToElement();
+        
         for (unsigned short i = 0; i < numAnims; ++i)
         {
             Animation* pAnim = pSkeleton->getAnimation(i);
@@ -410,12 +407,16 @@ namespace Ogre {
         }
 
         // Write links
-        if (!pSkeleton->getLinkedSkeletonAnimationSources().empty())
+        Skeleton::LinkedSkeletonAnimSourceIterator linkIt = 
+            pSkeleton->getLinkedSkeletonAnimationSourceIterator();
+        if (linkIt.hasMoreElements())
         {
             LogManager::getSingleton().logMessage("Exporting animation links.");
-            pugi::xml_node linksNode = rootNode.append_child("animationlinks");
-            for(const auto& link : pSkeleton->getLinkedSkeletonAnimationSources())
+            TiXmlElement* linksNode = 
+                rootNode->InsertEndChild(TiXmlElement("animationlinks"))->ToElement();
+            while(linkIt.hasMoreElements())
             {
+                const LinkedSkeletonAnimationSource& link = linkIt.getNext();
                 writeSkeletonAnimationLink(linksNode, link);
             }
         }
@@ -423,7 +424,7 @@ namespace Ogre {
         LogManager::getSingleton().logMessage("DOM populated, writing XML file..");
 
         // Write out to a file
-        if(! mXMLDoc.save_file(filename.c_str()) )
+        if(! mXMLDoc->SaveFile(filename) )
         {
             LogManager::getSingleton().logMessage("XMLSkeletonSerializer failed writing the XML file.", LML_CRITICAL);
         }
@@ -431,15 +432,21 @@ namespace Ogre {
         {
             LogManager::getSingleton().logMessage("XMLSkeletonSerializer export successful.");
         }
+
+        delete mXMLDoc;
+
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::writeSkeleton(const Skeleton* pSkel, pugi::xml_node& rootNode)
+    void XMLSkeletonSerializer::writeSkeleton(const Skeleton* pSkel)
     {
+        TiXmlElement* rootNode = mXMLDoc->RootElement();
+        
         // Blend mode
         String blendModeStr = pSkel->getBlendMode() == ANIMBLEND_CUMULATIVE ? "cumulative" : "average";
-        rootNode.append_attribute("blendmode") = blendModeStr.c_str();
+        rootNode->SetAttribute("blendmode", blendModeStr);
 
-        pugi::xml_node bonesElem = rootNode.append_child("bones");
+        TiXmlElement* bonesElem = 
+            rootNode->InsertEndChild(TiXmlElement("bones"))->ToElement();
 
         unsigned short numBones = pSkel->getNumBones();
         LogManager::getSingleton().logMessage("There are " + StringConverter::toString(numBones) + " bones.");
@@ -452,7 +459,8 @@ namespace Ogre {
         }
 
         // Write parents
-        pugi::xml_node hierElem = rootNode.append_child("bonehierarchy");
+        TiXmlElement* hierElem = 
+            rootNode->InsertEndChild(TiXmlElement("bonehierarchy"))->ToElement();
         for (i = 0; i < numBones; ++i)
         {
             Bone* pBone = pSkel->getBone(i);
@@ -468,168 +476,187 @@ namespace Ogre {
 
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::writeBone(pugi::xml_node& bonesElement, const Bone* pBone)
+    void XMLSkeletonSerializer::writeBone(TiXmlElement* bonesElement, const Bone* pBone)
     {
-        pugi::xml_node boneElem = bonesElement.append_child("bone");
+        TiXmlElement* boneElem = 
+            bonesElement->InsertEndChild(TiXmlElement("bone"))->ToElement();
 
+        
         // Bone name & handle
-        boneElem.append_attribute("id") = StringConverter::toString(pBone->getHandle()).c_str();
-        boneElem.append_attribute("name") = pBone->getName().c_str();
+        boneElem->SetAttribute("id", 
+            StringConverter::toString(pBone->getHandle()));
+        boneElem->SetAttribute("name", pBone->getName());
 
         // Position
-        pugi::xml_node subNode = boneElem.append_child("position");
+        TiXmlElement* subNode = 
+            boneElem->InsertEndChild(TiXmlElement("position"))->ToElement();
         Vector3 pos = pBone->getPosition();
-        subNode.append_attribute("x") = StringConverter::toString(pos.x).c_str();
-        subNode.append_attribute("y") = StringConverter::toString(pos.y).c_str();
-        subNode.append_attribute("z") = StringConverter::toString(pos.z).c_str();
+        subNode->SetAttribute("x", StringConverter::toString(pos.x));
+        subNode->SetAttribute("y", StringConverter::toString(pos.y));
+        subNode->SetAttribute("z", StringConverter::toString(pos.z));
         
         // Orientation 
         subNode = 
-            boneElem.append_child("rotation");
+            boneElem->InsertEndChild(TiXmlElement("rotation"))->ToElement();
         // Show Quaternion as angle / axis
         Radian angle;
         Vector3 axis;
         pBone->getOrientation().ToAngleAxis(angle, axis);
-        pugi::xml_node axisNode = subNode.append_child("axis");
-        subNode.append_attribute("angle") = StringConverter::toString(angle.valueRadians()).c_str();
-        axisNode.append_attribute("x") = StringConverter::toString(axis.x).c_str();
-        axisNode.append_attribute("y") = StringConverter::toString(axis.y).c_str();
-        axisNode.append_attribute("z") = StringConverter::toString(axis.z).c_str();
+        TiXmlElement* axisNode = 
+            subNode->InsertEndChild(TiXmlElement("axis"))->ToElement();
+        subNode->SetAttribute("angle", StringConverter::toString(angle.valueRadians()));
+        axisNode->SetAttribute("x", StringConverter::toString(axis.x));
+        axisNode->SetAttribute("y", StringConverter::toString(axis.y));
+        axisNode->SetAttribute("z", StringConverter::toString(axis.z));
 
         // Scale optional
         Vector3 scale = pBone->getScale();
         if (scale != Vector3::UNIT_SCALE)
         {
-            pugi::xml_node scaleNode = boneElem.append_child("scale");
-            scaleNode.append_attribute("x") = StringConverter::toString(scale.x).c_str();
-            scaleNode.append_attribute("y") = StringConverter::toString(scale.y).c_str();
-            scaleNode.append_attribute("z") = StringConverter::toString(scale.z).c_str();
+            TiXmlElement* scaleNode =
+                boneElem->InsertEndChild(TiXmlElement("scale"))->ToElement();
+            scaleNode->SetAttribute("x", StringConverter::toString(scale.x));
+            scaleNode->SetAttribute("y", StringConverter::toString(scale.y));
+            scaleNode->SetAttribute("z", StringConverter::toString(scale.z));
         }
 
 
     }
     //---------------------------------------------------------------------
     // 
-    // Modifications effectuï¿½es:
+    // Modifications effectuées:
     //
     // on stoque les noms et pas les Id. c'est plus lisibles.
 
 
-    void XMLSkeletonSerializer::writeBoneParent(pugi::xml_node& boneHierarchyNode,
-        const String& boneName, const String& parentName)
+    void XMLSkeletonSerializer::writeBoneParent(TiXmlElement* boneHierarchyNode, 
+        String boneName, String parentName)
     {
-        pugi::xml_node boneParentNode = boneHierarchyNode.append_child("boneparent");
+        TiXmlElement* boneParentNode = 
+            boneHierarchyNode->InsertEndChild(TiXmlElement("boneparent"))->ToElement();
         /*
-        boneParentNode.append_attribute("boneid") = StringConverter::toString(boneId).c_str();
-        boneParentNode.append_attribute("parentid") = StringConverter::toString(parentId).c_str();
+        boneParentNode->SetAttribute("boneid", StringConverter::toString(boneId));
+        boneParentNode->SetAttribute("parentid", StringConverter::toString(parentId));
         */
         // Modifications: on stoque les noms./ 
-        boneParentNode.append_attribute("bone") = boneName.c_str();
-        boneParentNode.append_attribute("parent") = parentName.c_str();
+        boneParentNode->SetAttribute("bone", boneName);
+        boneParentNode->SetAttribute("parent", parentName);
 
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::writeAnimation(pugi::xml_node& animsNode,
+    void XMLSkeletonSerializer::writeAnimation(TiXmlElement* animsNode, 
         const Animation* anim)
     {
-        pugi::xml_node animNode = animsNode.append_child("animation");
+        TiXmlElement* animNode = 
+            animsNode->InsertEndChild(TiXmlElement("animation"))->ToElement();
 
-        animNode.append_attribute("name") = anim->getName().c_str();
-        animNode.append_attribute("length") = StringConverter::toString(anim->getLength()).c_str();
+        animNode->SetAttribute("name", anim->getName());
+        animNode->SetAttribute("length", StringConverter::toString(anim->getLength()));
         
         // Optional base keyframe information
         if (anim->getUseBaseKeyFrame())
         {
-            pugi::xml_node baseInfoNode = animNode.append_child("baseinfo");
-            baseInfoNode.append_attribute("baseanimationname") = anim->getBaseKeyFrameAnimationName().c_str();
-            baseInfoNode.append_attribute("basekeyframetime") = StringConverter::toString(anim->getBaseKeyFrameTime()).c_str();
+            TiXmlElement* baseInfoNode = 
+                animNode->InsertEndChild(TiXmlElement("baseinfo"))->ToElement();
+            baseInfoNode->SetAttribute("baseanimationname", anim->getBaseKeyFrameAnimationName());
+            baseInfoNode->SetAttribute("basekeyframetime", StringConverter::toString(anim->getBaseKeyFrameTime()));
         }
 
         // Write all tracks
-        pugi::xml_node tracksNode = animNode.append_child("tracks");
+        TiXmlElement* tracksNode = 
+            animNode->InsertEndChild(TiXmlElement("tracks"))->ToElement();
 
-        for (const auto& it : anim->_getNodeTrackList())
+        Animation::NodeTrackIterator trackIt = anim->getNodeTrackIterator();
+        while (trackIt.hasMoreElements())
         {
-            writeAnimationTrack(tracksNode, it.second);
+            writeAnimationTrack(tracksNode, trackIt.getNext());
         }
 
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::writeAnimationTrack(pugi::xml_node& tracksNode,
+    void XMLSkeletonSerializer::writeAnimationTrack(TiXmlElement* tracksNode, 
         const NodeAnimationTrack* track)
     {
-        pugi::xml_node trackNode = tracksNode.append_child("track");
-
+        TiXmlElement* trackNode = 
+            tracksNode->InsertEndChild(TiXmlElement("track"))->ToElement();
+        
+        
         // unsigned short boneIndex     : Index of bone to apply to
         Bone* bone = (Bone*)track->getAssociatedNode();
         //unsigned short boneid = bone->getHandle();
         String boneName = bone->getName();
-        trackNode.append_attribute("bone") = boneName.c_str();
+        trackNode->SetAttribute("bone", boneName);
 
         // Write all keyframes
-        pugi::xml_node keysNode =
-            trackNode.append_child("keyframes");
+        TiXmlElement* keysNode = 
+            trackNode->InsertEndChild(TiXmlElement("keyframes"))->ToElement();
         for (unsigned short i = 0; i < track->getNumKeyFrames(); ++i)
         {
             writeKeyFrame(keysNode, track->getNodeKeyFrame(i));
         }
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::writeKeyFrame(pugi::xml_node& keysNode,
+    void XMLSkeletonSerializer::writeKeyFrame(TiXmlElement* keysNode, 
         const TransformKeyFrame* key)
     {
-        pugi::xml_node keyNode = keysNode.append_child("keyframe");
+        TiXmlElement* keyNode = 
+            keysNode->InsertEndChild(TiXmlElement("keyframe"))->ToElement();
 
-        keyNode.append_attribute("time") = StringConverter::toString(key->getTime()).c_str();
+        keyNode->SetAttribute("time", StringConverter::toString(key->getTime()));
 
-        pugi::xml_node transNode =
-            keyNode.append_child("translate");
+        TiXmlElement* transNode = 
+            keyNode->InsertEndChild(TiXmlElement("translate"))->ToElement();
         Vector3 trans = key->getTranslate();
-        transNode.append_attribute("x") = StringConverter::toString(trans.x).c_str();
-        transNode.append_attribute("y") = StringConverter::toString(trans.y).c_str();
-        transNode.append_attribute("z") = StringConverter::toString(trans.z).c_str();
+        transNode->SetAttribute("x", StringConverter::toString(trans.x));
+        transNode->SetAttribute("y", StringConverter::toString(trans.y));
+        transNode->SetAttribute("z", StringConverter::toString(trans.z));
 
-        pugi::xml_node rotNode = keyNode.append_child("rotate");
+        TiXmlElement* rotNode = 
+            keyNode->InsertEndChild(TiXmlElement("rotate"))->ToElement();
         // Show Quaternion as angle / axis
         Radian angle;
         Vector3 axis;
         key->getRotation().ToAngleAxis(angle, axis);
-        pugi::xml_node axisNode = rotNode.append_child("axis");
-        rotNode.append_attribute("angle") = StringConverter::toString(angle.valueRadians()).c_str();
-        axisNode.append_attribute("x") = StringConverter::toString(axis.x).c_str();
-        axisNode.append_attribute("y") = StringConverter::toString(axis.y).c_str();
-        axisNode.append_attribute("z") = StringConverter::toString(axis.z).c_str();
+        TiXmlElement* axisNode = 
+            rotNode->InsertEndChild(TiXmlElement("axis"))->ToElement();
+        rotNode->SetAttribute("angle", StringConverter::toString(angle.valueRadians()));
+        axisNode->SetAttribute("x", StringConverter::toString(axis.x));
+        axisNode->SetAttribute("y", StringConverter::toString(axis.y));
+        axisNode->SetAttribute("z", StringConverter::toString(axis.z));
 
         // Scale optional
         if (key->getScale() != Vector3::UNIT_SCALE)
         {
-            pugi::xml_node scaleNode = keyNode.append_child("scale");
+            TiXmlElement* scaleNode = 
+                keyNode->InsertEndChild(TiXmlElement("scale"))->ToElement();
 
-            scaleNode.append_attribute("x") = StringConverter::toString(key->getScale().x).c_str();
-            scaleNode.append_attribute("y") = StringConverter::toString(key->getScale().y).c_str();
-            scaleNode.append_attribute("z") = StringConverter::toString(key->getScale().z).c_str();
+            scaleNode->SetAttribute("x", StringConverter::toString(key->getScale().x));
+            scaleNode->SetAttribute("y", StringConverter::toString(key->getScale().y));
+            scaleNode->SetAttribute("z", StringConverter::toString(key->getScale().z));
         }
 
     }
     //---------------------------------------------------------------------
-    void XMLSkeletonSerializer::writeSkeletonAnimationLink(pugi::xml_node& linksNode,
+    void XMLSkeletonSerializer::writeSkeletonAnimationLink(TiXmlElement* linksNode, 
         const LinkedSkeletonAnimationSource& link)
     {
-        pugi::xml_node linkNode = linksNode.append_child("animationlink");
-        linkNode.append_attribute("skeletonName") = link.skeletonName.c_str();
-        linkNode.append_attribute("scale") = StringConverter::toString(link.scale).c_str();
+        TiXmlElement* linkNode = 
+            linksNode->InsertEndChild(TiXmlElement("animationlink"))->ToElement();
+        linkNode->SetAttribute("skeletonName", link.skeletonName);
+        linkNode->SetAttribute("scale", StringConverter::toString(link.scale));
 
     }
     //---------------------------------------------------------------------
     void XMLSkeletonSerializer::readSkeletonAnimationLinks(Skeleton* skel, 
-        pugi::xml_node& linksNode)
+        TiXmlElement* linksNode)
     {
         LogManager::getSingleton().logMessage("XMLSkeletonSerializer: Reading Animations links...");
 
-        for (pugi::xml_node& linkElem : linksNode.children("animationlink"))
+        for (TiXmlElement* linkElem = linksNode->FirstChildElement("animationlink"); 
+            linkElem != 0; linkElem = linkElem->NextSiblingElement())
         {
-            String skelName = linkElem.attribute("skeletonName").value();
-            const char* strScale = linkElem.attribute("scale").as_string(NULL);
+            String skelName = linkElem->Attribute("skeletonName");
+            const char* strScale = linkElem->Attribute("scale");
             Real scale;
             // Scale optional
             if (strScale == 0)

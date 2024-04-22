@@ -10,26 +10,34 @@
 # Configure Tests build
 if (OGRE_BUILD_TESTS)
 
-  if(NOT EXISTS ${PROJECT_BINARY_DIR}/googletest-1.11.0)
-    message(STATUS "Building gtest")
-    file(DOWNLOAD
-        https://github.com/google/googletest/archive/refs/tags/release-1.11.0.tar.gz
-        ${PROJECT_BINARY_DIR}/release-1.11.0.tar.gz)
-    execute_process(COMMAND ${CMAKE_COMMAND}
-        -E tar xf release-1.11.0.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
-    execute_process(COMMAND ${BUILD_COMMAND_COMMON}
-        ${PROJECT_BINARY_DIR}/googletest-release-1.11.0
-        -Dgtest_force_shared_crt=TRUE
-        -DBUILD_GMOCK=FALSE
-        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/googletest-release-1.11.0)
-    execute_process(COMMAND ${CMAKE_COMMAND}
-        --build ${PROJECT_BINARY_DIR}/googletest-release-1.11.0 ${BUILD_COMMAND_OPTS})
-  endif()
-  find_package(GTest REQUIRED CONFIG)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Common/include)
 
+    if(APPLE AND NOT APPLE_IOS)
+        set(CROSS ${CROSS} -DCMAKE_CXX_FLAGS=-stdlib=libc++)
+    endif()
+    
+    if(MSVC)
+        set(CROSS ${CROSS} -DCMAKE_CXX_FLAGS=-D_SILENCE_TR1_NAMESPACE_DEPRECATION_WARNING)
+    endif()
+
+    set(GTEST_INSTALL_DIR ${CMAKE_BINARY_DIR}/gtest)
+    include(ExternalProject)
+    ExternalProject_Add(googletest
+        URL https://github.com/google/googletest/archive/release-1.8.0.tar.gz
+        SOURCE_DIR ${GTEST_INSTALL_DIR}
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=${GTEST_INSTALL_DIR}
+            -DBUILD_SHARED_LIBS=FALSE
+            -DBUILD_GMOCK=FALSE
+            -DBUILD_GTEST=TRUE
+            -Dgtest_force_shared_crt=TRUE
+            -G ${CMAKE_GENERATOR}
+            -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+            ${CROSS})
+
     # unit tests are go!
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OgreMain/include)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/OgreMain/include ${GTEST_INSTALL_DIR}/include)
+    link_directories(${GTEST_INSTALL_DIR}/lib)
     
     file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/OgreMain/include/*.h")
     file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/OgreMain/src/*.cpp"
@@ -65,7 +73,7 @@ if (OGRE_BUILD_TESTS)
       list(APPEND SOURCE_FILES Components/RTShaderSystemTests.cpp)
     endif ()
     
-    if(TARGET OgreGLSupport)
+    if(TEST_GLSUPPORT)
       set(OGRE_LIBRARIES ${OGRE_LIBRARIES} OgreGLSupport)
       list(APPEND SOURCE_FILES RenderSystems/GLSupport/GLSLTests.cpp)
     endif()
@@ -79,13 +87,10 @@ if (OGRE_BUILD_TESTS)
       add_definitions(-Wno-undef)
     endif()
     add_executable(Test_Ogre ${HEADER_FILES} ${SOURCE_FILES} ${RESOURCE_FILES} )
+    add_dependencies(Test_Ogre googletest)
     ogre_install_target(Test_Ogre "" FALSE)
-    target_link_libraries(Test_Ogre OgreBites Codec_STBI ${OGRE_LIBRARIES} GTest::gtest)
+    target_link_libraries(Test_Ogre OgreBites Codec_STBI ${OGRE_LIBRARIES} gtest)
     
-    add_test(NAME Test_Ogre
-        COMMAND $<TARGET_FILE_NAME:Test_Ogre>
-        WORKING_DIRECTORY $<TARGET_FILE_DIR:Test_Ogre>)
-
     if(ANDROID)
         set_target_properties(Test_Ogre PROPERTIES LINK_FLAGS -pie)
     endif()
@@ -94,6 +99,8 @@ if (OGRE_BUILD_TESTS)
       set_property(TARGET Test_Ogre PROPERTY MACOSX_BUNDLE TRUE)
       set(OGRE_BUILT_FRAMEWORK "$(PLATFORM_NAME)/$(CONFIGURATION)")
       set(OGRE_TEST_CONTENTS_PATH ${PROJECT_BINARY_DIR}/bin/$(CONFIGURATION)/Test_Ogre.app/Contents)
+      set_target_properties(Test_Ogre PROPERTIES
+        LINK_FLAGS "-framework Carbon -framework Cocoa")
       add_custom_command(TARGET Test_Ogre POST_BUILD
         COMMAND mkdir ARGS -p ${OGRE_TEST_CONTENTS_PATH}/Resources/Media/CustomCapabilities
         COMMAND ditto
@@ -107,6 +114,8 @@ if (OGRE_BUILD_TESTS)
         COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/resources.cfg
         ${OGRE_TEST_CONTENTS_PATH}/Resources/
         COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/samples.cfg
+        ${OGRE_TEST_CONTENTS_PATH}/Resources/
+        COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/quakemap.cfg
         ${OGRE_TEST_CONTENTS_PATH}/Resources/
         COMMAND ditto
         ${PROJECT_SOURCE_DIR}/Samples/Media/ ${OGRE_TEST_CONTENTS_PATH}/Resources/Media/
@@ -140,12 +149,10 @@ if (OGRE_BUILD_TESTS)
         Plugin_OctreeZone
         Plugin_ParticleFX
         Plugin_PCZSceneManager
-        Plugin_DotScene
         Codec_STBI
         Codec_FreeImage
         RenderSystem_GL
         RenderSystem_GL3Plus
-        RenderSystem_Metal
       )
   
       foreach(FWK ${FRAMEWORKS})

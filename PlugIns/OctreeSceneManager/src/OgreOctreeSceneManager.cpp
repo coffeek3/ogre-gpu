@@ -528,6 +528,22 @@ void OctreeSceneManager::_updateSceneGraph( Camera * cam )
     SceneManager::_updateSceneGraph( cam );
 }
 
+void OctreeSceneManager::_alertVisibleObjects( void )
+{
+    OGRE_EXCEPT( Exception::ERR_NOT_IMPLEMENTED,
+        "Function doesn't do as advertised",
+        "OctreeSceneManager::_alertVisibleObjects" );
+
+//    Octree::NodeList::iterator it = mVisible.begin();
+//
+//    while ( it != mVisible.end() )
+//    {
+//        OctreeNode * node = *it;
+//
+//        ++it;
+//    }
+}
+
 void OctreeSceneManager::_findVisibleObjects(Camera * cam, 
     VisibleObjectsBoundsInfo* visibleBounds, bool onlyShadowCasters )
 {
@@ -613,8 +629,12 @@ void OctreeSceneManager::walkOctree( OctreeCamera *camera, RenderQueue *queue,
 
                 mVisible.push_back( sn );
 
-                if (getDebugDrawer())
-                    getDebugDrawer()->drawSceneNode(sn);
+                if ( mDisplayNodes )
+                    queue -> addRenderable( sn->getDebugRenderable() );
+
+                // check if the scene manager or this node wants the bounding box shown.
+                if (sn->getShowBoundingBox() || mShowBoundingBoxes)
+                    sn->_addBoundingBoxToQueue(queue);
             }
 
             ++it;
@@ -1108,10 +1128,22 @@ OctreeSceneManager::createIntersectionQuery(uint32 mask)
 //-----------------------------------------------------------------------
 const String OctreeSceneManagerFactory::FACTORY_TYPE_NAME = "OctreeSceneManager";
 //-----------------------------------------------------------------------
+void OctreeSceneManagerFactory::initMetaData(void) const
+{
+    mMetaData.typeName = FACTORY_TYPE_NAME;
+    mMetaData.worldGeometrySupported = false;
+}
+//-----------------------------------------------------------------------
 SceneManager* OctreeSceneManagerFactory::createInstance(
     const String& instanceName)
 {
     return OGRE_NEW OctreeSceneManager(instanceName);
 }
+//-----------------------------------------------------------------------
+void OctreeSceneManagerFactory::destroyInstance(SceneManager* instance)
+{
+    OGRE_DELETE instance;
+}
+
 
 }

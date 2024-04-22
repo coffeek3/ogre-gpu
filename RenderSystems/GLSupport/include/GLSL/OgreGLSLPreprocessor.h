@@ -32,8 +32,6 @@
 #include "OgrePlatform.h"
 #include <string.h>
 #include <stdlib.h>
-#include <forward_list>
-#include <vector>
 
 namespace Ogre {
 
@@ -161,7 +159,7 @@ namespace Ogre {
             void SetValue (long iValue);
 
             /// Test two tokens for equality
-            bool operator == (const Token &iOther) const
+            bool operator == (const Token &iOther)
             {
                 if (iOther.Length != Length)
                     return false;
@@ -175,23 +173,31 @@ namespace Ogre {
         public:
             /// Macro name
             Token Name;
+            /// Number of arguments
+            int NumArgs;
             /// The names of the arguments
-            std::vector<Token> Args;
+            Token *Args;
             /// The macro value
             Token Value;
             /// Unparsed macro body (keeps the whole raw unparsed macro body)
             Token Body;
+            /// Next macro in chained list
+            Macro *Next;
             /// A pointer to function implementation (if macro is really a func)
-            Token (*ExpandFunc) (CPreprocessor *iParent, const std::vector<Token>& iArgs);
+            Token (*ExpandFunc) (CPreprocessor *iParent, int iNumArgs, Token *iArgs);
             /// true if macro expansion is in progress
             bool Expanding;
 
-            Macro(const Token& iName) : Name(iName), ExpandFunc(NULL), Expanding(false) {}
+            Macro (const Token &iName) :
+            Name (iName), NumArgs (0), Args (NULL), Next (NULL),
+                ExpandFunc (NULL), Expanding (false)
+            { }
 
-            // Macro(Macro&&) = default; // TODO unsupported by VS2013
+            ~Macro ()
+            { delete [] Args; delete Next; }
 
             /// Expand the macro value (will not work for functions)
-            Token Expand (const std::vector<Token>& iArgs, std::forward_list<Macro>& iMacros);
+            Token Expand (int iNumArgs, Token *iArgs, Macro *iMacros);
         };
 
         friend class CPreprocessor::Macro;
@@ -204,13 +210,10 @@ namespace Ogre {
         int Line;
         /// True if we are at beginning of line
         bool BOL;
-        /// Are we expanding a macro?
-        bool SupplimentaryExpand;
         /// A stack of 32 booleans packed into one value :)
         unsigned EnableOutput;
-        unsigned EnableElif;
         /// The list of macros defined so far
-        std::forward_list<Macro> MacroList;
+        Macro *MacroList;
 
         /**
          * Private constructor to re-parse a single token.
@@ -285,9 +288,6 @@ namespace Ogre {
          */
         bool HandleIf (Token &iBody, int iLine);
 
-        /// @overload
-        bool HandleIf(bool val, int iLine);
-
         /**
          * Handle an #elif directive.
          * @param iBody
@@ -343,6 +343,8 @@ namespace Ogre {
 
         /**
          * Get all the arguments of a macro: '(' arg1 { ',' arg2 { ',' ... }} ')'
+         * @param oNumArgs
+         *     Number of parsed arguments is stored into this variable.
          * @param oArgs
          *     This is set to a pointer to an array of parsed arguments.
          * @param shouldAppendArg
@@ -351,7 +353,7 @@ namespace Ogre {
          *     If false, parameters are not expanded and no expressions are
          *     allowed; only a single keyword is expected per argument.
          */
-        Token GetArguments (std::vector<Token>& oArgs, bool iExpand, bool shouldAppendArg);
+        Token GetArguments (int &oNumArgs, Token *&oArgs, bool iExpand, bool shouldAppendArg);
 
         /**
          * Parse an expression, compute it and return the result.
@@ -385,10 +387,6 @@ namespace Ogre {
          */
         bool GetValue (const Token &iToken, long &oValue, int iLine);
 
-        /// @overload
-        /// same as above, but considers the defined() function
-        bool GetValueDef(const Token &iToken, long &oValue, int iLine);
-
         /**
          * Expand the given macro, if it exists.
          * If macro has arguments, they are collected from source stream.
@@ -412,12 +410,14 @@ namespace Ogre {
          * The implementation of the defined() preprocessor function
          * @param iParent
          *     The parent preprocessor object
+         * @param iNumArgs
+         *     Number of arguments
          * @param iArgs
          *     The arguments themselves
          * @return
          *     The return value encapsulated in a token
          */
-        static Token ExpandDefined (CPreprocessor *iParent, const std::vector<Token>& iArgs);
+        static Token ExpandDefined (CPreprocessor *iParent, int iNumArgs, Token *iArgs);
 
         /**
          * Parse the input string and return a token containing the whole output.
@@ -441,7 +441,8 @@ namespace Ogre {
 
     public:
         /// Create an empty preprocessor object
-        CPreprocessor();
+        CPreprocessor () : MacroList (NULL)
+        { }
 
         /// Destroy the preprocessor object
         virtual ~CPreprocessor ();
@@ -461,13 +462,15 @@ namespace Ogre {
                      const char *iMacroValue, size_t iMacroValueLen);
 
         /**
-         * Define a symbolical macro.
+         * Define a numerical macro.
          * @param iMacroName
          *     The name of the defined macro
          * @param iMacroNameLen
          *     The length of the name of the defined macro
+         * @param iMacroValue
+         *     The value of the defined macro
          */
-        void Define (const char *iMacroName, size_t iMacroNameLen);
+        void Define (const char *iMacroName, size_t iMacroNameLen, long iMacroValue);
 
         /**
          * Undefine a macro.

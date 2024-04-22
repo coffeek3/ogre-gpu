@@ -53,8 +53,23 @@ namespace Ogre {
     class _OgreGL3PlusExport GLSLProgramManager : public GLSLProgramManagerCommon, public Singleton<GLSLProgramManager>
     {
     protected:
+        /// Active shader objects defining the active program object.
+        GLSLShader* mActiveVertexShader;
+        GLSLShader* mActiveHullShader;
+        GLSLShader* mActiveDomainShader;
+        GLSLShader* mActiveGeometryShader;
+        GLSLShader* mActiveFragmentShader;
+        GLSLShader* mActiveComputeShader;
+
+        /// active objects defining the active rendering gpu state
+        GLSLProgram* mActiveProgram;
+
         GL3PlusRenderSystem* mRenderSystem;
 
+        /**  Convert GL uniform size and type to OGRE constant types
+             and associate uniform definitions together. */
+        void convertGLUniformtoOgreType(GLenum gltype,
+                                        GpuConstantDefinition& defToUpdate);
         /** Find the data source definition for a given uniform name
             and reference. Return true if found and pair the reference
             with its data source. */
@@ -62,6 +77,13 @@ namespace Ogre {
             const String& paramName,
             const GpuConstantDefinitionMap* (&constantDefs)[6],
             GLUniformReference& refToUpdate);
+        /** Find the data source definition for a given atomic counter
+            uniform name and reference. Return true if found and pair
+            the reference with its data source. */
+        static bool findAtomicCounterDataSource(
+            const String& paramName,
+            const GpuConstantDefinitionMap* (&constantDefs)[6],
+            GLAtomicCounterReference& refToUpdate);
     public:
 
         GLSLProgramManager(GL3PlusRenderSystem* renderSystem);
@@ -74,12 +96,34 @@ namespace Ogre {
         */
         GLSLProgram* getActiveProgram(void);
 
+        /** Set the shader for the next rendering state.
+            The active program object will be cleared.  Normally
+            called from the GLSLShader::bindProgram and
+            unbindProgram methods
+        */
+        void setActiveVertexShader(GLSLShader* vertexGpuProgram);
+        /// @copydoc setActiveVertexShader
+        void setActiveHullShader(GLSLShader* hullGpuProgram);
+        /// @copydoc setActiveVertexShader
+        void setActiveDomainShader(GLSLShader* domainGpuProgram);
+        /// @copydoc setActiveVertexShader
+        void setActiveGeometryShader(GLSLShader* geometryGpuProgram);
+        /// @copydoc setActiveVertexShader
+        void setActiveFragmentShader(GLSLShader* fragmentGpuProgram);
+        /// @copydoc setActiveVertexShader
+        void setActiveComputeShader(GLSLShader* computeGpuProgram);
+
         /** Populate a list of uniforms based on an OpenGL program object.
         */
         void extractUniformsFromProgram(
             GLuint programObject,
             const GpuConstantDefinitionMap* (&constantDefs)[6],
-            GLUniformReferenceList& uniformList);
+            GLUniformReferenceList& uniformList,
+            GLAtomicCounterReferenceList& counterList,
+            GLUniformBufferList& uniformBufferList,
+            SharedParamsBufferMap& sharedParamsBufferMap,
+            //GLShaderStorageBufferList& shaderStorageBufferList,
+            GLCounterBufferList& counterBufferList);
 
         GL3PlusStateCacheManager* getStateCacheManager();
 

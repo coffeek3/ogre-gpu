@@ -32,15 +32,13 @@ THE SOFTWARE.
 #include "OgrePass.h"
 #include "OgreTextureUnitState.h"
 #include "OgreGpuProgramManager.h"
+#include "OgreHighLevelGpuProgramManager.h"
 #include "OgreShadowCameraSetupPSSM.h"
 #include "OgreLogManager.h"
 #include "OgreHighLevelGpuProgram.h"
 #include "OgreRoot.h"
 #include "OgreRenderSystem.h"
-#include "OgreTextureManager.h"
-
-#include "OgreShaderGenerator.h"
-#include "OgreTerrainRTShaderSRS.h"
+#include "OgreTerrainMaterialShaderHelpers.h"
 
 #include <fstream>
 #include <string>
@@ -48,42 +46,29 @@ THE SOFTWARE.
 namespace Ogre
 {
     //---------------------------------------------------------------------
-    TerrainMaterialGeneratorA::TerrainMaterialGeneratorA() :
-        mLightmapEnabled(true),
-        mCompositeMapEnabled(true),
-        mReceiveDynamicShadows(true),
-        mLowLodShadows(false)
+    TerrainMaterialGeneratorA::TerrainMaterialGeneratorA()
     {
         // define the layers
         // We expect terrain textures to have no alpha, so we use the alpha channel
         // in the albedo texture to store specular reflection
         // similarly we double-up the normal and height (for parallax)
-        mLayerDecl = {{"albedo_specular", PF_BYTE_RGBA}, {"normal_height", PF_BYTE_RGBA}};
+        mLayerDecl.samplers.push_back(TerrainLayerSampler("albedo_specular", PF_BYTE_RGBA));
+        mLayerDecl.samplers.push_back(TerrainLayerSampler("normal_height", PF_BYTE_RGBA));
+        
+        mLayerDecl.elements.push_back(
+            TerrainLayerSamplerElement(0, TLSS_ALBEDO, 0, 3));
+        mLayerDecl.elements.push_back(
+            TerrainLayerSamplerElement(0, TLSS_SPECULAR, 3, 1));
+        mLayerDecl.elements.push_back(
+            TerrainLayerSamplerElement(1, TLSS_NORMAL, 0, 3));
+        mLayerDecl.elements.push_back(
+            TerrainLayerSamplerElement(1, TLSS_HEIGHT, 3, 1));
 
-        mActiveProfile.reset(new SM2Profile(this));
 
-        using namespace RTShader;
+        mProfiles.push_back(OGRE_NEW SM2Profile(this, "SM2", "Profile for rendering on Shader Model 2 capable cards"));
 
-        if (!ShaderGenerator::getSingletonPtr())
-        {
-            LogManager::getSingleton().logError(
-                "TerrainMaterialGeneratorA - Shader generation not possible: RTSS is not initialized.");
-            return;
-        }
-
-        static SubRenderStateFactory* factory = nullptr;
-        if(!factory)
-        {
-            factory = new TerrainTransformFactory;
-            ShaderGenerator::getSingleton().addSubRenderStateFactory(factory);
-            factory = new TerrainSurfaceFactory;
-            ShaderGenerator::getSingleton().addSubRenderStateFactory(factory);
-        }
-
-        mMainRenderState.reset(new RenderState());
-        mMainRenderState->setLightCount(1);
-        mMainRenderState->addTemplateSubRenderStates(
-            {"TerrainTransform", "TerrainSurface", SRS_PER_PIXEL_LIGHTING, SRS_FOG});
+        // TODO - check hardware capabilities & use fallbacks if required (more profiles needed)
+        setActiveProfile(mProfiles.back());
     }
     //---------------------------------------------------------------------
     TerrainMaterialGeneratorA::~TerrainMaterialGeneratorA()
@@ -92,26 +77,48 @@ namespace Ogre
     }
     //---------------------------------------------------------------------
     //---------------------------------------------------------------------
-    TerrainMaterialGeneratorA::SM2Profile::SM2Profile(TerrainMaterialGeneratorA* parent)
-        : mParent(parent)
+    TerrainMaterialGeneratorA::SM2Profile::SM2Profile(TerrainMaterialGenerator* parent, const String& name, const String& desc)
+        : Profile(parent, name, desc)
+        , mShaderGen(0)
         , mLayerNormalMappingEnabled(true)
         , mLayerParallaxMappingEnabled(true)
-        , mLayerParallaxOcclusionMappingEnabled(true)
         , mLayerSpecularMappingEnabled(true)
+        , mGlobalColourMapEnabled(true)
+        , mLightmapEnabled(true)
+        , mCompositeMapEnabled(true)
+        , mReceiveDynamicShadows(true)
         , mPSSM(0)
+        , mDepthShadows(false)
+        , mLowLodShadows(false)
     {
+        HighLevelGpuProgramManager& hmgr = HighLevelGpuProgramManager::getSingleton();
+
+        if (hmgr.isLanguageSupported("glsl") || hmgr.isLanguageSupported("glsles"))
+        {
+            mShaderGen = OGRE_NEW ShaderHelperGLSL();
+        }
+        else if (hmgr.isLanguageSupported("cg") || hmgr.isLanguageSupported("hlsl"))
+        {
+            mShaderGen = OGRE_NEW ShaderHelperCg();
+        }
     }
     //---------------------------------------------------------------------
     TerrainMaterialGeneratorA::SM2Profile::~SM2Profile()
     {
+        OGRE_DELETE mShaderGen;
     }   
     //---------------------------------------------------------------------
-    void TerrainMaterialGeneratorA::requestOptions(Terrain* terrain)
+    void TerrainMaterialGeneratorA::SM2Profile::requestOptions(Terrain* terrain)
     {
         terrain->_setMorphRequired(true);
         terrain->_setNormalMapRequired(true);
         terrain->_setLightMapRequired(mLightmapEnabled, true);
         terrain->_setCompositeMapRequired(mCompositeMapEnabled);
+    }
+    //---------------------------------------------------------------------
+    bool TerrainMaterialGeneratorA::SM2Profile::isVertexCompressionSupported() const
+    {
+        return mShaderGen && mShaderGen->isVertexCompressionSupported();
     }
     //---------------------------------------------------------------------
     void TerrainMaterialGeneratorA::SM2Profile::setLayerNormalMappingEnabled(bool enabled)
@@ -132,15 +139,6 @@ namespace Ogre
         }
     }
     //---------------------------------------------------------------------
-    void TerrainMaterialGeneratorA::SM2Profile::setLayerParallaxOcclusionMappingEnabled(bool enabled)
-    {
-        if (enabled != mLayerParallaxOcclusionMappingEnabled)
-        {
-            mLayerParallaxOcclusionMappingEnabled = enabled;
-            mParent->_markChanged();
-        }
-    }
-    //---------------------------------------------------------------------
     void TerrainMaterialGeneratorA::SM2Profile::setLayerSpecularMappingEnabled(bool enabled)
     {
         if (enabled != mLayerSpecularMappingEnabled)
@@ -150,30 +148,39 @@ namespace Ogre
         }
     }
     //---------------------------------------------------------------------
-    void  TerrainMaterialGeneratorA::setLightmapEnabled(bool enabled)
+    void  TerrainMaterialGeneratorA::SM2Profile::setGlobalColourMapEnabled(bool enabled)
+    {
+        if (enabled != mGlobalColourMapEnabled)
+        {
+            mGlobalColourMapEnabled = enabled;
+            mParent->_markChanged();
+        }
+    }
+    //---------------------------------------------------------------------
+    void  TerrainMaterialGeneratorA::SM2Profile::setLightmapEnabled(bool enabled)
     {
         if (enabled != mLightmapEnabled)
         {
             mLightmapEnabled = enabled;
-            _markChanged();
+            mParent->_markChanged();
         }
     }
     //---------------------------------------------------------------------
-    void  TerrainMaterialGeneratorA::setCompositeMapEnabled(bool enabled)
+    void  TerrainMaterialGeneratorA::SM2Profile::setCompositeMapEnabled(bool enabled)
     {
         if (enabled != mCompositeMapEnabled)
         {
             mCompositeMapEnabled = enabled;
-            _markChanged();
+            mParent->_markChanged();
         }
     }
     //---------------------------------------------------------------------
-    void  TerrainMaterialGeneratorA::setReceiveDynamicShadowsEnabled(bool enabled)
+    void  TerrainMaterialGeneratorA::SM2Profile::setReceiveDynamicShadowsEnabled(bool enabled)
     {
         if (enabled != mReceiveDynamicShadows)
         {
             mReceiveDynamicShadows = enabled;
-            _markChanged();
+            mParent->_markChanged();
         }
     }
     //---------------------------------------------------------------------
@@ -186,12 +193,22 @@ namespace Ogre
         }
     }
     //---------------------------------------------------------------------
-    void TerrainMaterialGeneratorA::setReceiveDynamicShadowsLowLod(bool enabled)
+    void TerrainMaterialGeneratorA::SM2Profile::setReceiveDynamicShadowsDepth(bool enabled)
+    {
+        if (enabled != mDepthShadows)
+        {
+            mDepthShadows = enabled;
+            mParent->_markChanged();
+        }
+
+    }
+    //---------------------------------------------------------------------
+    void TerrainMaterialGeneratorA::SM2Profile::setReceiveDynamicShadowsLowLod(bool enabled)
     {
         if (enabled != mLowLodShadows)
         {
             mLowLodShadows = enabled;
-            _markChanged();
+            mParent->_markChanged();
         }
     }
     //---------------------------------------------------------------------
@@ -222,21 +239,6 @@ namespace Ogre
 
     }
     //---------------------------------------------------------------------
-    static int getRequiredLayers(const Terrain* terrain, bool pssm)
-    {
-        int layers = terrain->getLayerCount(); // layer diffusespec
-        if (!terrain->getLayerTextureName(0, 1).empty())
-            layers *= 2; // per layer normalheight
-        layers += 1; // global normal
-        layers += bool(terrain->getGlobalColourMap());
-        layers += bool(terrain->getLightmap());
-        layers += terrain->getBlendTextures().size();
-
-        if(pssm)
-            layers += 3; // 3 shadow textures
-
-        return layers;
-    }
     MaterialPtr TerrainMaterialGeneratorA::SM2Profile::generate(const Terrain* terrain)
     {
         // re-use old material if exists
@@ -256,108 +258,35 @@ namespace Ogre
         
         // Automatically disable normal & parallax mapping if card cannot handle it
         // We do this rather than having a specific technique for it since it's simpler
-        auto rsc = Root::getSingletonPtr()->getRenderSystem()->getCapabilities();
-        if (getRequiredLayers(terrain, mPSSM) > rsc->getNumTextureUnits())
+        GpuProgramManager& gmgr = GpuProgramManager::getSingleton();
+        if (!gmgr.isSyntaxSupported("ps_4_0") && !gmgr.isSyntaxSupported("ps_3_0") && !gmgr.isSyntaxSupported("ps_2_x")
+            && !gmgr.isSyntaxSupported("fp40") && !gmgr.isSyntaxSupported("arbfp1") && !gmgr.isSyntaxSupported("glsl")
+            && !gmgr.isSyntaxSupported("glsles"))
         {
             setLayerNormalMappingEnabled(false);
             setLayerParallaxMappingEnabled(false);
-            LogManager::getSingleton().logWarning(
-                "TerrainMaterialGeneratorA: Normal mapping disabled due to lack of texture units");
         }
 
-        Pass* pass;
-        pass = mat->createTechnique()->createPass();
-        pass->getUserObjectBindings().setUserAny("Terrain", terrain);
-        pass->setSpecular(ColourValue::White);
-        pass->setShininess(32); // user param
-
-        if(mLayerSpecularMappingEnabled)
-        {
-            // we use this to inject our specular map
-            pass->setVertexColourTracking(TVC_SPECULAR);
-        }
-
-        using namespace RTShader;
-        auto mainRenderState = std::make_shared<TargetRenderState>();
-        auto tplRS = static_cast<TerrainMaterialGeneratorA*>(mParent)->getMainRenderState();
-        mainRenderState->setLightCount(tplRS->getLightCount());
-        mainRenderState->setHaveAreaLights(tplRS->haveAreaLights());
-
-        if(auto surface = tplRS->getSubRenderState("TerrainSurface"))
-            surface->setParameter("use_normal_mapping", std::to_string(mLayerNormalMappingEnabled));
-
-        try
-        {
-            mainRenderState->link(*tplRS, pass, pass);
-            auto surface = mainRenderState->getSubRenderState("TerrainSurface");
-            OgreAssert(surface, "TerrainSurface SubRenderState not found");
-            surface->setParameter("use_parallax_mapping", std::to_string(mLayerParallaxMappingEnabled));
-            surface->setParameter("use_parallax_occlusion_mapping", std::to_string(mLayerParallaxOcclusionMappingEnabled));
-            surface->setParameter("use_specular_mapping", std::to_string(mLayerSpecularMappingEnabled));
-            if(isShadowingEnabled(HIGH_LOD, terrain))
-            {
-                auto pssm = ShaderGenerator::getSingleton().createSubRenderState(SRS_SHADOW_MAPPING);
-                if(mPSSM)
-                    pssm->setParameter("split_points", mPSSM->getSplitPoints());
-                pssm->preAddToRenderState(mainRenderState.get(), pass, pass);
-                mainRenderState->addSubRenderStateInstance(pssm);
-            }
-            mainRenderState->acquirePrograms(pass);
-        }
-        catch(const std::exception& e)
-        {
-            LogManager::getSingleton().logError(e.what());
-            return nullptr;
-        }
-
-        pass->getUserObjectBindings().setUserAny(TargetRenderState::UserKey, mainRenderState);
+        addTechnique(mat, terrain, HIGH_LOD);
 
         // LOD
-        if(mParent->isCompositeMapEnabled())
+        if(mCompositeMapEnabled)
         {
-            Technique* tech = mat->createTechnique();
-            tech->setLodIndex(1);
-
-            pass = tech->createPass();
-            TextureUnitState* tu = pass->createTextureUnitState();
-            tu->setTexture(terrain->getCompositeMap());
-            tu->setTextureAddressingMode(TAM_CLAMP);
-
-            pass->getUserObjectBindings().setUserAny("Terrain", terrain);
-
-            auto lod1RenderState = std::make_shared<TargetRenderState>();
-            try
-            {
-                lod1RenderState->link({"TerrainTransform", SRS_VERTEX_COLOUR, SRS_TEXTURING, SRS_FOG}, pass, pass);
-                if (isShadowingEnabled(LOW_LOD, terrain))
-                {
-                    // light count needed to enable PSSM3
-                    lod1RenderState->setLightCount(1);
-                    auto pssm = ShaderGenerator::getSingleton().createSubRenderState(SRS_SHADOW_MAPPING);
-                    if(mPSSM)
-                        pssm->setParameter("split_points", mPSSM->getSplitPoints());
-                    pssm->preAddToRenderState(lod1RenderState.get(), pass, pass);
-                    lod1RenderState->addSubRenderStateInstance(pssm);
-                }
-                lod1RenderState->acquirePrograms(pass);
-            }
-            catch(const Exception& e)
-            {
-                LogManager::getSingleton().logError(e.what());
-                return nullptr;
-            }
-
-            pass->getUserObjectBindings().setUserAny(TargetRenderState::UserKey, lod1RenderState);
-
-            mat->setLodLevels({TerrainGlobalOptions::getSingleton().getCompositeMapDistance()});
+            addTechnique(mat, terrain, LOW_LOD);
+            Material::LodValueList lodValues;
+            lodValues.push_back(TerrainGlobalOptions::getSingleton().getCompositeMapDistance());
+            mat->setLodLevels(lodValues);
+            Technique* lowLodTechnique = mat->getTechnique(1);
+            lowLodTechnique->setLodIndex(1);
         }
 
-        mParent->updateParams(mat, terrain);
+        updateParams(mat, terrain);
 
         return mat;
+
     }
     //---------------------------------------------------------------------
-    MaterialPtr TerrainMaterialGeneratorA::generateForCompositeMap(const Terrain* terrain)
+    MaterialPtr TerrainMaterialGeneratorA::SM2Profile::generateForCompositeMap(const Terrain* terrain)
     {
         // re-use old material if exists
         MaterialPtr mat = terrain->_getCompositeMapMaterial();
@@ -377,79 +306,445 @@ namespace Ogre
         // clear everything
         mat->removeAllTechniques();
 
-        using namespace RTShader;
-        auto pass = mat->createTechnique()->createPass();
-        pass->getUserObjectBindings().setUserAny("Terrain", terrain);
+        addTechnique(mat, terrain, RENDER_COMPOSITE_MAP);
 
-        auto compRenderState = std::make_shared<TargetRenderState>();
-        compRenderState->setLightCount(1);
-
-        try
-        {
-            compRenderState->link({SRS_TRANSFORM, "TerrainSurface", SRS_PER_PIXEL_LIGHTING}, pass, pass);
-            auto terrainSurface = compRenderState->getSubRenderState("TerrainSurface");
-            terrainSurface->setParameter("for_composite_map", "true");
-            compRenderState->acquirePrograms(pass);
-            terrainSurface->updateGpuProgramsParams(NULL, NULL, NULL, NULL); // composite map scene manager not registered
-        }
-        catch(const std::exception& e)
-        {
-            LogManager::getSingleton().logError(e.what());
-            return nullptr;
-        }
-
-        pass->getUserObjectBindings().setUserAny(TargetRenderState::UserKey, compRenderState);
         updateParamsForCompositeMap(mat, terrain);
 
         return mat;
 
     }
     //---------------------------------------------------------------------
+    void TerrainMaterialGeneratorA::SM2Profile::addTechnique(
+        const MaterialPtr& mat, const Terrain* terrain, TechniqueType tt)
+    {
+        Technique* tech = mat->createTechnique();
+
+        // Only supporting one pass
+        Pass* pass = tech->createPass();
+
+        HighLevelGpuProgramPtr vprog = mShaderGen->generateVertexProgram(this, terrain, tt);
+        HighLevelGpuProgramPtr fprog = mShaderGen->generateFragmentProgram(this, terrain, tt);
+
+        pass->setVertexProgram(vprog->getName());
+        pass->setFragmentProgram(fprog->getName());
+
+        if (tt == HIGH_LOD || tt == RENDER_COMPOSITE_MAP)
+        {
+            // global normal map
+            TextureUnitState* tu = pass->createTextureUnitState();
+            tu->setTextureName(terrain->getTerrainNormalMap()->getName());
+            tu->setTextureAddressingMode(TextureUnitState::TAM_CLAMP);
+
+            // global colour map
+            if (terrain->getGlobalColourMapEnabled() && isGlobalColourMapEnabled())
+            {
+                tu = pass->createTextureUnitState(terrain->getGlobalColourMap()->getName());
+                tu->setTextureAddressingMode(TextureUnitState::TAM_CLAMP);
+            }
+
+            // light map
+            if (isLightmapEnabled())
+            {
+                tu = pass->createTextureUnitState(terrain->getLightmap()->getName());
+                tu->setTextureAddressingMode(TextureUnitState::TAM_CLAMP);
+            }
+
+            // blend maps
+            uint maxLayers = getMaxLayers(terrain);
+            uint numBlendTextures = std::min(terrain->getBlendTextureCount(maxLayers), terrain->getBlendTextureCount());
+            uint numLayers = std::min(maxLayers, static_cast<uint>(terrain->getLayerCount()));
+            for (uint i = 0; i < numBlendTextures; ++i)
+            {
+                tu = pass->createTextureUnitState(terrain->getBlendTextureName(i));
+                tu->setTextureAddressingMode(TextureUnitState::TAM_CLAMP);
+            }
+
+            // layer textures
+            for (uint i = 0; i < numLayers; ++i)
+            {
+                // diffuse / specular
+                pass->createTextureUnitState(terrain->getLayerTextureName(i, 0));
+                // normal / height
+                if(mLayerNormalMappingEnabled)
+                    pass->createTextureUnitState(terrain->getLayerTextureName(i, 1));
+            }
+
+        }
+        else
+        {
+            // LOW_LOD textures
+            // composite map
+            TextureUnitState* tu = pass->createTextureUnitState();
+            tu->setTextureName(terrain->getCompositeMap()->getName());
+            tu->setTextureAddressingMode(TextureUnitState::TAM_CLAMP);
+
+            // That's it!
+
+        }
+
+        // Add shadow textures (always at the end)
+        if (isShadowingEnabled(tt, terrain))
+        {
+            uint numTextures = 1;
+            if (getReceiveDynamicShadowsPSSM())
+            {
+                numTextures = (uint)getReceiveDynamicShadowsPSSM()->getSplitCount();
+            }
+            for (uint i = 0; i < numTextures; ++i)
+            {
+                TextureUnitState* tu = pass->createTextureUnitState();
+                tu->setContentType(TextureUnitState::CONTENT_SHADOW);
+                tu->setTextureAddressingMode(TextureUnitState::TAM_BORDER);
+                tu->setTextureBorderColour(ColourValue::White);
+            }
+        }
+
+    }
+    //---------------------------------------------------------------------
     bool TerrainMaterialGeneratorA::SM2Profile::isShadowingEnabled(TechniqueType tt, const Terrain* terrain) const
     {
-        return mParent->getReceiveDynamicShadowsEnabled() && tt != RENDER_COMPOSITE_MAP &&
-               (tt != LOW_LOD || mParent->getReceiveDynamicShadowsLowLod()) &&
-               terrain->getSceneManager()->isShadowTechniqueTextureBased();
+        return getReceiveDynamicShadowsEnabled() && tt != RENDER_COMPOSITE_MAP && 
+            (tt != LOW_LOD || mLowLodShadows) &&
+            terrain->getSceneManager()->isShadowTechniqueTextureBased();
+
     }
     //---------------------------------------------------------------------
-    void TerrainMaterialGeneratorA::updateParams(const MaterialPtr& mat, const Terrain* terrain)
+    void TerrainMaterialGeneratorA::SM2Profile::updateParams(const MaterialPtr& mat, const Terrain* terrain)
     {
-        using namespace RTShader;
-        auto mainRenderState = any_cast<TargetRenderStatePtr>(
-            mat->getTechnique(0)->getPass(0)->getUserObjectBindings().getUserAny(TargetRenderState::UserKey));
+        mShaderGen->updateParams(this, mat, terrain, false);
 
-        for (auto srs : mainRenderState->getSubRenderStates())
+    }
+    //---------------------------------------------------------------------
+    void TerrainMaterialGeneratorA::SM2Profile::updateParamsForCompositeMap(const MaterialPtr& mat, const Terrain* terrain)
+    {
+        mShaderGen->updateParams(this, mat, terrain, true);
+    }
+    //---------------------------------------------------------------------
+    //---------------------------------------------------------------------
+    HighLevelGpuProgramPtr 
+        ShaderHelper::generateVertexProgram(
+            const SM2Profile* prof, const Terrain* terrain, TechniqueType tt)
+    {
+        HighLevelGpuProgramPtr ret = createVertexProgram(prof, terrain, tt);
+
+        StringStream sourceStr;
+        generateVertexProgramSource(prof, terrain, tt, sourceStr);
+
+        ret->setSource(sourceStr.str());
+        ret->load();
+        defaultVpParams(prof, terrain, tt, ret);
+
+#if OGRE_DEBUG_MODE
+        LogManager::getSingleton().stream(LML_TRIVIAL) << "*** Terrain Vertex Program: " 
+            << ret->getName() << " ***\n" << ret->getSource() << "\n***   ***";
+#endif
+        return ret;
+
+    }
+    //---------------------------------------------------------------------
+    HighLevelGpuProgramPtr 
+    ShaderHelper::generateFragmentProgram(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt)
+    {
+        HighLevelGpuProgramPtr ret = createFragmentProgram(prof, terrain, tt);
+
+        StringStream sourceStr;
+        generateFragmentProgramSource(prof, terrain, tt, sourceStr);
+        ret->setSource(sourceStr.str());
+        ret->load();
+        defaultFpParams(prof, terrain, tt, ret);
+
+#if OGRE_DEBUG_MODE
+        LogManager::getSingleton().stream(LML_TRIVIAL) << "*** Terrain Fragment Program: " 
+            << ret->getName() << " ***\n" << ret->getSource() << "\n*** ***";
+#endif
+        return ret;
+    }
+    //---------------------------------------------------------------------
+    void ShaderHelper::generateVertexProgramSource(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt, StringStream& outStream)
+    {
+        generateVpHeader(prof, terrain, tt, outStream);
+
+        if (tt != LOW_LOD)
         {
-            if (auto transform = dynamic_cast<TerrainTransform*>(srs))
+            uint maxLayers = prof->getMaxLayers(terrain);
+            uint numLayers = std::min(maxLayers, static_cast<uint>(terrain->getLayerCount()));
+
+            for (uint i = 0; i < numLayers; ++i)
+                generateVpLayer(prof, terrain, tt, i, outStream);
+        }
+
+        generateVpFooter(prof, terrain, tt, outStream);
+
+    }
+    //---------------------------------------------------------------------
+    void ShaderHelper::generateFragmentProgramSource(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt, StringStream& outStream)
+    {
+        generateFpHeader(prof, terrain, tt, outStream);
+
+        if (tt != LOW_LOD)
+        {
+            uint maxLayers = prof->getMaxLayers(terrain);
+            uint numLayers = std::min(maxLayers, static_cast<uint>(terrain->getLayerCount()));
+
+            for (uint i = 0; i < numLayers; ++i)
+                generateFpLayer(prof, terrain, tt, i, outStream);
+        }
+
+        generateFpFooter(prof, terrain, tt, outStream);
+    }
+    //---------------------------------------------------------------------
+    void ShaderHelper::defaultVpParams(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt, const HighLevelGpuProgramPtr& prog)
+    {
+        GpuProgramParametersSharedPtr params = prog->getDefaultParameters();
+        params->setIgnoreMissingParams(true);
+        params->setNamedAutoConstant("worldMatrix", GpuProgramParameters::ACT_WORLD_MATRIX);
+        params->setNamedAutoConstant("viewProjMatrix", GpuProgramParameters::ACT_VIEWPROJ_MATRIX);
+        params->setNamedAutoConstant("lodMorph", GpuProgramParameters::ACT_CUSTOM, 
+            Terrain::LOD_MORPH_CUSTOM_PARAM);
+        params->setNamedAutoConstant("fogParams", GpuProgramParameters::ACT_FOG_PARAMS);
+
+        if (prof->isShadowingEnabled(tt, terrain))
+        {
+            uint numTextures = 1;
+            if (prof->getReceiveDynamicShadowsPSSM())
             {
-                transform->updateParams();
+                numTextures = (uint)prof->getReceiveDynamicShadowsPSSM()->getSplitCount();
             }
-            if (auto surface = dynamic_cast<TerrainSurface*>(srs))
+            for (uint i = 0; i < numTextures; ++i)
             {
-                surface->updateParams();
+                params->setNamedAutoConstant("texViewProjMatrix" + StringConverter::toString(i), 
+                    GpuProgramParameters::ACT_TEXTURE_VIEWPROJ_MATRIX, i);
             }
         }
 
-        if(!isCompositeMapEnabled())
-            return;
-
-        auto lod1RenderState = any_cast<TargetRenderStatePtr>(
-            mat->getTechnique(1)->getPass(0)->getUserObjectBindings().getUserAny(TargetRenderState::UserKey));
-        if (auto transform = lod1RenderState->getSubRenderState("TerrainTransform"))
+        if (terrain->_getUseVertexCompression() && tt != RENDER_COMPOSITE_MAP)
         {
-            static_cast<TerrainTransform*>(transform)->updateParams();
+            Matrix4 posIndexToObjectSpace;
+            terrain->getPointTransform(&posIndexToObjectSpace);
+            params->setNamedConstant("posIndexToObjectSpace", posIndexToObjectSpace);
+        }
+
+        
+        
+    }
+    //---------------------------------------------------------------------
+    void ShaderHelper::defaultFpParams(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt, const HighLevelGpuProgramPtr& prog)
+    {
+        GpuProgramParametersSharedPtr params = prog->getDefaultParameters();
+        params->setIgnoreMissingParams(true);
+
+        params->setNamedAutoConstant("ambient", GpuProgramParameters::ACT_AMBIENT_LIGHT_COLOUR);
+        params->setNamedAutoConstant("lightPosObjSpace", GpuProgramParameters::ACT_LIGHT_POSITION_OBJECT_SPACE, 0);
+        params->setNamedAutoConstant("lightDiffuseColour", GpuProgramParameters::ACT_LIGHT_DIFFUSE_COLOUR, 0);
+        params->setNamedAutoConstant("lightSpecularColour", GpuProgramParameters::ACT_LIGHT_SPECULAR_COLOUR, 0);
+        params->setNamedAutoConstant("eyePosObjSpace", GpuProgramParameters::ACT_CAMERA_POSITION_OBJECT_SPACE);
+        params->setNamedAutoConstant("fogColour", GpuProgramParameters::ACT_FOG_COLOUR);
+
+        if (prof->isShadowingEnabled(tt, terrain))
+        {
+            uint numTextures = 1;
+            if (prof->getReceiveDynamicShadowsPSSM())
+            {
+                PSSMShadowCameraSetup* pssm = prof->getReceiveDynamicShadowsPSSM();
+                numTextures = (uint)pssm->getSplitCount();
+                Vector4 splitPoints;
+                const PSSMShadowCameraSetup::SplitPointList& splitPointList = pssm->getSplitPoints();
+                // Populate from split point 1, not 0, since split 0 isn't useful (usually 0)
+                for (uint i = 1; i < numTextures; ++i)
+                {
+                    splitPoints[i-1] = splitPointList[i];
+                }
+                params->setNamedConstant("pssmSplitPoints", splitPoints);
+            }
+
+            if (prof->getReceiveDynamicShadowsDepth())
+            {
+                size_t samplerOffset = (tt == HIGH_LOD) ? mShadowSamplerStartHi : mShadowSamplerStartLo;
+                for (uint i = 0; i < numTextures; ++i)
+                {
+                    params->setNamedAutoConstant("inverseShadowmapSize" + StringConverter::toString(i), 
+                        GpuProgramParameters::ACT_INVERSE_TEXTURE_SIZE, i + samplerOffset);
+                }
+            }
+        }
+
+        // Explicitly bind samplers for GLSL
+        if (mIsGLSL)
+        {
+            int numSamplers = 0;
+            if (tt == LOW_LOD)
+            {
+                params->setNamedConstant("compositeMap", (int)numSamplers++);
+            }
+            else
+            {
+                params->setNamedConstant("globalNormal", (int)numSamplers++);
+
+                if (terrain->getGlobalColourMapEnabled() && prof->isGlobalColourMapEnabled())
+                {
+                    params->setNamedConstant("globalColourMap", (int)numSamplers++);
+                }
+                if (prof->isLightmapEnabled())
+                {
+                    params->setNamedConstant("lightMap", (int)numSamplers++);
+                }
+
+                uint maxLayers = prof->getMaxLayers(terrain);
+                uint numBlendTextures = std::min(terrain->getBlendTextureCount(maxLayers), terrain->getBlendTextureCount());
+                uint numLayers = std::min(maxLayers, static_cast<uint>(terrain->getLayerCount()));
+                // Blend textures - sampler definitions
+                for (uint i = 0; i < numBlendTextures; ++i)
+                {
+                    params->setNamedConstant("blendTex" + StringConverter::toString(i), (int)numSamplers++);
+                }
+
+                // Layer textures - sampler definitions & UV multipliers
+                for (uint i = 0; i < numLayers; ++i)
+                {
+                    params->setNamedConstant("difftex" + StringConverter::toString(i), (int)numSamplers++);
+                    if(prof->isLayerNormalMappingEnabled())
+                        params->setNamedConstant("normtex" + StringConverter::toString(i), (int)numSamplers++);
+                }
+
+                uint numShadowTextures = 1;
+                if (prof->getReceiveDynamicShadowsPSSM())
+                    numShadowTextures = (uint)prof->getReceiveDynamicShadowsPSSM()->getSplitCount();
+
+                for (uint i = 0; i < numShadowTextures; ++i)
+                {
+                    if (prof->isShadowingEnabled(tt, terrain))
+                        params->setNamedConstant("shadowMap" + StringConverter::toString(i), (int)numSamplers++);
+                }
+            }
         }
     }
     //---------------------------------------------------------------------
-    void TerrainMaterialGeneratorA::updateParamsForCompositeMap(const MaterialPtr& mat, const Terrain* terrain)
+    void ShaderHelper::updateParams(
+        const SM2Profile* prof, const MaterialPtr& mat, const Terrain* terrain, bool compositeMap)
     {
-        using namespace RTShader;
-        auto mainRenderState = any_cast<TargetRenderStatePtr>(
-            mat->getTechnique(0)->getPass(0)->getUserObjectBindings().getUserAny(TargetRenderState::UserKey));
-
-        if (auto surface = mainRenderState->getSubRenderState("TerrainSurface"))
+        Pass* p = mat->getTechnique(0)->getPass(0);
+        if (compositeMap)
         {
-            static_cast<TerrainSurface*>(surface)->updateParams();
+            updateVpParams(prof, terrain, RENDER_COMPOSITE_MAP, p->getVertexProgramParameters());
+            updateFpParams(prof, terrain, RENDER_COMPOSITE_MAP, p->getFragmentProgramParameters());
         }
+        else
+        {
+            // high lod
+            updateVpParams(prof, terrain, HIGH_LOD, p->getVertexProgramParameters());
+            updateFpParams(prof, terrain, HIGH_LOD, p->getFragmentProgramParameters());
+
+            if(prof->isCompositeMapEnabled())
+            {
+                // low lod
+                p = mat->getTechnique(1)->getPass(0);
+                updateVpParams(prof, terrain, LOW_LOD, p->getVertexProgramParameters());
+                updateFpParams(prof, terrain, LOW_LOD, p->getFragmentProgramParameters());
+            }
+        }
+    }
+    //---------------------------------------------------------------------
+    void ShaderHelper::updateVpParams(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt, const GpuProgramParametersSharedPtr& params)
+    {
+        params->setIgnoreMissingParams(true);
+        uint maxLayers = prof->getMaxLayers(terrain);
+        uint numLayers = std::min(maxLayers, static_cast<uint>(terrain->getLayerCount()));
+        uint numUVMul = numLayers / 4;
+        if (numLayers % 4)
+            ++numUVMul;
+        for (uint i = 0; i < numUVMul; ++i)
+        {
+            Vector4 uvMul(
+                terrain->getLayerUVMultiplier(i * 4), 
+                terrain->getLayerUVMultiplier(i * 4 + 1), 
+                terrain->getLayerUVMultiplier(i * 4 + 2), 
+                terrain->getLayerUVMultiplier(i * 4 + 3) 
+                );
+            params->setNamedConstant("uvMul_" + StringConverter::toString(i), uvMul);
+        }
+        
+        if (terrain->_getUseVertexCompression() && tt != RENDER_COMPOSITE_MAP)
+        {
+            Real baseUVScale = 1.0f / (terrain->getSize() - 1);
+            params->setNamedConstant("baseUVScale", baseUVScale);
+        }
+
+    }
+    //---------------------------------------------------------------------
+    void ShaderHelper::updateFpParams(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt, const GpuProgramParametersSharedPtr& params)
+    {
+        params->setIgnoreMissingParams(true);
+        // TODO - parameterise this?
+        Vector4 scaleBiasSpecular(0.03, -0.04, 32, 1);
+        params->setNamedConstant("scaleBiasSpecular", scaleBiasSpecular);
+
+    }
+    //---------------------------------------------------------------------
+    String ShaderHelper::getChannel(uint idx)
+    {
+        uint rem = idx % 4;
+        switch(rem)
+        {
+        case 0:
+        default:
+            return "r";
+        case 1:
+            return "g";
+        case 2:
+            return "b";
+        case 3:
+            return "a";
+        };
+    }
+    //---------------------------------------------------------------------
+    String ShaderHelper::getVertexProgramName(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt)
+    {
+        String progName = terrain->getMaterialName() + "/sm2/vp";
+        
+        switch(tt)
+        {
+        case HIGH_LOD:
+            progName += "/hlod";
+            break;
+        case LOW_LOD:
+            progName += "/llod";
+            break;
+        case RENDER_COMPOSITE_MAP:
+            progName += "/comp";
+            break;
+        }
+
+        return progName;
+
+    }
+    //---------------------------------------------------------------------
+    String ShaderHelper::getFragmentProgramName(
+        const SM2Profile* prof, const Terrain* terrain, TechniqueType tt)
+    {
+
+        String progName = terrain->getMaterialName() + "/sm2/fp";
+
+        switch(tt)
+        {
+        case HIGH_LOD:
+            progName += "/hlod";
+            break;
+        case LOW_LOD:
+            progName += "/llod";
+            break;
+        case RENDER_COMPOSITE_MAP:
+            progName += "/comp";
+            break;
+        }
+
+        return progName;
     }
 }

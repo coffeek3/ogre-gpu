@@ -31,12 +31,14 @@ THE SOFTWARE.
 
 namespace Ogre
 {
-    DepthBuffer::DepthBuffer( uint16 poolId, uint32 width, uint32 height,
-                              uint32 fsaa, bool manual ) :
+    DepthBuffer::DepthBuffer( uint16 poolId, uint16 bitDepth, uint32 width, uint32 height,
+                              uint32 fsaa, const String &fsaaHint, bool manual ) :
                 mPoolId(poolId),
+                mBitDepth(bitDepth),
                 mWidth(width),
                 mHeight(height),
                 mFsaa(fsaa),
+                mFsaaHint(fsaaHint),
                 mManual(manual)
     {
     }
@@ -59,6 +61,11 @@ namespace Ogre
     uint16 DepthBuffer::getPoolId() const
     {
         return mPoolId;
+    }
+    //-----------------------------------------------------------------------
+    uint16 DepthBuffer::getBitDepth() const
+    {
+        return mBitDepth;
     }
     //-----------------------------------------------------------------------
     uint32 DepthBuffer::getWidth() const
@@ -105,8 +112,14 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void DepthBuffer::detachFromAllRenderTargets()
     {
-        for (auto *r : mAttachedRenderTargets)
-            r->_detachDepthBuffer();
+        RenderTargetSet::const_iterator itor = mAttachedRenderTargets.begin();
+        RenderTargetSet::const_iterator end  = mAttachedRenderTargets.end();
+        while( itor != end )
+        {
+            //If we call, detachDepthBuffer, we'll invalidate the iterators
+            (*itor)->_detachDepthBuffer();
+            ++itor;
+        }
 
         mAttachedRenderTargets.clear();
     }

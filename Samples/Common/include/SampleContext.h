@@ -3,19 +3,19 @@
  This source file is part of OGRE
  (Object-oriented Graphics Rendering Engine)
  For the latest info, see http://www.ogre3d.org/
-
+ 
  Copyright (c) 2000-2014 Torus Knot Software Ltd
-
+ 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
  in the Software without restriction, including without limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
-
+ 
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
-
+ 
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -80,13 +80,16 @@ namespace OgreBites
             if (s)
             {
                 // retrieve sample's required plugins and currently installed plugins
-                for (const auto& p : s->getRequiredPlugins())
+                Ogre::Root::PluginInstanceList ip = mRoot->getInstalledPlugins();
+                Ogre::StringVector rp = s->getRequiredPlugins();
+
+                for (Ogre::StringVector::iterator j = rp.begin(); j != rp.end(); j++)
                 {
                     bool found = false;
                     // try to find the required plugin in the current installed plugins
-                    for (const auto *i : mRoot->getInstalledPlugins())
+                    for (Ogre::Root::PluginInstanceList::iterator k = ip.begin(); k != ip.end(); k++)
                     {
-                        if (i->getName() == p)
+                        if ((*k)->getName() == *j)
                         {
                             found = true;
                             break;
@@ -94,16 +97,25 @@ namespace OgreBites
                     }
                     if (!found)  // throw an exception if a plugin is not found
                     {
-                        OGRE_EXCEPT(Ogre::Exception::ERR_NOT_IMPLEMENTED, "Sample requires plugin: " + p);
+                        Ogre::String desc = "Sample requires plugin: " + *j;
+                        Ogre::String src = "SampleContext::runSample";
+                        OGRE_EXCEPT(Ogre::Exception::ERR_NOT_IMPLEMENTED, desc, src);
                     }
+                }
+
+                // throw an exception if samples requires the use of another renderer
+                Ogre::String rrs = s->getRequiredRenderSystem();
+                if (!rrs.empty() && rrs != mRoot->getRenderSystem()->getName())
+                {
+                    Ogre::String desc = "Sample only runs with renderer: " + rrs;
+                    Ogre::String src = "SampleContext::runSample";
+                    OGRE_EXCEPT(Ogre::Exception::ERR_INVALID_STATE, desc, src);
                 }
 
                 // test system capabilities against sample requirements
                 s->testCapabilities(mRoot->getRenderSystem()->getCapabilities());
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
-                s->setShaderGenerator(mShaderGenerator);
-#endif
-                s->_setup(this);   // start new sample
+
+                s->_setup(mWindow, mFSLayer, mOverlaySystem);   // start new sample
             }
 
             if (prof)
@@ -118,10 +130,20 @@ namespace OgreBites
         virtual void go(Sample* initialSample = 0)
         {
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
+            createRoot();
+
+            if (!oneTimeConfig()) return;
+
+            if (!mFirstRun) mRoot->setRenderSystem(mRoot->getRenderSystemByName(mNextRenderer));
+
             mLastRun = true;  // assume this is our last run
 
-            initApp();
-            loadStartUpSample();
+            setup();
+
+            if (!mFirstRun) recoverLastSample();
+            else if (initialSample) runSample(initialSample);
+
+            mRoot->saveConfig();
 #else
             while (!mLastRun)
             {
@@ -136,7 +158,7 @@ namespace OgreBites
 #endif
 
                 loadStartUpSample();
-
+        
                 if (mRoot->getRenderSystem() != NULL)
                 {
                     mRoot->startRendering();    // start the render loop
@@ -150,15 +172,16 @@ namespace OgreBites
         }
 
         virtual void loadStartUpSample() {}
-
-        bool isCurrentSamplePaused()
+        
+        virtual bool isCurrentSamplePaused()
         {
-            return !mCurrentSample || mSamplePaused;
+            if (mCurrentSample) return mSamplePaused;
+            return false;
         }
 
         virtual void pauseCurrentSample()
         {
-            if (!isCurrentSamplePaused())
+            if (mCurrentSample && !mSamplePaused)
             {
                 mSamplePaused = true;
                 mCurrentSample->paused();
@@ -173,31 +196,31 @@ namespace OgreBites
                 mCurrentSample->unpaused();
             }
         }
-
+            
         /*-----------------------------------------------------------------------------
         | Processes frame started events.
         -----------------------------------------------------------------------------*/
-        bool frameStarted(const Ogre::FrameEvent& evt) override
+        virtual bool frameStarted(const Ogre::FrameEvent& evt)
         {
             pollEvents();
 
             // manually call sample callback to ensure correct order
-            return !isCurrentSamplePaused() ? mCurrentSample->frameStarted(evt) : true;
+            return (mCurrentSample && !mSamplePaused) ? mCurrentSample->frameStarted(evt) : true;
         }
-
+            
         /*-----------------------------------------------------------------------------
         | Processes rendering queued events.
         -----------------------------------------------------------------------------*/
-        bool frameRenderingQueued(const Ogre::FrameEvent& evt) override
+        virtual bool frameRenderingQueued(const Ogre::FrameEvent& evt)
         {
             // manually call sample callback to ensure correct order
-            return !isCurrentSamplePaused() ? mCurrentSample->frameRenderingQueued(evt) : true;
+            return (mCurrentSample && !mSamplePaused) ? mCurrentSample->frameRenderingQueued(evt) : true;
         }
-
+            
         /*-----------------------------------------------------------------------------
         | Processes frame ended events.
         -----------------------------------------------------------------------------*/
-        bool frameEnded(const Ogre::FrameEvent& evt) override
+        virtual bool frameEnded(const Ogre::FrameEvent& evt)
         {
             // manually call sample callback to ensure correct order
             if (mCurrentSample && !mSamplePaused && !mCurrentSample->frameEnded(evt)) return false;
@@ -209,6 +232,194 @@ namespace OgreBites
             return true;
         }
 
+        /*-----------------------------------------------------------------------------
+        | Processes window size change event. Adjusts mouse's region to match that
+        | of the window. You could also override this method to prevent resizing.
+        -----------------------------------------------------------------------------*/
+        virtual void windowResized(Ogre::RenderWindow* rw)
+        {
+            // manually call sample callback to ensure correct order
+            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowResized(rw);
+        }
+
+        // window event callbacks which manually call their respective sample callbacks to ensure correct order
+
+        virtual void windowMoved(Ogre::RenderWindow* rw)
+        {
+            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowMoved(rw);
+        }
+
+        virtual bool windowClosing(Ogre::RenderWindow* rw)
+        {
+            if (mCurrentSample && !mSamplePaused) return mCurrentSample->windowClosing(rw);
+            return true;
+        }
+
+        virtual void windowClosed(Ogre::RenderWindow* rw)
+        {
+            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowClosed(rw);
+        }
+
+        virtual void windowFocusChange(Ogre::RenderWindow* rw)
+        {
+            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowFocusChange(rw);
+        }
+
+        // keyboard and mouse callbacks which manually call their respective sample callbacks to ensure correct order
+
+        virtual bool keyPressed(const KeyboardEvent& evt)
+        {
+            // Ignore repeated signals from key being held down.
+            if (evt.repeat) return true;
+
+            if (mCurrentSample && !mSamplePaused) return mCurrentSample->keyPressed(evt);
+            return true;
+        }
+
+        virtual bool keyReleased(const KeyboardEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused) return mCurrentSample->keyReleased(evt);
+            return true;
+        }
+
+        void transformInputState(TouchFingerEvent &state)
+        {
+#if 0
+            int w = mWindow->getViewport(0)->getActualWidth();
+            int h = mWindow->getViewport(0)->getActualHeight();
+            int absX = state.X.abs;
+            int absY = state.Y.abs;
+            int relX = state.X.rel;
+            int relY = state.Y.rel;
+
+            // as OIS work in windowing system units we need to convert them to pixels
+            float scale = mWindow->getViewPointToPixelScale();
+            if(scale != 1.0f)
+            {
+                absX = (int)(absX * scale);
+                absY = (int)(absY * scale);
+                relX = (int)(relX * scale);
+                relY = (int)(relY * scale);
+            }
+
+            // determine required orientation
+            Ogre::OrientationMode orientation = Ogre::OR_DEGREE_0;
+#    if (OGRE_NO_VIEWPORT_ORIENTATIONMODE == 0)
+            orientation = mWindow->getViewport(0)->getOrientationMode();
+#    elif (OGRE_NO_VIEWPORT_ORIENTATIONMODE == 1) && (OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS)
+            UIInterfaceOrientation interfaceOrientation = [UIApplication sharedApplication].statusBarOrientation;
+            switch (interfaceOrientation)
+            {
+            case UIInterfaceOrientationPortrait:           break;
+            case UIInterfaceOrientationLandscapeLeft:      orientation = Ogre::OR_DEGREE_90;  break;
+            case UIInterfaceOrientationPortraitUpsideDown: orientation = Ogre::OR_DEGREE_180; break;
+            case UIInterfaceOrientationLandscapeRight:     orientation = Ogre::OR_DEGREE_270; break;
+            }
+#    endif
+
+            // apply changes
+            switch (orientation)
+            {
+            case Ogre::OR_DEGREE_0:
+                state.X.abs = absX;
+                state.Y.abs = absY;
+                state.X.rel = relX;
+                state.Y.rel = relY;
+                state.width = w;
+                state.height = h;
+                break;
+            case Ogre::OR_DEGREE_90:
+                state.X.abs = w - absY;
+                state.Y.abs = absX;
+                state.X.rel = -relY;
+                state.Y.rel = relX;
+                state.width = h;
+                state.height = w;
+                break;
+            case Ogre::OR_DEGREE_180:
+                state.X.abs = w - absX;
+                state.Y.abs = h - absY;
+                state.X.rel = -relX;
+                state.Y.rel = -relY;
+                state.width = w;
+                state.height = h;
+                break;
+            case Ogre::OR_DEGREE_270:
+                state.X.abs = absY;
+                state.Y.abs = h - absX;
+                state.X.rel = relY;
+                state.Y.rel = -relX;
+                state.width = h;
+                state.height = w;
+                break;
+            }
+#endif
+        }
+
+        virtual bool touchMoved(const TouchFingerEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->touchMoved(evt);
+            return true;
+        }
+
+        virtual bool mouseMoved(const MouseMotionEvent& evt)
+        {
+            // Miniscule mouse movements are still considered hovering.
+            // if (evt.xrel > 100000 || evt.yrel > 100000)
+            // {
+            //     mTimeSinceMouseMoved = 0;
+            // }
+
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->mouseMoved(evt);
+            return true;
+        }
+
+        virtual bool touchPressed(const TouchFingerEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->touchPressed(evt);
+            return true;
+        }
+
+        virtual bool mousePressed(const MouseButtonEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->mousePressed(evt);
+            return true;
+        }
+
+        virtual bool touchReleased(const TouchFingerEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->touchReleased(evt);
+            return true;
+        }
+
+        virtual bool mouseReleased(const MouseButtonEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->mouseReleased(evt);
+            return true;
+        }
+
+#if (OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS) || (OGRE_PLATFORM == OGRE_PLATFORM_ANDROID)
+        //FIXME: Handle mouse wheel wheel events on mobile devices.
+        // virtual bool touchReleased(const SDL_TouchFingerEvent& evt)
+        // {
+        //     if (mCurrentSample && !mSamplePaused)
+        //         return mCurrentSample->touchReleased(evt);
+        //     return true;
+        // }
+#endif
+        virtual bool mouseWheelRolled(const MouseWheelEvent& evt)
+        {
+            if (mCurrentSample && !mSamplePaused)
+                return mCurrentSample->mouseWheelRolled(evt);
+            return true;
+        }
+
         bool isFirstRun() { return mFirstRun; }
         void setFirstRun(bool flag) { mFirstRun = flag; }
         bool isLastRun() { return mLastRun; }
@@ -217,21 +428,15 @@ namespace OgreBites
         /*-----------------------------------------------------------------------------
         | Reconfigures the context. Attempts to preserve the current sample state.
         -----------------------------------------------------------------------------*/
-        void reconfigure(const Ogre::String& renderer)
+        virtual void reconfigure(const Ogre::String& renderer, Ogre::NameValuePairList& options)
         {
             // save current sample state
             mLastSample = mCurrentSample;
             if (mCurrentSample) mCurrentSample->saveState(mLastSampleState);
 
             mLastRun = false;             // we want to go again with the new settings
-            mNextRenderer = renderer;
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
-            // Need to save the config on iOS to make sure that changes are kept on disk
-            mRoot->saveConfig();
-#endif
-            mRoot->queueEndRendering(); // break from render loop
+            ApplicationContext::reconfigure(renderer, options);
         }
-        using ApplicationContextBase::reconfigure; // unused, silence warning
 
         /*-----------------------------------------------------------------------------
         | Recovers the last sample after a reset. You can override in the case that
@@ -249,7 +454,7 @@ namespace OgreBites
         /*-----------------------------------------------------------------------------
         | Cleans up and shuts down the context.
         -----------------------------------------------------------------------------*/
-        void shutdown() override
+        virtual void shutdown()
         {
             if (mCurrentSample)
             {
@@ -259,8 +464,8 @@ namespace OgreBites
 
             ApplicationContext::shutdown();
         }
-
-        Sample* mCurrentSample;         // The active sample (0 if none is active)
+        
+        Sample* mCurrentSample;         // currently running sample
         bool mSamplePaused;             // whether current sample is paused
         bool mLastRun;                  // whether or not this is the final run
         Sample* mLastSample;            // last sample run before reconfiguration

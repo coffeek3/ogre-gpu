@@ -1,16 +1,16 @@
-# Manual {#manual}
+Manual {#manual}
+======
 
 - @subpage Introduction
 - @subpage The-Core-Objects
 - @subpage Resource-Management
 - @subpage Scripts
-- @subpage rtss
+- @subpage High-level-Programs
+- @subpage Runtime-Shader-Generation
 - @subpage Mesh-Tools
 - @subpage Hardware-Buffers
 - @subpage Shadows
 - @subpage Animation
-- @subpage Instancing
-- @subpage Cross-platform-Shaders
 
 @page Introduction Introduction
 
@@ -28,31 +28,38 @@ I’m not going to teach you OO here, that’s a subject for many other books, b
 
 In summary, here’s the benefits an object-oriented approach brings to OGRE:
 
+<dl compact="compact">
+<dt>Abstraction</dt> <dd>
 
-@par Abstraction
 Common interfaces hide the nuances between different implementations of 3D API and operating systems
 
-@par Encapsulation
+</dd> <dt>Encapsulation</dt> <dd>
+
 There is a lot of state management and context-specific actions to be done in a graphics engine - encapsulation allows me to put the code and data nearest to where it is used which makes the code cleaner and easier to understand, and more reliable because duplication is avoided
 
-@par Polymorphism
+</dd> <dt>Polymorphism</dt> <dd>
+
 The behaviour of methods changes depending on the type of object you are using, even if you only learn one interface, e.g. a class specialised for managing indoor levels behaves completely differently from the standard scene manager, but looks identical to other classes in the system and has the same methods called on it
+
+</dd> </dl>
+
+
 
 <a name="Multi_002deverything"></a> <a name="Multi_002deverything-1"></a>
 
 # Multi-everything
 
-OGRE is more than a 3D engine that runs on one 3D API, on one platform, with one type of scene (indoor levels are most popular). OGRE is able to extend to any kind of scene (but yet still implements scene-specific optimisations under the surface), any platform and any 3D API.
+I wanted to do more than create a 3D engine that ran on one 3D API, on one platform, with one type of scene (indoor levels are most popular). I wanted OGRE to be able to extend to any kind of scene (but yet still implement scene-specific optimisations under the surface), any platform and any 3D API.
 
 Therefore all the ’visible’ parts of OGRE are completely independent of platform, 3D API and scene type. There are no dependencies on Windows types, no assumptions about the type of scene you are creating, and the principles of the 3D aspects are based on core maths texts rather than one particular API implementation.
 
 Now of course somewhere OGRE has to get down to the nitty-gritty of the specifics of the platform, API and scene, but it does this in subclasses specially designed for the environment in question, but which still expose the same interface as the abstract versions.
 
-For example, there is a @c Win32Window class which handles all the details about rendering windows on a Win32 platform - however the application designer only has to manipulate it via the superclass interface Ogre::RenderWindow, which will be the same across all platforms.
+For example, there is a ’Win32Window’ class which handles all the details about rendering windows on a Win32 platform - however the application designer only has to manipulate it via the superclass interface ’RenderWindow’, which will be the same across all platforms.
 
-Similarly the Ogre::SceneManager class looks after the arrangement of objects in the scene and their rendering sequence. Applications only have to use this interface, but there is a Ogre::OctreeSceneManager class which optimises the scene management for outdoor levels, meaning you get both performance and an easy to learn interface. All applications have to do is hint about the kind of scene they will be creating and let OGRE choose the most appropriate implementation - this is covered in a later tutorial.
+Similarly the ’SceneManager’ class looks after the arrangement of objects in the scene and their rendering sequence. Applications only have to use this interface, but there is a ’BspSceneManager’ class which optimises the scene management for indoor levels, meaning you get both performance and an easy to learn interface. All applications have to do is hint about the kind of scene they will be creating and let OGRE choose the most appropriate implementation - this is covered in a later tutorial.
 
-OGRE’s object-oriented nature makes all this possible. Currently OGRE runs on different platforms using plugins to drive the underlying rendering API. Applications use OGRE at the abstract level, thus ensuring that they automatically operate on all platforms and rendering subsystems that OGRE provides without any need for platform or API specific code.
+OGRE’s object-oriented nature makes all this possible. Currently OGRE runs on Windows, Linux and Mac OSX using plugins to drive the underlying rendering API (currently Direct3D or OpenGL). Applications use OGRE at the abstract level, thus ensuring that they automatically operate on all platforms and rendering subsystems that OGRE provides without any need for platform or API specific code.
 
 @page The-Core-Objects The Core Objects
 
@@ -60,26 +67,38 @@ OGRE’s object-oriented nature makes all this possible. Currently OGRE runs on 
 
 This tutorial gives you a quick summary of the core objects that you will use in OGRE and what they are used for.
 
+<a name="A-Word-About-Namespaces"></a>
+
+# A Word About Namespaces
+
+OGRE uses a C++ feature called namespaces. This lets you put classes, enums, structures, anything really within a ’namespace’ scope which is an easy way to prevent name clashes, i.e. situations where you have 2 things called the same thing. Since OGRE is designed to be used inside other applications, I wanted to be sure that name clashes would not be a problem. Some people prefix their classes/types with a short code because some compilers don’t support namespaces, but I chose to use them because they are the ’right’ way to do it. Sorry if you have a non-compliant compiler, but hey, the C++ standard has been defined for years, so compiler writers really have no excuse anymore. If your compiler doesn’t support namespaces then it’s probably because it’s sh\*t - get a better one. ;)
+
+This means every class, type etc should be prefixed with Ogre, e.g. Ogre::Camera, Ogre::Vector3 etc which means if elsewhere in your application you have used a Vector3 type you won’t get name clashes. To avoid lots of extra typing you can add a ’using namespace Ogre;’ statement to your code which means you don’t have to type the Ogre prefix unless there is ambiguity (in the situation where you have another definition with the same name).
+
 <a name="Overview-from-10_002c000-feet"></a>
 
 # Overview from 10,000 feet
 
-Shown below is a diagram of some of the core objects and where they ’sit’ in the grand scheme of things. This is not all the classes by a long shot, just a few examples of the more more significant ones to give you an idea of how it slots together.
+Shown below is a diagram of some of the core objects and where they ’sit’ in the grand scheme of things. This is not all the classes by a long shot, just a few examples of the more more significant ones to give you an idea of how it slots together. ![](images/uml-overview.svg)
 
 At the very top of the diagram is the Root object. This is your ’way in’ to the OGRE system, and it’s where you tend to create the top-level objects that you need to deal with, like scene managers, rendering systems and render windows, loading plugins, all the fundamental stuff. If you don’t know where to start, Root is it for almost everything, although often it will just give you another object which will actually do the detail work, since Root itself is more of an organiser and facilitator object.
 
 The majority of rest of OGRE’s classes fall into one of 3 roles:
 
-@par Scene Management
+<dl compact="compact">
+<dt>Scene Management</dt> <dd>
+
 This is about the contents of your scene, how it’s structured, how it’s viewed from cameras, etc. Objects in this area are responsible for giving you a natural declarative interface to the world you’re building; i.e. you don’t tell OGRE "set these render states and then render 3 polygons", you tell it "I want an object here, here and here, with these materials on them, rendered from this view", and let it get on with it.
 
-@par Resource Management
+</dd> <dt>Resource Management</dt> <dd>
+
 All rendering needs resources, whether it’s geometry, textures, fonts, whatever. It’s important to manage the loading, re-use and unloading of these things carefully, so that’s what classes in this area do.
 
-@par Rendering
+</dd> <dt>Rendering</dt> <dd>
+
 Finally, there’s getting the visuals on the screen - this is about the lower-level end of the rendering pipeline, the specific rendering system API objects like buffers, render states and the like and pushing it all down the pipeline. Classes in the Scene Management subsystem use this to get their higher-level scene information onto the screen.
 
-![](images/uml-overview.svg)
+</dd> </dl>
 
 You’ll notice that scattered around the edge are a number of plugins. OGRE is designed to be extended, and plugins are the usual way to go about it. Many of the classes in OGRE can be subclassed and extended, whether it’s changing the scene organisation through a custom SceneManager, adding a new render system implementation (e.g. Direct3D or OpenGL), or providing a way to load resources from another source (say from a web location or a database). Again this is just a small smattering of the kinds of things plugins can do, but as you can see they can plug in to almost any aspect of the system. This way, OGRE isn’t just a solution for one narrowly defined problem, it can extend to pretty much anything you need it to do.
 
@@ -109,13 +128,13 @@ Apart from the Ogre::Root object, this is probably the most critical part of the
 
 It is to the SceneManager that you go when you want to create a camera for the scene. It’s also where you go to retrieve or to remove a light from the scene. There is no need for your application to keep lists of objects, the SceneManager keeps a named set of all of the scene objects for you to access, should you need them. Look in the main documentation under the getCamera, getLight, getEntity etc methods.
 
-The SceneManager also sends the scene to the RenderSystem object when it is time to render the scene. You never have to call the Ogre::SceneManager::_renderScene method directly though - it is called automatically whenever a rendering target is asked to update (see Ogre::Root::renderOneFrame for details).
+The SceneManager also sends the scene to the RenderSystem object when it is time to render the scene. You never have to call the Ogre::SceneManager::\_renderScene method directly though - it is called automatically whenever a rendering target is asked to update.
 
 So most of your interaction with the SceneManager is during scene setup. You’re likely to call a great number of methods (perhaps driven by some input file containing the scene data) in order to set up your scene. You can also modify the contents of the scene dynamically during the rendering cycle if you create your own FrameListener object (see later).
 
-Because different scene types require very different algorithmic approaches to deciding which objects get sent to the RenderSystem in order to attain good rendering performance, the SceneManager class is designed to be subclassed for different scene types. The default SceneManager object will render a scene, but it does little or no scene organisation and you should not expect the results to be high performance in the case of large scenes. The intention is that specialisations will be created for each type of scene such that under the surface the subclass will optimise the scene organisation for best performance given assumptions which can be made for that scene type. An example is the @c OctreeSceneManager which optimises rendering for large levels based on the Octree partitioning scheme.
+Because different scene types require very different algorithmic approaches to deciding which objects get sent to the RenderSystem in order to attain good rendering performance, the SceneManager class is designed to be subclassed for different scene types. The default SceneManager object will render a scene, but it does little or no scene organisation and you should not expect the results to be high performance in the case of large scenes. The intention is that specialisations will be created for each type of scene such that under the surface the subclass will optimise the scene organisation for best performance given assumptions which can be made for that scene type. An example is the BspSceneManager which optimises rendering for large indoor levels based on a Binary Space Partition (BSP) tree.
 
-You can specify the SceneManager type you want as the parameter of Ogre::Root::createSceneManager. If you do not specify any parameter, OGRE will use to the default SceneManager, which is well suited for small and moderate sized scenes.
+The application using OGRE does not have to know which subclasses are available. The application simply calls Ogre::Root::createSceneManager(..) passing as a parameter one of a number of scene types (e.g. Ogre::ST_GENERIC, Ogre::ST_INTERIOR etc). OGRE will automatically use the best SceneManager subclass available for that scene type, or default to the basic SceneManager if a specialist one is not available. This allows the developers of OGRE to add new scene specialisations later and thus optimise previously unoptimised scene types without the user applications having to change any code.
 
 # The ResourceGroupManager Object {#The-ResourceGroupManager-Object}
 
@@ -162,7 +181,7 @@ When a Ogre::Mesh is loaded, it automatically comes with a number of materials d
 
 To understand how this works, you have to know that all Mesh objects are actually composed of Ogre::SubMesh objects, each of which represents a part of the mesh using one Material. If a Ogre::Mesh uses only one Ogre::Material, it will only have one Ogre::SubMesh.
 
-When an Ogre::Entity is created based on this Mesh, it is composed of (possibly) multiple Ogre::SubEntity objects, each matching 1 for 1 with the Ogre::SubMesh objects from the original Mesh. You can access the Ogre::SubEntity objects using the Ogre::Entity::getSubEntity method. Once you have a reference to a Ogre::SubEntity, you can change the material it uses by calling its setMaterialName method. In this way you can make an Ogre::Entity deviate from the default materials and thus create an individual looking version of it.
+When an Ogre::Entity is created based on this Mesh, it is composed of (possibly) multiple Ogre::SubEntity objects, each matching 1 for 1 with the Ogre::SubMesh objects from the original Mesh. You can access the Ogre::SubEntity objects using the Ogre::Entity::getSubEntity method. Once you have a reference to a Ogre::SubEntity, you can change the material it uses by calling it’s setMaterialName method. In this way you can make an Ogre::Entity deviate from the default materials and thus create an individual looking version of it.
 
 # Materials {#Materials}
 
@@ -170,7 +189,7 @@ The Ogre::Material object controls how objects in the scene are rendered. It spe
 
 Materials can either be set up programmatically, by calling Ogre::MaterialManager::create and tweaking the settings, or by specifying it in a ’script’ which is loaded at runtime. See [Material Scripts](@ref Material-Scripts) for more info.
 
-Basically everything about the appearance of an object apart from its shape is controlled by the Material class.
+Basically everything about the appearance of an object apart from it’s shape is controlled by the Material class.
 
 The Ogre::MaterialManager class manages the master list of materials available to the scene. The list can be added to by the application by calling Ogre::MaterialManager::create, or by loading a Mesh (which will in turn load material properties).
 
@@ -178,7 +197,7 @@ The Ogre::MaterialManager class manages the master list of materials available t
 
 You can alter these settings by calling Ogre::MaterialManager::getDefaultSettings() and making the required changes to the Material which is returned.
 
-Entities automatically have Material’s associated with them if they use a Ogre::Mesh object, since the Ogre::Mesh object typically sets up its required materials on loading. You can also customise the material used by an entity as described in @ref Entities. Just create a new Material, set it up how you like (you can copy an existing material into it if you like using a standard assignment statement) and point the SubEntity entries at it using Ogre::SubEntity::setMaterialName().
+Entities automatically have Material’s associated with them if they use a Ogre::Mesh object, since the Ogre::Mesh object typically sets up it’s required materials on loading. You can also customise the material used by an entity as described in @ref Entities. Just create a new Material, set it up how you like (you can copy an existing material into it if you like using a standard assignment statement) and point the SubEntity entries at it using Ogre::SubEntity::setMaterialName().
 
 
 
@@ -186,12 +205,11 @@ Entities automatically have Material’s associated with them if they use a Ogre
 
 Overlays allow you to render 2D and 3D elements on top of the normal scene contents to create effects like heads-up displays (HUDs), menu systems, status panels etc. The frame rate statistics panel which comes as standard with OGRE is an example of an overlay. Overlays can contain 2D or 3D elements. 2D elements are used for HUDs, and 3D elements can be used to create cockpits or any other 3D object which you wish to be rendered on top of the rest of the scene.
 
-You can create overlays either through the Ogre::OverlayManager::create method, or you can define them in an .overlay script. See [Overlay Scripts](@ref Overlay-Scripts) for more info. In reality the latter is likely to be the most practical because it is easier to tweak (without the need to recompile the code). Note that you can define as many overlays as you like: they all start off life hidden, and you display them by calling Ogre::Overlay::show. You can get pointers to them with Ogre::OverlayManager::getByName. You can also show multiple overlays at once, and their Z order is determined by the Ogre::Overlay::setZOrder() method.
+You can create overlays either through the Ogre::OverlayManager::create method, or you can define them in an .overlay script. See [Overlay Scripts](@ref Overlay-Scripts) for more info. In reality the latter is likely to be the most practical because it is easier to tweak (without the need to recompile the code). Note that you can define as many overlays as you like: they all start off life hidden, and you display them by calling Ogre::Overlay::show. You can also show multiple overlays at once, and their Z order is determined by the Ogre::Overlay::setZOrder() method.
 
-<a name="Notes-On-Integration"></a> <!-- left in just in case something links to it -->
-<a name="How-to-Enable-Overlays"></a>
+<a name="Notes-on-Integration"></a>
 
-## How to Enable Overlays
+## Notes on Integration
 
 The OverlaySystem is its own component, you need to manually initialize it, with the following two lines of code (mSceneMgr is a pointer to your current Ogre::SceneManager):
 
@@ -201,14 +219,6 @@ mSceneMgr->addRenderQueueListener(pOverlaySystem);
 ```
 
 One Ogre::OverlaySystem per application is enough but you need to call addRenderQueueListener once per SceneManager.
-
-If you are using OgreBites, then you need to fetch the pre-existing OverlaySystem.
-```cpp
-Ogre::OverlaySystem* pOverlaySystem = myApplicationContext.getOverlaySystem();
-mSceneMgr->addRenderQueueListener(pOverlaySystem);
-```
-
-Where `myApplicationContext` is your OgreBites::ApplicationContext object.
 
 <a name="Creating-2D-Elements"></a>
 
@@ -226,7 +236,7 @@ The third important class is Ogre::OverlayManager. Whenever an application wishe
 
 Only OverlayContainers can be added direct to an overlay. The reason is that each level of container establishes the Zorder of the elements contained within it, so if you nest several containers, inner containers have a higher Z-order than outer ones to ensure they are displayed correctly. To add a container (such as a Panel) to the overlay, simply call Ogre::Overlay::add2D.
 
-If you wish to add child elements to that container, call Ogre::OverlayContainer::addChild. Child elements can be Ogre::OverlayElements or Ogre::OverlayContainer instances themselves. Remember that the position of a child element is relative to the top-left corner of its parent.
+If you wish to add child elements to that container, call Ogre::OverlayContainer::addChild. Child elements can be Ogre::OverlayElements or Ogre::OverlayContainer instances themselves. Remember that the position of a child element is relative to the top-left corner of it’s parent.
 
 <a name="A-word-about-2D-coordinates"></a>
 
@@ -241,7 +251,7 @@ This mode is useful when you want to specify an exact size for your overlay item
 
 </dd> <dt>Relative Mode</dt> <dd>
 
-This mode is useful when you want items in the overlay to be the same size on the screen no matter what the resolution. In relative mode, the top-left of the screen is (0,0) and the bottom-right is (1,1). So if you place an element at (0.5, 0.5), its top-left corner is placed exactly in the center of the screen, no matter what resolution the application is running in. The same principle applies to sizes; if you set the width of an element to 0.5, it covers half the width of the screen. Note that because the aspect ratio of the screen is typically 1.3333 : 1 (width : height), an element with dimensions (0.25, 0.25) will not be square, but it will take up exactly 1/16th of the screen in area terms. If you want square-looking areas you will have to compensate using the typical aspect ratio e.g. use (0.1875, 0.25) instead.
+This mode is useful when you want items in the overlay to be the same size on the screen no matter what the resolution. In relative mode, the top-left of the screen is (0,0) and the bottom-right is (1,1). So if you place an element at (0.5, 0.5), it’s top-left corner is placed exactly in the center of the screen, no matter what resolution the application is running in. The same principle applies to sizes; if you set the width of an element to 0.5, it covers half the width of the screen. Note that because the aspect ratio of the screen is typically 1.3333 : 1 (width : height), an element with dimensions (0.25, 0.25) will not be square, but it will take up exactly 1/16th of the screen in area terms. If you want square-looking areas you will have to compensate using the typical aspect ratio e.g. use (0.1875, 0.25) instead.
 
 </dd> </dl>
 
@@ -254,84 +264,28 @@ Another nice feature of overlays is being able to rotate, scroll and scale them 
 
 ## GUI systems
 
-Overlays are only really designed for non-interactive screen elements, although you can create a simple GUI using the [Trays System](@ref trays). For a far more complete GUI solution, we recommend Ogre's integration with [Dear ImGui](<https://github.com/OGRECave/ogre/blob/master/Samples/Simple/include/ImGuiDemo.h>), or third-party libraries like [CEGui](<http://www.cegui.org.uk>) or [MyGUI](<http://mygui.info/>).
+Overlays are only really designed for non-interactive screen elements, although you can create a simple GUI using the [Trays System](@ref trays). For a far more complete GUI solution, we recommend or [Dear ImGui](<https://github.com/OGRECave/ogre-imgui>), [CEGui](<http://www.cegui.org.uk>) or [MyGUI](<http://mygui.info/>).
 
 @page Mesh-Tools Mesh Tools
 
 There are a number of mesh tools available with OGRE to help you manipulate your meshes.
 
-@tableofcontents
+<dl compact="compact">
+<dt>[Exporters](@ref Exporters)</dt> <dd>
 
-# XMLConverter {#XMLConverter}
+For getting data out of modellers and into OGRE.
 
-This tool can convert binary .mesh and .skeleton files to XML and back again - this is a very useful tool for debugging the contents of meshes, or for exchanging mesh data easily - many of the modeller mesh exporters export to XML because it is simpler to do, and @c OgreXMLConverter can then produce a binary from it.
+</dd> <dt>[XMLConverter](@ref XMLConverter)</dt> <dd>
 
-@par Usage
-```
-OgreXMLConverter [parameters] sourcefile [destfile]
-```
+For converting meshes and skeletons to/from XML.
 
-@param -v        Display version information
-@param -merge    [n0,n1] Merge texcoordn0 with texcoordn1. The , separator must be
-                 present, otherwise only n0 is provided assuming n1 = n0+1;
-                 n0 and n1 must be in the same buffer source & adjacent
-                 to each other for the merge to work.
-@param -o        DON'T optimise out redundant tracks & keyframes
-@param -E        Set endian mode `big` `little` or `native` (default)
-@param -x        Generate no more than num eXtremes for every submesh (default 0)
-@param -q        Quiet mode, less output
-@param -log      name of the log file (default: `OgreXMLConverter.log`)
+</dd> <dt>[MeshUpgrader](@ref MeshUpgrader)</dt> <dd>
 
-# MeshUpgrader {#MeshUpgrader}
+For upgrading binary meshes from one version of OGRE to another.
 
-This tool is provided to allow you to upgrade your meshes when the binary format changes - sometimes we alter it to add new features and as such you need to keep your own assets up to date.
-Furthermore, @c OgreMeshUpgrader can generate additional information for the mesh, like bounding regions and level-of-detail reduction.
-See the @ref meshlod-generator Tutorial for details.
-
-@par Usage
-```
-OgreMeshUpgrader [parameters] sourcefile [destfile]
-```
-
-@param -pack          Pack normals and tangents as @c int_10_10_10_2
-@param -optvtxcache   Reorder the indexes to optimise vertex cache utilisation
-@param -autogen       Generate autoconfigured LOD. No LOD options needed
-@param -l             number of LOD levels
-@param -d             distance increment to reduce LOD
-@param -p             Percentage triangle reduction amount per LOD
-@param -f             Fixed vertex reduction per LOD
-@param -el            generate edge lists (for stencil shadows)
-@param -t             Generate tangents (for normal mapping)
-@param -ts            Tangent size (4 includes parity, default: 3)
-@param -tm            Split tangent vertices at UV mirror points
-@param -tr            Split tangent vertices where basis is rotated > 90 degrees
-@param -r             DON'T reorganise buffers to recommended format
-@param -E             Set endian mode `big` `little` or `native` (default)
-@param -b             Recalculate bounding box (static meshes only)
-@param -V             Specify OGRE version format to write instead of latest
-                      Options are: `1.10, 1.8, 1.7, 1.4, 1.0`
-@param -log filename  name of the log file (default: `OgreMeshUpgrader.log`)
+</dd> </dl>
 
 
-@note
-The OGRE release notes will notify you when meshes should be upgraded with a new release.
-
-# AssimpConverter {#AssimpConverter}
-
-This tool converts 3D-formats supported by [assimp](https://assimp-docs.readthedocs.io/en/stable/about/introduction.html) to native OGRE .mesh .skeleton and .material files.
-
-@par Usage
-```
-OgreAssimpConverter [parameters] sourcefile [destination]
-```
-
-@param -q                  Quiet mode, less output
-@param -log filename       name of the log file (default: `OgreAssimp.log`)
-@param -aniSpeedMod [0..1] Factor to scale the animation speed (default: 1.0)
-@param -3ds_ani_fix        Fix for 3ds max, which exports the animation over a
-                           longer time frame than the animation actually plays
-@param -max_edge_angle deg When normals are generated, max angle between
-                           two faces to smooth over
 
 # Exporters {#Exporters}
 
@@ -353,32 +307,52 @@ If you’re creating non-animated meshes, then you do not need to be concerned w
 
 Full documentation for each exporter is provided along with the exporter itself, and there is a [selection of the currently supported modelling tools at OGRECave](https://github.com/OGRECave).
 
-## A Note About empty Material Names
 
-All mesh files are required to have a material name set, otherwise most mesh tools will fail with an exception.
-Even if they don't, the exception will happen deep inside the render-loop which is way harder to debug  (unless you set the material programmatically).
 
-To set a material name for the mesh, you have these options:
+# XMLConverter {#XMLConverter}
 
- - Re-export the mesh from your preferred DCC (Digital Content Creator) exporter, making sure that a material has been assigned.
- - Edit the mesh.xml file to set a material name and reprocess the xml with @c OgreXMLConverter.
- - Edit the mesh file with [MeshMagick](https://github.com/OGRECave/meshmagick) to set a material name
+The OgreXMLConverter tool can converter binary .mesh and .skeleton files to XML and back again - this is a very useful tool for debugging the contents of meshes, or for exchanging mesh data easily - many of the modeller mesh exporters export to XML because it is simpler to do, and OgreXMLConverter can then produce a binary from it. Other than simplicity, the other advantage is that OgreXMLConverter can generate additional information for the mesh, like bounding regions and level-of-detail reduction. 
+
+Syntax:
+
+```
+OgreXMLConverter [options] sourcefile [destfile] 
+```
+
+@param sourcefile name of file to convert
+@param destfile optional name of file to write to. If you don't
+specify this OGRE works it out through the extension
+and the XML contents if the source is XML. For example
+test.mesh becomes test.xml, test.xml becomes test.mesh
+if the XML document root is mesh etc.
+
+When converting XML to .mesh, you will be prompted to (re)generate level-of-detail(LOD) information for the mesh - you can choose to skip this part if you wish, but doing it will allow you to make your mesh reduce in detail automatically when it is loaded into the engine. The engine uses a complex algorithm to determine the best parts of the mesh to reduce in detail depending on many factors such as the curvature of the surface, the edges of the mesh and seams at the edges of textures and smoothing groups - taking advantage of it is advised to make your meshes more scalable in real scenes.
+
+
+
+# MeshUpgrader {#MeshUpgrader}
+
+This tool is provided to allow you to upgrade your meshes when the binary format changes - sometimes we alter it to add new features and as such you need to keep your own assets up to date. This tools has a very simple syntax:
+
+```
+OgreMeshUpgrader [options] sourcefile [destfile]
+```
+
+The OGRE release notes will notify you when this is necessary with a new release.
 
 @page Shadows Shadows
 
-Shadows are clearly an important part of rendering a believable scene - they provide a more tangible feel to the objects in the scene, and aid the viewer in understanding the spatial relationship between objects. Unfortunately, shadows are also one of the most challenging aspects of 3D rendering, and they are still very much an active area of research. Whilst there are many techniques to render shadows, none is perfect and they all come with advantages and disadvantages. For this reason, %Ogre provides multiple shadow implementations, with plenty of configuration settings, so you can choose which technique is most appropriate for your scene.
+Shadows are clearly an important part of rendering a believable scene - they provide a more tangible feel to the objects in the scene, and aid the viewer in understanding the spatial relationship between objects. Unfortunately, shadows are also one of the most challenging aspects of 3D rendering, and they are still very much an active area of research. Whilst there are many techniques to render shadows, none is perfect and they all come with advantages and disadvantages. For this reason, Ogre provides multiple shadow implementations, with plenty of configuration settings, so you can choose which technique is most appropriate for your scene.
 
-Shadow implementations fall into 2 basic categories:
-- @ref Stencil-Shadows
-- @ref Texture_002dbased-Shadows.
+Shadow implementations fall into basically 2 broad categories:
+1. @ref Stencil-Shadows
+2. @ref Texture_002dbased-Shadows.
 
-This describes the method by which the shape of the shadow is generated.
-
-In addition, there is more than one way to render the shadow into the scene:
+This describes the method by which the shape of the shadow is generated. In addition, there is more than one way to render the shadow into the scene:
 - @ref Modulative-Shadows, which darkens the scene in areas of shadow, and
 - @ref Additive-Light-Masking, which by contrast builds up light contribution in areas which are not in shadow.
 
-You also have the option of @ref Integrated-Texture-Shadows which gives you complete control over texture shadow application, allowing for complex single-pass shadowing shaders. %Ogre supports all these combinations.
+You also have the option of @ref Integrated-Texture-Shadows which gives you complete control over texture shadow application, allowing for complex single-pass shadowing shaders. Ogre supports all these combinations.
 
 @tableofcontents
 
@@ -387,12 +361,12 @@ You also have the option of @ref Integrated-Texture-Shadows which gives you comp
 Shadows are disabled by default, here’s how you turn them on and configure them in the general sense:
 
 1.  Enable a shadow technique on the SceneManager as the **first** thing you doing your scene setup. It is important that this is done first because the shadow technique can alter the way meshes are loaded. Here’s an example:
-```cpp
-mSceneMgr->setShadowTechnique(SHADOWTYPE_STENCIL_ADDITIVE);
-```
+
+    `mSceneMgr->setShadowTechnique(SHADOWTYPE_STENCIL_ADDITIVE);`
+
 2.  Create one or more lights. Note that not all light types are necessarily supported by all shadow techniques, you should check the sections about each technique to check. Note that if certain lights should not cast shadows, you can turn that off by calling setCastShadows(false) on the light, the default is true.
 3.  Disable shadow casting on objects which should not cast shadows. Call setCastShadows(false) on objects you don’t want to cast shadows, the default for all objects is to cast shadows.
-4.  Configure shadow far distance. You can limit the distance at which shadows are considered for performance reasons, by calling Ogre::SceneManager::setShadowFarDistance.
+4.  Configure shadow far distance. You can limit the distance at which shadows are considered for performance reasons, by calling SceneManager::setShadowFarDistance.
 5.  Turn off the receipt of shadows on materials that should not receive them. You can turn off the receipt of shadows (note, not the casting of shadows - that is done per-object) by calling Material::setReceiveShadows or using the receive\_shadows material attribute. This is useful for materials which should be considered self-illuminated for example. Note that transparent materials are typically excluded from receiving and casting shadows, although see the [transparency\_casts\_shadows](#transparency_005fcasts_005fshadows) option for exceptions.
 
 # Opting out of shadows {#Opting-out-of-shadows}
@@ -482,9 +456,9 @@ Don’t expect to be able to throw any scene using any hardware at the stencil s
 
  <a name="Stencil-Optimisations-Performed-By-Ogre"></a><a name="Stencil-Optimisations-Performed-By-Ogre-1"></a>
 
-## Stencil optimisations performed by Ogre
+## Stencil Optimisations Performed By %Ogre
 
-Despite all that, stencil shadows can look very nice (especially with @ref Additive-Light-Masking) and can be fast if you respect the rules above. In addition, %Ogre comes pre-packed with a lot of optimisations which help to make this as quick as possible. This section is more for developers or people interested in knowing something about the ’under the hood’ behaviour of %Ogre.
+Despite all that, stencil shadows can look very nice (especially with [Additive Light Masking](#Additive-Light-Masking)) and can be fast if you respect the rules above. In addition, Ogre comes pre-packed with a lot of optimisations which help to make this as quick as possible. This section is more for developers or people interested in knowing something about the ’under the hood’ behaviour of Ogre.
 
 <dl compact="compact">
 <dt>Vertex program extrusion</dt> <dd>
@@ -518,10 +492,10 @@ The main disadvantage to texture shadows is that, because they are simply a text
 <dl compact="compact">
 <dt>Choosing a projection basis</dt> <dd>
 
-The simplest projection is just to render the shadow casters from the lights perspective using a regular camera setup. This can look bad though, so there are many other projections which can help to improve the quality from the main camera’s perspective. OGRE supports pluggable projection bases via its ShadowCameraSetup class, and comes with several existing options
+The simplest projection is just to render the shadow casters from the lights perspective using a regular camera setup. This can look bad though, so there are many other projections which can help to improve the quality from the main camera’s perspective. OGRE supports pluggable projection bases via it’s ShadowCameraSetup class, and comes with several existing options
 - **Uniform**, which is the simplest,
-- **Uniform Focused**, which is still a normal camera projection, except that the camera is focused into the area that the main viewing camera is looking at
-- **Light Space Perspective Shadow Mapping** (LiSPSM), which both focuses and distorts the shadow frustum based on the main view camera and
+- **Uniform Focussed**, which is still a normal camera projection, except that the camera is focussed into the area that the main viewing camera is looking at
+- **Light Space Perspective Shadow Mapping** (LiSPSM), which both focusses and distorts the shadow frustum based on the main view camera and
 - **Plane Optimal**, which seeks to optimise the shadow fidelity for a single receiver plane.
 
 </dd> <dt>Filtering</dt> <dd>
@@ -748,7 +722,7 @@ Ogre is pretty good at classifying and splitting your passes to ensure that the 
 
 In practice this is very easy. Even though your vertex program could be doing a lot of complex, highly customised processing, it can still be classified into one of the 3 types listed above. All you need to do to tell Ogre what you’re doing is to use the pass attributes ambient, diffuse, specular and self\_illumination, just as if you were not using a vertex program. Sure, these attributes do nothing (as far as rendering is concerned) when you’re using vertex programs, but it’s the easiest way to indicate to Ogre which light components you’re using in your vertex program. Ogre will then classify and potentially split your programmable pass based on this information - it will leave the vertex program as-is (so that any split passes will respect any vertex modification that is being done). 
 
-Note that when classifying a diffuse/specular programmable pass, Ogre checks to see whether you have indicated the pass can be run once per light (iteration once\_per\_light). If so, the pass is left intact, including its vertex and fragment programs. However, if this attribute is not included in the pass, Ogre tries to split off the per-light part, and in doing so it will disable the fragment program, since in the absence of the ’iteration once\_per\_light’ attribute it can only assume that the fragment program is performing decal work and hence must not be used per light.
+Note that when classifying a diffuse/specular programmable pass, Ogre checks to see whether you have indicated the pass can be run once per light (iteration once\_per\_light). If so, the pass is left intact, including it’s vertex and fragment programs. However, if this attribute is not included in the pass, Ogre tries to split off the per-light part, and in doing so it will disable the fragment program, since in the absence of the ’iteration once\_per\_light’ attribute it can only assume that the fragment program is performing decal work and hence must not be used per light.
 
 So clearly, when you use additive light masking as a shadow technique, you need to make sure that programmable passes you use are properly set up so that they can be classified correctly. However, also note that the changes you have to make to ensure the classification is correct does not affect the way the material renders when you choose not to use additive lighting, so the principle that you should be able to use the same material definitions for all lighting scenarios still holds. Here is an example of a programmable material which will be classified correctly by the illumination pass classifier:
 
@@ -810,7 +784,7 @@ Skeletal animation can be performed in software, or implemented in shaders (hard
 
 SceneNode animation is created from the SceneManager in order to animate the movement of SceneNodes, to make any attached objects move around automatically. You can see this performing a camera swoop in the CameraTrack Sample, or controlling how the fish move around in the pond in the Fresnel Sample.
 
-At its heart, scene node animation is mostly the same code which animates the underlying skeleton in skeletal animation. After creating the main Animation using Ogre::SceneManager::createAnimation you can create a NodeAnimationTrack per SceneNode that you want to animate, and create keyframes which control its position, orientation and scale which can be interpolated linearly or via splines. You use @ref Animation-State in the same way as you do for skeletal/vertex animation, except you obtain the state from SceneManager instead of from an individual Entity. Animations are applied automatically every frame, or the state can be applied manually in advance using the \_applySceneAnimations() method on SceneManager. See the API reference for full details of the interface for configuring scene animations.
+At it’s heart, scene node animation is mostly the same code which animates the underlying skeleton in skeletal animation. After creating the main Animation using Ogre::SceneManager::createAnimation you can create a NodeAnimationTrack per SceneNode that you want to animate, and create keyframes which control its position, orientation and scale which can be interpolated linearly or via splines. You use @ref Animation-State in the same way as you do for skeletal/vertex animation, except you obtain the state from SceneManager instead of from an individual Entity. Animations are applied automatically every frame, or the state can be applied manually in advance using the \_applySceneAnimations() method on SceneManager. See the API reference for full details of the interface for configuring scene animations.
 
 # Vertex Animation {#Vertex-Animation}
 
@@ -922,60 +896,3 @@ One example of this is the Ogre::Light class. It extends AnimableObject and prov
 ## AnimableValue
 
 When implementing custom animable properties, you have to also implement a number of methods on the AnimableValue interface - basically anything which has been marked as unimplemented. These are not pure virtual methods simply because you only have to implement the methods required for the type of value you’re animating. Again, see the examples in Light to see how this is done.
-
-
-@page Instancing Instancing
-
-Instancing significantly reduces the CPU overhead of submitting many separate draw calls and is a great technique for rendering trees, rocks, grass, RTS units and other groups of similar (but necessarily identical) objects.
-
-OGRE supports a variety of techniques to speed up the rendering of many objects in the Scene.
-
-<dl compact="compact">
-<dt>@ref Static-Geometry</dt>
-<dd>Pre-transforms and batches up meshes for efficient use as static geometry in a scene.</dd>
-<dt>@ref Instance-Manager</dt>
-<dd>Instancing is a way of batching up geometry into a much more efficient form, but with some limitations, and still be able to move & animate it.</dd>
-</dl>
-
-@tableofcontents
-
-# Static Geometry {#Static-Geometry}
-Modern graphics cards (GPUs) prefer to receive geometry in large batches.
-It is orders of magnitude faster to render 10 batches of 10,000 triangles than it is to render 10,000 batches of 10 triangles, even though both result in the same number of on-screen triangles.
-
-Therefore it is important when you are rendering a lot of geometry to batch things up into as few rendering calls as possible.
-This class allows you to build a batched object from a series of entities in order to benefit from this behaviour. Batching has implications of it's own though:
- - A geometry region cannot be subdivided; that means that the whole group will be displayed, or none of it will. This obivously has culling issues.
- - A single world transform must apply to the entire batch. Therefore once you have batched things, you can't move them around relative to each other.
-   That's why this class is most useful when dealing with static geometry (hence the name).
-   In addition, geometry is effectively duplicated, so if you add 3 entities based on the same mesh in different positions, they will use 3 times the geometry space than the movable version (which re-uses the same geometry).
-   So you trade memory and flexibility of movement for pure speed when using this class.
- - A single material must apply for each batch. In fact this class allows you to use multiple materials, but you should be aware that internally this means that there is one batch per material.
-   Therefore you won't gain as much benefit from the batching if you use many different materials; try to keep the number down.
-
-@see Ogre::StaticGeometry
-@see [Tutorial - Static Geometry](@ref tut_StaticGeom)
-
-# Instance Manager {#Instance-Manager}
-Instancing is a rendering technique to draw multiple instances of the same mesh using just one render call. There are two kinds of instancing:
-
-@par Software
-Two larges vertex & index buffers are created and the mesh vertices/indices are duplicated N number of times. When rendering, invisible instances receive a transform matrix filled with 0s. This technique can take a lot of VRAM and has limited culling capabilities.
-@par Hardware
-The hardware supports an extra param which allows Ogre to tell the GPU to repeat the drawing of vertices N number of times; thus taking considerably less VRAM. Because N can be controlled at runtime, individual instances can be culled before sending the data to the GPU.
-Hardware techniques are almost always superior to Software techniques, but Software are more compatible, where as Hardware techniques require D3D9 or GL3, and is not supported in GLES2
-
-All instancing techniques require shaders. It is possible to have the [RTSS (Realtime Shader System)](@ref rtss) generate the shaders for you.
-
-@see Ogre::InstanceManager
-@see @subpage WhatIsInstancing
-
-# Static Geometry vs Instancing {#Static-Geometry-vs-Instancing}
-
-| Static Geometry | Instancing |
-| ----------------|------------|
-| Any sort of mesh is grouped in a minimal number of meshes, and cannot be updated (each mesh cannot move independently, only all the static geometry would be able to do so.) | The same mesh used many times, so Instanced geometry can be updated (each mesh can move independently) |
-| You have a scene with many unique meshes| Reuse the same mesh many times without the draw call cost. |
-| Batches up small static detail fragments like grass without shaders. | One mesh is repeated many times without the performance hit of having them as individual meshes. |
-| Geometry that doesn't move and has low in GPU requirements | Dynamic geometry (animated or moving) and better GPU (sm2.0+) |
-| Batches separate sets of polygons together, as long as they have the same properties such as material. These batches are then automatically split into regions for better culling. You can control the region size. This is a good way to reduce batches for static elements. | Good for large numbers of the same exact object. You can have multiple instances of one object that can dynamically move but that are drawn in one draw call. |

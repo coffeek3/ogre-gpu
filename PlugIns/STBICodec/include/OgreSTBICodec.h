@@ -38,10 +38,7 @@ namespace Ogre {
     *  @{
     */
     /** \defgroup STBIImageCodec STBIImageCodec
-    * %Codec for loading generic image formats (e.g. jpg, png) using [stb_image](https://github.com/nothings/stb)
-    *
-    * This Codec is ideal for files, that you are in control of. There are no external dependencies and no superfluous pixel conversions.
-    * The downside is that not all format variants are supported and the code is more vulnerable to malicious files.
+    * %Codec specialized in images loaded using stb image (https://github.com/nothings/stb).
     * @{
     */
     class STBIImageCodec : public ImageCodec
@@ -56,17 +53,33 @@ namespace Ogre {
         STBIImageCodec(const String &type);
         virtual ~STBIImageCodec() { }
 
-        DataStreamPtr encode(const Any& input) const override;
-        void encodeToFile(const Any& input, const String& outFileName) const override;
-        void decode(const DataStreamPtr& input, const Any& output) const override;
+        /// @copydoc Codec::encode
+        DataStreamPtr encode(const MemoryDataStreamPtr& input, const CodecDataPtr& pData) const;
+        /// @copydoc Codec::encodeToFile
+        void encodeToFile(const MemoryDataStreamPtr& input, const String& outFileName, const CodecDataPtr& pData) const;
+        /// @copydoc Codec::decode
+        DecodeResult decode(const DataStreamPtr& input) const;
 
-        String getType() const  override;
-        String magicNumberToFileExt(const char *magicNumberPtr, size_t maxbytes) const override;
+        
+        virtual String getType() const;        
+
+        /// @copydoc Codec::magicNumberToFileExt
+        String magicNumberToFileExt(const char *magicNumberPtr, size_t maxbytes) const;
 
         /// Static method to startup and register the codecs
         _OgreSTBICodecExport static void startup(void);
         /// Static method to shutdown and unregister the codecs
         _OgreSTBICodecExport static void shutdown(void);
+    };
+
+    class STBIPlugin : public Plugin
+    {
+    public:
+        const String& getName() const;
+        void install() { STBIImageCodec::startup(); }
+        void uninstall() { STBIImageCodec::shutdown(); }
+        void initialise() {}
+        void shutdown() {}
     };
     /** @} */
     /** @} */

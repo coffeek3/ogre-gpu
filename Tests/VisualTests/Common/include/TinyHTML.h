@@ -49,7 +49,7 @@ struct HtmlTextNode : public HtmlNode
     HtmlTextNode(Ogre::String text):contents(text){}
     //-------------------------------------------------------------------
 
-    Ogre::String print(Ogre::String indent = "") override
+    virtual Ogre::String print(Ogre::String indent = "")
     {
         return contents;
     }
@@ -108,7 +108,7 @@ struct HtmlElement : public HtmlNode
     }
     //-------------------------------------------------------------------
 
-    Ogre::String print(Ogre::String indent = "") override
+    virtual Ogre::String print(Ogre::String indent = "")
     {
         // stream we'll output to
         StringStream out;

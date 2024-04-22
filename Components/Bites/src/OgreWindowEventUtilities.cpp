@@ -67,6 +67,7 @@ LRESULT CALLBACK WindowEventUtilities::_WndProc(HWND hWnd, UINT uMsg, WPARAM wPa
     if (!win)
         return DefWindowProc(hWnd, uMsg, wParam, lParam);
 
+    //LogManager* log = LogManager::getSingletonPtr();
     //Iterator of all listeners registered to this RenderWindow
     WindowEventListeners::iterator index,
         start = _msListeners.lower_bound(win),
@@ -138,11 +139,7 @@ LRESULT CALLBACK WindowEventUtilities::_WndProc(HWND hWnd, UINT uMsg, WPARAM wPa
         break;
     case WM_SIZE:
         //log->logMessage("WM_SIZE");
-        {
-            UINT width = LOWORD(lParam);
-            UINT height = HIWORD(lParam);
-            win->resize(width, height);
-        }
+        win->windowMovedOrResized();
         for(index = start; index != end; ++index)
             (index->second)->windowResized(win);
         break;
@@ -186,27 +183,30 @@ void WindowEventUtilities::messagePump()
     }
 #elif OGRE_PLATFORM == OGRE_PLATFORM_LINUX
     //GLX Message Pump
+    Ogre::RenderWindowList::iterator win = _msWindows.begin();
+    Ogre::RenderWindowList::iterator end = _msWindows.end();
+
     Display* xDisplay = 0; // same for all windows
 
-    for (const auto& w : _msWindows)
+    for (; win != end; win++)
     {
         XID xid;
         XEvent event;
 
         if (!xDisplay)
-        w->getCustomAttribute("XDISPLAY", &xDisplay);
+        (*win)->getCustomAttribute("XDISPLAY", &xDisplay);
 
-        w->getCustomAttribute("WINDOW", &xid);
+        (*win)->getCustomAttribute("WINDOW", &xid);
 
         while (XCheckWindowEvent (xDisplay, xid, StructureNotifyMask | VisibilityChangeMask | FocusChangeMask, &event))
         {
-            GLXProc(w, event);
+        GLXProc(*win, event);
         }
 
         // The ClientMessage event does not appear under any Event Mask
         while (XCheckTypedWindowEvent (xDisplay, xid, ClientMessage, &event))
         {
-            GLXProc(w, event);
+        GLXProc(*win, event);
         }
     }
 #endif
@@ -221,9 +221,16 @@ void WindowEventUtilities::addWindowEventListener( RenderWindow* window, WindowE
 //--------------------------------------------------------------------------------//
 void WindowEventUtilities::removeWindowEventListener( RenderWindow* window, WindowEventListener* listener )
 {
-    auto s = _msListeners.find(window);
-    if (s != _msListeners.end() && s->second == listener)
-        _msListeners.erase(s);
+    WindowEventListeners::iterator i = _msListeners.begin(), e = _msListeners.end();
+
+    for( ; i != e; ++i )
+    {
+        if( i->first == window && i->second == listener )
+        {
+            _msListeners.erase(i);
+            break;
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------//
@@ -285,15 +292,16 @@ static void GLXProc( Ogre::RenderWindow *win, const XEvent &event )
         break;
     }
     case ConfigureNotify:
-    {
-        unsigned int oldWidth, oldHeight;
+    {    
+        // This could be slightly more efficient if windowMovedOrResized took arguments:
+        unsigned int oldWidth, oldHeight, oldDepth;
         int oldLeft, oldTop;
-        win->getMetrics(oldWidth, oldHeight, oldLeft, oldTop);
-        win->resize(event.xconfigurerequest.width, event.xconfigurerequest.height);
+        win->getMetrics(oldWidth, oldHeight, oldDepth, oldLeft, oldTop);
+        win->windowMovedOrResized();
 
-        unsigned int newWidth, newHeight;
+        unsigned int newWidth, newHeight, newDepth;
         int newLeft, newTop;
-        win->getMetrics(newWidth, newHeight, newLeft, newTop);
+        win->getMetrics(newWidth, newHeight, newDepth, newLeft, newTop);
 
         if (newLeft != oldLeft || newTop != oldTop)
         {

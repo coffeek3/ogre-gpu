@@ -61,6 +61,7 @@ THE SOFTWARE.
 #include "OgreShaderProgramWriterManager.h"
 
 #include "OgreShaderFFPRenderState.h"
+#include "OgreShaderFFPRenderStateBuilder.h"
 #include "OgreShaderFFPTransform.h"
 #include "OgreShaderFFPLighting.h"
 #include "OgreShaderFFPColour.h"
@@ -76,71 +77,19 @@ THE SOFTWARE.
 #include "OgreShaderExHardwareSkinning.h"
 #include "OgreShaderExLinearSkinning.h"
 #include "OgreShaderExDualQuaternionSkinning.h"
+#include "OgreShaderExTextureAtlasSampler.h"
 #include "OgreShaderExTriplanarTexturing.h"
-#include "OgreShaderExGBuffer.h"
-#include "OgreShaderExWBOIT.h"
-#include "OgreShaderCookTorranceLighting.h"
-#include "OgreShaderImageBasedLighting.h"
+
+#include "OgreShaderCGProgramProcessor.h"
+#include "OgreShaderHLSLProgramProcessor.h"
+#include "OgreShaderGLSLProgramProcessor.h"
+#include "OgreShaderGLSLESProgramProcessor.h"
 
 #include "OgreShaderProgramWriter.h"
 #include "OgreShaderProgramWriterManager.h"
 #include "OgreShaderCGProgramWriter.h"
+#include "OgreShaderHLSLProgramWriter.h"
 #include "OgreShaderGLSLProgramWriter.h"
 #include "OgreShaderGLSLESProgramWriter.h"
-
-// Fixed Function Library: Transform functions
-#define FFP_LIB_TRANSFORM                           "FFPLib_Transform"
-#define FFP_FUNC_TRANSFORM                          "FFP_Transform"
-
-// Fixed Function Library: Texturing functions
-#define FFP_LIB_TEXTURING                           "FFPLib_Texturing"
-#define FFP_FUNC_TRANSFORM_TEXCOORD                 "FFP_TransformTexCoord"
-#define FFP_FUNC_GENERATE_TEXCOORD_ENV_NORMAL       "FFP_GenerateTexCoord_EnvMap_Normal"
-#define FFP_FUNC_GENERATE_TEXCOORD_ENV_SPHERE       "FFP_GenerateTexCoord_EnvMap_Sphere"
-#define FFP_FUNC_GENERATE_TEXCOORD_ENV_REFLECT      "FFP_GenerateTexCoord_EnvMap_Reflect"
-
-#define FFP_FUNC_ADDSMOOTH                          "FFP_AddSmooth"
-#define FFP_FUNC_DOTPRODUCT                         "FFP_DotProduct"
-
-// Fixed Function Library: Fog functions
-#define FFP_LIB_FOG                                 "FFPLib_Fog"
-
-// Fixed Function Library: Alpha Test
-#define FFP_LIB_ALPHA_TEST							"FFPLib_AlphaTest"
-#define FFP_FUNC_ALPHA_TEST							"FFP_Alpha_Test"
-
-#define SGX_LIB_PERPIXELLIGHTING                    "SGXLib_PerPixelLighting"
-
-namespace Ogre {
-namespace RTShader {
-class LayeredBlendingFactory : public SubRenderStateFactory
-{
-public:
-    const String& getType() const override;
-    SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, TextureUnitState* texState,
-                                   SGScriptTranslator* translator) override;
-    void writeInstance(MaterialSerializer* ser, SubRenderState* subRenderState, const TextureUnitState* srcTextureUnit,
-                       const TextureUnitState* dstTextureUnit) override;
-
-private:
-    SubRenderState* createInstanceImpl() override;
-    LayeredBlending* createOrRetrieveSubRenderState(SGScriptTranslator* translator);
-};
-
-class FFPTexturingFactory : public SubRenderStateFactory
-{
-public:
-    const String& getType() const override;
-    SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, Pass* pass,
-                                   SGScriptTranslator* translator) override;
-    void writeInstance(MaterialSerializer* ser, SubRenderState* subRenderState, Pass* srcPass, Pass* dstPass) override;
-protected:
-    SubRenderState* createInstanceImpl() override;
-};
-
-uint16 ensureLtcLUTPresent(Pass* dstPass);
-
-} // namespace RTShader
-} // namespace Ogre
 
 #endif 

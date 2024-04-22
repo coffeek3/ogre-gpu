@@ -30,20 +30,27 @@ THE SOFTWARE.
 
 namespace Ogre {
 
-    const String MOT_SIMPLE_RENDERABLE = "SimpleRenderable";
-
     uint SimpleRenderable::msGenNameCount = 0;
 
-    SimpleRenderable::SimpleRenderable() : SimpleRenderable(BLANKSTRING)
+    SimpleRenderable::SimpleRenderable()
+    : MovableObject()
+    , mTransform(Affine3::IDENTITY)
+    , mMaterial(MaterialManager::getSingleton().getDefaultMaterial())
+    , mParentSceneManager(NULL)
+    , mCamera(NULL)
+
     {
         // Generate name
-        mName = StringUtil::format("SimpleRenderable%d", msGenNameCount++);
+        StringStream name;
+        name << "SimpleRenderable" << msGenNameCount++;
+        mName = name.str();
     }
 
     SimpleRenderable::SimpleRenderable(const String& name)
     : MovableObject(name)
     , mTransform(Affine3::IDENTITY)
     , mMaterial(MaterialManager::getSingleton().getDefaultMaterial())
+    , mParentSceneManager(NULL)
     , mCamera(NULL)
     {
     }
@@ -111,7 +118,8 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     const String& SimpleRenderable::getMovableType(void) const
     {
-        return MOT_SIMPLE_RENDERABLE;
+        static String movType = "SimpleRenderable";
+        return movType;
     }
     //-----------------------------------------------------------------------
     const LightList& SimpleRenderable::getLights(void) const

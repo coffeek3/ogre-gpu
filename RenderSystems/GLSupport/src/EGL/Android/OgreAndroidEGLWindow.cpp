@@ -57,45 +57,65 @@ namespace Ogre {
     {
     }
 
+    void AndroidEGLWindow::getLeftAndTopFromNativeWindow( int & left, int & top, uint width, uint height )
+    {
+        // We don't have a native window.... but I think all android windows are origined
+        left = top = 0;
+    }
+
+    void AndroidEGLWindow::initNativeCreatedWindow(const NameValuePairList *miscParams)
+    {
+    }
+
+    void AndroidEGLWindow::createNativeWindow( int &left, int &top, uint &width, uint &height, String &title )
+    {
+    }
+
+    void AndroidEGLWindow::reposition( int left, int top )
+    {
+    }
+
     void AndroidEGLWindow::resize(uint width, uint height)
     {
-        width *= mScale;
-        height *= mScale;
+      EGLint format;
+      eglGetConfigAttrib(mEglDisplay, mEglConfig, EGL_NATIVE_VISUAL_ID, &format);
+      EGL_CHECK_ERROR
 
-        if (!mActive || (mWidth == width && mHeight == height))
-            return;
-
-        mWidth = width;
-        mHeight = height;
-
-        // Notify viewports of resize
-        ViewportList::iterator it = mViewportList.begin();
-        while (it != mViewportList.end())
-            (*it++).second->_updateDimensions();
-
-        EGLint format;
-        eglGetConfigAttrib(mEglDisplay, mEglConfig, EGL_NATIVE_VISUAL_ID, &format);
-        EGL_CHECK_ERROR
-
-        if (mScale != 1.0f)
-        {
-            ANativeWindow_setBuffersGeometry(mWindow, mWidth, mHeight, format);
-        }
-        else
-        {
-            ANativeWindow_setBuffersGeometry(mWindow, 0, 0, format);
-        }
+      if (mScale != 1.0f)
+      {
+        int nwidth = (int)((float)ANativeWindow_getWidth(mWindow) * mScale);
+        int nheight = (int)((float)ANativeWindow_getHeight(mWindow) * mScale);
+        ANativeWindow_setBuffersGeometry(mWindow, nwidth, nheight, format);
+      }
+      else
+      {
+        ANativeWindow_setBuffersGeometry(mWindow, 0, 0, format);
+      }
     }
 
     void AndroidEGLWindow::windowMovedOrResized()
     {
         if(mActive)
-        {
-            int nwidth = ANativeWindow_getWidth(mWindow);
-            int nheight = ANativeWindow_getHeight(mWindow);
-
-            resize(nwidth, nheight);
+        {		
+            // When using GPU rendering for Android UI the os creates a context in the main thread
+            // Now we have 2 choices create OGRE in its own thread or set our context current before doing
+            // anything else. I put this code here because this function called before any rendering is done.
+            // Because the events for screen rotation / resizing did not worked on all devices it is the best way
+            // to query the correct dimensions.
+            mContext->setCurrent(); 
+            eglQuerySurface(mEglDisplay, mEglSurface, EGL_WIDTH, (EGLint*)&mWidth);
+            eglQuerySurface(mEglDisplay, mEglSurface, EGL_HEIGHT, (EGLint*)&mHeight);
+            
+            // Notify viewports of resize
+            ViewportList::iterator it = mViewportList.begin();
+            while( it != mViewportList.end() )
+                (*it++).second->_updateDimensions();
         }
+    }
+    
+    void AndroidEGLWindow::switchFullScreen(bool fullscreen)
+    {
+    
     }
     
     void AndroidEGLWindow::create(const String& name, uint width, uint height,
@@ -126,7 +146,8 @@ namespace Ogre {
                                 "currentGLContext was specified with no current GL context",
                                 "EGLWindow::create");
                 }
-
+                
+                mEglSurface = eglGetCurrentSurface(EGL_DRAW);
                 mEglDisplay = eglGetCurrentDisplay();
             }
 
@@ -161,7 +182,7 @@ namespace Ogre {
                 if (mMinBufferSize > mMaxBufferSize) mMinBufferSize = mMaxBufferSize;
             }
 
-            if((opt = miscParams->find("FSAA")) != end)
+            if((opt = miscParams->find("MSAA")) != end)
             {
                 mMSAA = Ogre::StringConverter::parseInt(opt->second);
             }
@@ -188,6 +209,13 @@ namespace Ogre {
             }
         }
 
+        initNativeCreatedWindow(miscParams);
+
+        if (mEglSurface)
+        {
+            mEglConfig = mGLSupport->getGLConfigFromDrawable (mEglSurface, &width, &height);
+        }
+
         if (!mEglConfig && eglContext)
         {
             mEglConfig = mGLSupport->getGLConfigFromContext(eglContext);
@@ -201,22 +229,25 @@ namespace Ogre {
             }
         }
 
+        mIsExternal = (mEglSurface != 0);
+
         if (!mEglConfig)
         {
             _notifySurfaceCreated(mWindow, config);
             mHwGamma = false;
         }
         
-        mContext = createEGLContext(eglContext);
+        mContext = createEGLContext();
         mContext->setCurrent();
 
         eglQuerySurface(mEglDisplay, mEglSurface, EGL_WIDTH, (EGLint*)&mWidth);
         eglQuerySurface(mEglDisplay, mEglSurface, EGL_HEIGHT, (EGLint*)&mHeight);
         EGL_CHECK_ERROR
 
+        mActive = true;
+        mVisible = true;
+        mClosed = false;
         mPreserveContext = preserveContextOpt;
-
-        finaliseWindow();
     }
 
     void AndroidEGLWindow::_notifySurfaceDestroyed()
@@ -229,7 +260,7 @@ namespace Ogre {
             mContext->setCurrent();
 
             static_cast<GLRenderSystemCommon*>(Root::getSingletonPtr()->getRenderSystem())->notifyOnContextLost();
-            static_cast<EGLContext*>(mContext)->_destroyInternalResources();
+            mContext->_destroyInternalResources();
         }
         
         eglDestroySurface(mEglDisplay, mEglSurface);
@@ -272,7 +303,7 @@ namespace Ogre {
             }
 
             mEglSurface = createSurfaceFromWindow(mEglDisplay, mWindow);
-            static_cast<EGLContext*>(mContext)->_updateInternalResources(mEglDisplay, mEglConfig, mEglSurface);
+            mContext->_updateInternalResources(mEglDisplay, mEglConfig, mEglSurface);
         }
         else
         {
@@ -384,7 +415,7 @@ namespace Ogre {
             
             if (!mPreserveContext)
             {
-                static_cast<EGLContext*>(mContext)->_createInternalResources(mEglDisplay, mEglConfig, mEglSurface, NULL);
+                mContext->_createInternalResources(mEglDisplay, mEglConfig, mEglSurface, NULL);
 
                 static_cast<GLRenderSystemCommon*>(Root::getSingletonPtr()->getRenderSystem())->resetRenderer(this);
             }

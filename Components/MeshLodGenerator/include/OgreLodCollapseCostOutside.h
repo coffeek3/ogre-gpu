@@ -45,9 +45,9 @@ class _OgreLodExport LodCollapseCostOutside :
 public:
     LodCollapseCostOutside(LodCollapseCostPtr costCalculator, Real outsideWeight, Real outsideWalkAngle);
     ~LodCollapseCostOutside();
-    void initCollapseCosts(LodData* data) override;
-    Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge) override;
-private:
+    virtual void initCollapseCosts(LodData* data);
+    virtual Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge);
+protected:
 
     Real mOutsideWeight;
     Real mOutsideWalkAngle;

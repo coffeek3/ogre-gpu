@@ -50,52 +50,56 @@ namespace Ogre {
     class _OgreExport PixelCountLodStrategyBase : public LodStrategy
     {
     protected:
-        Real getValueImpl(const MovableObject *movableObject, const Camera *camera) const override;
+        virtual Real getValueImpl(const MovableObject *movableObject, const Camera *camera) const = 0;
 
     public:
         /** Default constructor. */
         PixelCountLodStrategyBase(const String& name);
 
         /// @copydoc LodStrategy::getBaseValue
-        Real getBaseValue() const override;
+        virtual Real getBaseValue() const;
 
         /// @copydoc LodStrategy::transformBias
-        Real transformBias(Real factor) const override;
+        virtual Real transformBias(Real factor) const;
 
         /// @copydoc LodStrategy::getIndex
-        ushort getIndex(Real value, const Mesh::MeshLodUsageList& meshLodUsageList) const override;
+        virtual ushort getIndex(Real value, const Mesh::MeshLodUsageList& meshLodUsageList) const;
 
         /// @copydoc LodStrategy::getIndex
-        ushort getIndex(Real value, const Material::LodValueList& materialLodValueList) const override;
+        virtual ushort getIndex(Real value, const Material::LodValueList& materialLodValueList) const;
 
         /// @copydoc LodStrategy::sort
-        void sort(Mesh::MeshLodUsageList& meshLodUsageList) const override;
+        virtual void sort(Mesh::MeshLodUsageList& meshLodUsageList) const;
 
         /// @copydoc LodStrategy::isSorted
-        bool isSorted(const Mesh::LodValueList& values) const override;
+        virtual bool isSorted(const Mesh::LodValueList& values) const;
     };
+    /** @} */
+    /** @} */
 
     class _OgreExport AbsolutePixelCountLodStrategy : public PixelCountLodStrategyBase, public Singleton<AbsolutePixelCountLodStrategy>
     {
     public:
         /** Default constructor. */
         AbsolutePixelCountLodStrategy();
-        ~AbsolutePixelCountLodStrategy();
 
-        Real getValueImpl(const MovableObject *movableObject, const Camera *camera) const override;
+        Real getValueImpl(const MovableObject *movableObject, const Camera *camera) const;
 
         /// @copydoc Singleton::getSingleton()
         static AbsolutePixelCountLodStrategy& getSingleton(void);
         /// @copydoc Singleton::getSingleton()
         static AbsolutePixelCountLodStrategy* getSingletonPtr(void);
     };
+    /** @} */
+    /** @} */
 
     class _OgreExport ScreenRatioPixelCountLodStrategy : public PixelCountLodStrategyBase, public Singleton<ScreenRatioPixelCountLodStrategy>
     {
     public:
         /** Default constructor. */
         ScreenRatioPixelCountLodStrategy();
-        ~ScreenRatioPixelCountLodStrategy();
+
+        Real getValueImpl(const MovableObject *movableObject, const Camera *camera) const;
 
         /// @copydoc Singleton::getSingleton()
         static ScreenRatioPixelCountLodStrategy& getSingleton(void);

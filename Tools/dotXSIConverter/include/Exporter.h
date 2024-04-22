@@ -5,7 +5,9 @@
 #include "stdafx.h"
 #include "SemanticLayer.h"
 #include "OgrePrerequisites.h"
-#include "OgreVector.h"
+#include "OgreVector2.h"
+#include "OgreVector3.h"
+#include "OgreVector3.h"
 #include "OgreColourValue.h"
 #include "OgreMesh.h"
 

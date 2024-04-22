@@ -36,8 +36,6 @@ THE SOFTWARE.
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre {
-    enum TexCoordCalcMethod : uint8;
-
     /** \addtogroup Core
     *  @{
     */
@@ -47,7 +45,7 @@ namespace Ogre {
 
     /** Class which determines how a TextureUnitState accesses data from a Texture
 
-        There are a number of parameters affecting how texture data is fetched.
+        There are a number of parameters affecting how texture data is featched.
         Most notably @ref FilterOptions and @ref TextureAddressingMode.
      */
     class _OgreExport Sampler {
@@ -58,7 +56,6 @@ namespace Ogre {
             TextureAddressingMode u, v, w;
         };
 
-        /// must be created through TextureManager
         Sampler();
         virtual ~Sampler();
 
@@ -138,7 +135,7 @@ namespace Ogre {
         option on this texture to Ogre::FO_ANISOTROPIC.
         @param maxAniso
             The maximal anisotropy level, should be between 2 and the maximum
-            supported by hardware (1 is the default, ie. no anisotropy).
+            supported by hardware (1 is the default, ie. no anisotrophy).
         */
         void setAnisotropy(unsigned int maxAniso)
         {
@@ -206,12 +203,8 @@ namespace Ogre {
         const ColourValue& getBorderColour(void) const { return mBorderColour; }
 
     protected:
-        ColourValue mBorderColour;
-        /// Texture anisotropy.
-        unsigned int mMaxAniso;
-        /// Mipmap bias (always float, not Real).
-        float mMipmapBias;
         UVWAddressingMode mAddressMode;
+        ColourValue mBorderColour;
         /// Texture filtering - minification.
         FilterOptions mMinFilter;
         /// Texture filtering - magnification.
@@ -219,6 +212,10 @@ namespace Ogre {
         /// Texture filtering - mipmapping.
         FilterOptions mMipFilter;
         CompareFunction mCompareFunc;
+        /// Texture anisotropy.
+        unsigned int mMaxAniso;
+        /// Mipmap bias (always float, not Real).
+        float mMipmapBias;
         bool mCompareEnabled : 1;
         bool mDirty : 1; // flag for derived classes to sync with implementation
     };
@@ -264,16 +261,17 @@ namespace Ogre {
 
         };
 
-        /// %Texture coordinate generation method for environment mapping.
+        /** Enumeration to specify type of envmap.
+        */
         enum EnvMapType
         {
-            /// 2D texture coordinates using view space position. Same as ENV_CURVED on all backends.
+            /// Envmap based on vector from camera to vertex position, good for planar geometry.
             ENV_PLANAR,
-            /// 2D texture coordinates using spherical reflection mapping
+            /// Envmap based on dot of vector from camera to vertex and vertex normal, good for curves.
             ENV_CURVED,
-            /// Cubic texture coordinates using the reflection vector
+            /// Envmap intended to supply reflection vectors for cube mapping.
             ENV_REFLECTION,
-            /// Cubic texture coordinates using the normal vector
+            /// Envmap intended to supply normal vectors for cube mapping.
             ENV_NORMAL
         };
 
@@ -293,6 +291,7 @@ namespace Ogre {
         static const Ogre::TextureAddressingMode TAM_MIRROR = Ogre::TAM_MIRROR;
         static const Ogre::TextureAddressingMode TAM_CLAMP = Ogre::TAM_CLAMP;
         static const Ogre::TextureAddressingMode TAM_BORDER = Ogre::TAM_BORDER;
+        static const Ogre::TextureAddressingMode TAM_UNKNOWN = Ogre::TAM_UNKNOWN;
 
         OGRE_DEPRECATED typedef Ogre::TextureAddressingMode TextureAddressingMode;
         OGRE_DEPRECATED typedef Sampler::UVWAddressingMode UVWAddressingMode;
@@ -320,7 +319,7 @@ namespace Ogre {
             Real frequency;
             Real phase;
             Real amplitude;
-            ControllerFloat* controller;
+            Controller<Real>* controller;
             const Frustum* frustum;
         };
 
@@ -341,16 +340,15 @@ namespace Ogre {
         ~TextureUnitState();
 
         /** Name-based constructor.
-        @param parent the parent Pass object.
         @param texName
             The basic name of the texture e.g. brickwall.jpg, stonefloor.png.
         @param texCoordSet
             The index of the texture coordinate set to use.
         */
-        TextureUnitState( Pass* parent, const String& texName, uint8 texCoordSet = 0);
+        TextureUnitState( Pass* parent, const String& texName, unsigned int texCoordSet = 0);
 
         /** Get the name of current texture image for this layer.
-
+        @remarks
             This will either always be a single name for this layer,
             or will be the name of the current frame for an animated
             or otherwise multi-frame texture.
@@ -360,10 +358,7 @@ namespace Ogre {
         /** Sets this texture layer to use a single texture, given the
             name of the texture to use on this layer.
         */
-        void setTextureName( const String& name);
-
-        /// @overload
-        void setTextureName( const String& name, TextureType ttype);
+        void setTextureName( const String& name, TextureType ttype = TEX_TYPE_2D);
 
         /** Sets this texture layer to use a single texture, given the
             pointer to the texture to use on this layer.
@@ -381,7 +376,11 @@ namespace Ogre {
         /**
         @deprecated use setLayerArrayNames()
          */
-        OGRE_DEPRECATED void setCubicTextureName( const String* const names, bool forUVW = false );
+        OGRE_DEPRECATED void setCubicTextureName( const String* const names, bool forUVW = false )
+        {
+            setLayerArrayNames(TEX_TYPE_CUBE_MAP,
+                               std::vector<String>(names, names + 6));
+        }
 
         /**
         @deprecated use setTexture()
@@ -398,7 +397,7 @@ namespace Ogre {
             if you specify a name of "flame.jpg" with 3 frames, the image names must be "flame_0.jpg", "flame_1.jpg"
             and "flame_2.jpg".
 
-            You can change the active frame on a texture layer by calling the Ogre::TextureUnitState::setCurrentFrame method.
+            You can change the active frame on a texture layer by calling the setCurrentFrame method.
         @note
             If you can't make your texture images conform to the naming standard laid out here, you
             can call the alternative setAnimatedTextureName method which takes an array of names instead.
@@ -413,6 +412,7 @@ namespace Ogre {
         void setAnimatedTextureName( const String& name, size_t numFrames, Real duration = 0 );
 
         /// @overload
+        /// @param names Pointer to array of names of the textures to use, in frame order.
         /// @deprecated use setAnimatedTextureName( const std::vector<String>&, Real )
         void setAnimatedTextureName( const String* const names, size_t numFrames, Real duration = 0 );
 
@@ -427,7 +427,7 @@ namespace Ogre {
 
         /** Returns the width and height of the texture in the given frame.
         */
-        std::pair<uint32, uint32> getTextureDimensions(unsigned int frame = 0) const;
+        std::pair< size_t, size_t > getTextureDimensions( unsigned int frame = 0 ) const;
 
         /** Changes the active frame in an animated or multi-image texture.
 
@@ -471,9 +471,22 @@ namespace Ogre {
         */
         unsigned int getNumFrames(void) const;
 
+
+        /** The type of unit to bind the texture settings to.
+            @deprecated only D3D9 has separate sampler bindings. All other RenderSystems use unified pipelines.
+         */
+        enum BindingType
+        {
+            /** Regular fragment processing unit - the default. */
+            BT_FRAGMENT = 0,
+            /** Vertex processing unit - indicates this unit will be used for 
+                a vertex texture fetch.
+            */
+            BT_VERTEX = 1
+        };
         /** Enum identifying the type of content this texture unit contains.
         */
-        enum ContentType : uint8
+        enum ContentType
         {
             /// The default option, this derives texture content from a texture name, loaded by
             /// ordinary means from a file or having been manually created with a given name.
@@ -485,8 +498,25 @@ namespace Ogre {
             CONTENT_COMPOSITOR = 2
         };
 
-        /** Set the type of content this TextureUnitState references.
+        /** Sets the type of unit these texture settings should be bound to. 
 
+            Some render systems, when implementing vertex texture fetch, separate
+            the binding of textures for use in the vertex program versus those
+            used in fragment programs. This setting allows you to target the
+            vertex processing unit with a texture binding, in those cases. For
+            rendersystems which have a unified binding for the vertex and fragment
+            units, this setting makes no difference.
+        @deprecated see @ref Ogre::TextureUnitState::BindingType comment
+        */
+        void setBindingType(BindingType bt);
+
+        /** Gets the type of unit these texture settings should be bound to.  
+        @deprecated see @ref BindingType
+        */
+        BindingType getBindingType(void) const;
+
+        /** Set the type of content this TextureUnitState references.
+        @remarks
             The default is to reference a standard named texture, but this unit
             can also reference automated content like a shadow texture.
         */
@@ -495,10 +525,10 @@ namespace Ogre {
         ContentType getContentType(void) const;
 
         /// @deprecated use getTextureType()
-        OGRE_DEPRECATED bool isCubic(void) const { return getTextureType() == TEX_TYPE_CUBE_MAP; }
+        OGRE_DEPRECATED bool isCubic(void) const;
 
         /// @deprecated use getTextureType()
-        OGRE_DEPRECATED bool is3D(void) const { return getTextureType() == TEX_TYPE_CUBE_MAP; }
+        OGRE_DEPRECATED bool is3D(void) const;
 
         /** Returns the type of this texture.
         */
@@ -517,8 +547,11 @@ namespace Ogre {
         */
         int getNumMipmaps(void) const;
 
-        /// @deprecated use setDesiredFormat(PF_A8)
-        OGRE_DEPRECATED void setIsAlpha(bool isAlpha);
+        /// @copydoc Texture::setTreatLuminanceAsAlpha
+        void setIsAlpha(bool isAlpha);
+
+        /// @copydoc Texture::getTreatLuminanceAsAlpha
+        bool getIsAlpha(void) const;
 
         /// @copydoc Texture::getGamma
         float getGamma() const;
@@ -534,18 +567,14 @@ namespace Ogre {
         @note
         Only applies to the fixed function pipeline and has no effect if a fragment program is used.
         */
-        uint8 getTextureCoordSet(void) const;
+        unsigned int getTextureCoordSet(void) const;
 
         /** Sets which texture coordinate set is to be used for this texture layer.
 
             A mesh can define multiple sets of texture coordinates, this sets which one this
             material uses.
         */
-        void setTextureCoordSet(uint8 set);
-
-        /// Enables Unordered Access to the provided mipLevel of the texture
-        void setUnorderedAccessMipLevel(int mipLevel) { mUnorderedAccessMipLevel = mipLevel; }
-        int getUnorderedAccessMipLevel() const { return mUnorderedAccessMipLevel; }
+        void setTextureCoordSet(unsigned int set);
 
         /** Sets a matrix used to transform any texture coordinates on this layer.
 
@@ -636,11 +665,7 @@ namespace Ogre {
 
         /// get the associated sampler
         const SamplerPtr& getSampler() const { return mSampler; }
-        void setSampler(const SamplerPtr& sampler)
-        {
-            OgreAssert(sampler, "sampler must not be NULL");
-            mSampler = sampler;
-        }
+        void setSampler(const SamplerPtr& sampler) { mSampler = sampler; }
 
         /// @copydoc Sampler::setAddressingMode
         const Sampler::UVWAddressingMode& getTextureAddressingMode(void) const
@@ -666,7 +691,7 @@ namespace Ogre {
         {
             _getLocalSampler()->setFiltering(filterType);
         }
-        /// @copydoc Sampler::setFiltering(FilterType, FilterOptions)
+        /// @copydoc Sampler::setFiltering
         void setTextureFiltering(FilterType ftype, FilterOptions opts)
         {
             _getLocalSampler()->setFiltering(ftype, opts);
@@ -722,6 +747,9 @@ namespace Ogre {
             effect of darkening the textures - for this reason there are brightening operations
             like Ogre::LBX_MODULATE_X2. See the Ogre::LayerBlendOperation and Ogre::LayerBlendSource enumerated
             types for full details.
+        @note
+            Because of the limitations on some underlying APIs (Direct3D included)
+            the Ogre::LBS_TEXTURE argument can only be used as the first argument, not the second.
 
             The final 3 parameters are only required if you decide to pass values manually
             into the operation, i.e. you want one or more of the inputs to the colour calculation
@@ -848,13 +876,13 @@ namespace Ogre {
             Real manualBlend = 0.0);
 
         /** Generic method for setting up texture effects.
-
-            Allows you to specify effects directly by using the #TextureEffectType enumeration. The
+        @remarks
+            Allows you to specify effects directly by using the TextureEffectType enumeration. The
             arguments that go with it depend on the effect type. Only one effect of
             each type can be applied to a texture layer.
         @par
             This method is used internally by Ogre but it is better generally for applications to use the
-            more intuitive specialised methods such as #setEnvironmentMap and #setTextureScroll.
+            more intuitive specialised methods such as setEnvironmentMap and setScroll.
         */
         void addEffect(TextureEffect& effect);
 
@@ -865,7 +893,9 @@ namespace Ogre {
 
             The vectors generated can either be used to address a single 2D texture which
             is a 'fish-eye' lens view of a scene, or a 3D cubic environment map which requires 6 textures
-            for each side of the inside of a cube.
+            for each side of the inside of a cube. The type depends on what texture you set up - if you use the
+            setTextureName method then a 2D fisheye lens texture is required, whereas if you used setCubicTextureName
+            then a cubic environment map will be used.
 
             This effect works best if the object has lots of gradually changing normals. The texture also
             has to be designed for this effect - see the example spheremap.png included with the sample
@@ -877,9 +907,10 @@ namespace Ogre {
             generated coordinates rather than static model texture coordinates.
         @param enable
             True to enable, false to disable
-        @param texGenType texture coordinate generation type
+        @param envMapType
+            The type of environment mapping to perform. Planar, curved, reflection or normal. @see EnvMapType
         */
-        void setEnvironmentMap(bool enable, EnvMapType texGenType = ENV_CURVED);
+        void setEnvironmentMap(bool enable, EnvMapType envMapType = ENV_CURVED);
 
         /** Sets up an animated scroll for the texture layer.
 
@@ -921,7 +952,7 @@ namespace Ogre {
 
 
         /** Enables or disables projective texturing on this texture unit.
-
+        @remarks
             Projective texturing allows you to generate texture coordinates 
             based on a Frustum, which gives the impression that a texture is
             being projected onto the surface. Note that once you have called
@@ -990,14 +1021,14 @@ namespace Ogre {
         @param mrtIndex
             The index of the wanted texture, if referencing an MRT.
         */
-        void setCompositorReference(const String& compositorName, const String& textureName, uint32 mrtIndex = 0);
+        void setCompositorReference(const String& compositorName, const String& textureName, size_t mrtIndex = 0);
 
-        /** Gets the name of the compositor that this texture references. */
+        /** Gets the name of the compositor that this texture referneces. */
         const String& getReferencedCompositorName() const { return mCompositorRefName; }
         /** Gets the name of the texture in the compositor that this texture references. */
         const String& getReferencedTextureName() const { return mCompositorRefTexName; }
         /** Gets the MRT index of the texture in the compositor that this texture references. */ 
-        uint32 getReferencedMRTIndex() const { return mCompositorRefMrtIndex; }
+        size_t getReferencedMRTIndex() const { return mCompositorRefMrtIndex; }
     
         /// Gets the parent Pass object.
         Pass* getParent(void) const { return mParent; }
@@ -1010,6 +1041,8 @@ namespace Ogre {
         void _load(void);
         /** Internal method for unloading this object as part of Material::unload. */
         void _unload(void);
+        /// Returns whether this unit has texture coordinate generation that depends on the camera.
+        bool hasViewRelativeTextureCoordinateGeneration(void) const;
 
         /// Is this loaded?
         bool isLoaded(void) const;
@@ -1019,16 +1052,36 @@ namespace Ogre {
         /** Set the name of the Texture Unit State.
 
             The name of the Texture Unit State is optional.  Its useful in material scripts where a material could inherit
-            from another material and only want to modify a particular Texture Unit State.
+            from another material and only want to modify a particalar Texture Unit State.
         */
         void setName(const String& name);
         /// Get the name of the Texture Unit State.
         const String& getName(void) const { return mName; }
 
-        /// @deprecated use setName()
-        OGRE_DEPRECATED void setTextureNameAlias(const String& name) { setName(name); }
-        /// @deprecated use getName()
-        OGRE_DEPRECATED const String& getTextureNameAlias(void) const { return getName();}
+        /** Set the alias name used for texture frame names.
+        @param name
+            Can be any sequence of characters and does not have to be unique.
+        */
+        void setTextureNameAlias(const String& name);
+        /** Gets the Texture Name Alias of the Texture Unit.
+        */
+        const String& getTextureNameAlias(void) const { return mTextureNameAlias;}
+
+        /** Applies texture names to Texture Unit State with matching texture name aliases.
+            If no matching aliases are found then the TUS state does not change.
+
+            Cubic, 1d, 2d, and 3d textures are determined from current state of the Texture Unit.
+            Assumes animated frames are sequentially numbered in the name.
+            If matching texture aliases are found then true is returned.
+
+        @param aliasList
+            A map container of texture alias, texture name pairs.
+        @param apply
+            Set @c true to apply the texture aliases else just test to see if texture alias matches are found.
+        @return
+            True if matching texture aliases were found in the Texture Unit State.
+        */
+        bool applyTextureAliases(const AliasTextureNamePairList& aliasList, const bool apply = true);
 
         /** Notify this object that its parent has changed. */
         void _notifyParent(Pass* parent);
@@ -1048,43 +1101,41 @@ namespace Ogre {
         /** Gets the animation controller (as created because of setAnimatedTexture)
             if it exists.
         */
-        ControllerFloat* _getAnimController() const { return mAnimController; }
+        Controller<Real>* _getAnimController() const { return mAnimController; }
 
         /// return a sampler local to this TUS instead of the shared global one
         const SamplerPtr& _getLocalSampler();
-
-        TexCoordCalcMethod _deriveTexCoordCalcMethod() const;
-private:
+protected:
         // State
         /// The current animation frame.
         unsigned int mCurrentFrame;
 
         /// Duration of animation in seconds.
         Real mAnimDuration;
+        bool mCubic; /// Is this a series of 6 2D textures to make up a cube?
 
-        int mUnorderedAccessMipLevel;
+        unsigned int mTextureCoordSetIndex;
 
         LayerBlendModeEx mColourBlendMode;
         SceneBlendFactor mColourBlendFallbackSrc;
         SceneBlendFactor mColourBlendFallbackDest;
 
         LayerBlendModeEx mAlphaBlendMode;
+        mutable bool mTextureLoadFailed;
         Real mGamma;
+
+        mutable bool mRecalcTexMatrix;
         Real mUMod, mVMod;
         Real mUScale, mVScale;
         Radian mRotate;
         mutable Matrix4 mTexModMatrix;
 
+        /// Binding type (fragment, vertex, tesselation hull and domain pipeline).
+        BindingType mBindingType;
         /// Content type of texture (normal loaded texture, auto-texture).
         ContentType mContentType;
-
-        mutable bool mTextureLoadFailed;
-        mutable bool mRecalcTexMatrix;
-
-        uint8 mTextureCoordSetIndex;
-
         /// The index of the referenced texture if referencing an MRT in a compositor.
-        uint32 mCompositorRefMrtIndex;
+        size_t mCompositorRefMrtIndex;
 
         //-----------------------------------------------------------------------------
         // Complex members (those that can't be copied using memcpy) are at the end to 
@@ -1093,6 +1144,7 @@ private:
         mutable std::vector<TexturePtr> mFramePtrs; // must at least contain a single nullptr
         SamplerPtr mSampler;
         String mName;               ///< Optional name for the TUS.
+        String mTextureNameAlias;   ///< Optional alias for texture frames.
         EffectMap mEffects;
         /// The data that references the compositor.
         String mCompositorRefName;
@@ -1104,7 +1156,7 @@ private:
         // preserving even if assign from others
         //
         Pass* mParent;
-        ControllerFloat* mAnimController;
+        Controller<Real>* mAnimController;
         //-----------------------------------------------------------------------------
 
 
@@ -1126,8 +1178,6 @@ private:
         void ensureLoaded(size_t frame) const;
 
         TexturePtr retrieveTexture(const String& name);
-
-        bool checkTexCalcSettings(const TexturePtr& tex) const;
     };
 
     /** @} */

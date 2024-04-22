@@ -49,7 +49,6 @@ namespace Ogre {
     */
     class _OgreExport SimpleRenderable : public MovableObject, public Renderable
     {
-        bool getCastsShadows(void) const override { return getCastShadows(); }
     protected:
         RenderOperation mRenderOp;
 
@@ -57,6 +56,9 @@ namespace Ogre {
         AxisAlignedBox mBox;
 
         MaterialPtr mMaterial;
+
+        /// The scene manager for the current frame.
+        SceneManager *mParentSceneManager;
 
         /// The camera for the current frame.
         Camera *mCamera;
@@ -72,25 +74,25 @@ namespace Ogre {
         SimpleRenderable(const String& name);
 
         virtual void setMaterial(const MaterialPtr& mat);
-        const MaterialPtr& getMaterial(void) const override;
+        virtual const MaterialPtr& getMaterial(void) const;
 
         virtual void setRenderOperation( const RenderOperation& rend );
-        void getRenderOperation(RenderOperation& op) override;
+        virtual void getRenderOperation(RenderOperation& op);
 
         void setTransform( const Affine3& xform );
-        void getWorldTransforms( Matrix4* xform ) const override;
+        virtual void getWorldTransforms( Matrix4* xform ) const;
 
 
-        void _notifyCurrentCamera(Camera* cam) override;
+        virtual void _notifyCurrentCamera(Camera* cam);
 
         void setBoundingBox( const AxisAlignedBox& box );
-        const AxisAlignedBox& getBoundingBox(void) const override;
+        virtual const AxisAlignedBox& getBoundingBox(void) const;
 
-        void _updateRenderQueue(RenderQueue* queue) override;
+        virtual void _updateRenderQueue(RenderQueue* queue);
 
         void visitRenderables(Renderable::Visitor* visitor,
             bool debugRenderables = false) override;
-        const String& getMovableType(void) const override;
+        virtual const String& getMovableType(void) const override;
         const LightList& getLights(void) const override;
 
     };

@@ -145,37 +145,15 @@ namespace Volume {
     */
     class _OgreVolumeExport Chunk : public SimpleRenderable, public FrameListener
     {
-    /** Data being passed around while loading.
-    */
-    struct ChunkRequest
-    {
-
-        /// The back lower left corner of the world.
-        Vector3 totalFrom;
-
-        /// The front upper rightcorner of the world.
-        Vector3 totalTo;
-
-        /// The current LOD level.
-        size_t level;
-
-        /// The maximum amount of levels.
-        size_t maxLevels;
-
-        /// The MeshBuilder to use.
-        MeshBuilder *meshBuilder;
-
-        /// The DualGridGenerator to use.
-        DualGridGenerator *dualGridGenerator;
-
-        /// The octree node to use.
-        OctreeNode *root;
-
-        /// Whether this is an update of an existing tree
-        bool isUpdate;
-    };
+    
+    /// So the actual loading functions can be called.
+    friend class ChunkHandler;
 
     protected:
+
+        /// To handle the WorkQueue.
+        static ChunkHandler mChunkHandler;
+                
         /// To attach this node to.
         SceneNode *mNode;
 
@@ -350,15 +328,15 @@ namespace Volume {
 
         /** Overridden from MovableObject.
         */
-        const String& getMovableType(void) const override;
+        virtual const String& getMovableType(void) const;
         
         /** Overridden from Renderable.
         */
-        Real getSquaredViewDepth(const Camera* camera) const override;
+        virtual Real getSquaredViewDepth(const Camera* camera) const;
 
         /** Overridden from  MovableObject.
         */
-        Real getBoundingRadius() const override;
+        virtual Real getBoundingRadius() const;
 
         /** Loads the volume mesh with all LODs.
         @param parent
@@ -432,7 +410,7 @@ namespace Volume {
         
         /** Overridden from FrameListener.
         */
-        bool frameStarted(const FrameEvent& evt) override;
+        virtual bool frameStarted(const FrameEvent& evt);
         
         /** Overridable factory method.
         @return
@@ -443,7 +421,7 @@ namespace Volume {
         /** Overridden from SimpleRenderable.
             Sets the material of this chunk and all of his children.
         */
-        void setMaterial(const MaterialPtr& mat) override;
+        void setMaterial(const MaterialPtr& mat);
 
         /// @overload
         using Ogre::SimpleRenderable::setMaterial;

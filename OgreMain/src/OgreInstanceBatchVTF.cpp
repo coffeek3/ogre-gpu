@@ -201,16 +201,22 @@ namespace Ogre
     {
         Material::Techniques::const_iterator t;
         for(t = material->getTechniques().begin(); t != material->getTechniques().end(); ++t)
-        for (auto *technique : material->getTechniques())
         {
-            for (auto *pass : technique->getPasses())
+            Technique *technique = *t;
+            Technique::Passes::const_iterator i;
+            for(i = technique->getPasses().begin(); i != technique->getPasses().end(); ++i)
             {
-                for(auto *texUnit : pass->getTextureUnitStates())
+                Pass *pass = *i;
+                Pass::TextureUnitStates::const_iterator it;
+                for(it = pass->getTextureUnitStates().begin(); it != pass->getTextureUnitStates().end(); ++it)
                 {
+                    TextureUnitState *texUnit = *it;
+
                     if( texUnit->getName() == "InstancingVTF" )
                     {
                         texUnit->setTextureName( mMatrixTexture->getName(), textureType );
                         texUnit->setTextureFiltering( TFO_NONE );
+                        texUnit->setBindingType( TextureUnitState::BT_VERTEX );
                     }
                 }
             }
@@ -218,7 +224,7 @@ namespace Ogre
             if( technique->getShadowCasterMaterial() )
             {
                 MaterialPtr matCaster = technique->getShadowCasterMaterial();
-                setupMaterialToUseVTF(textureType, matCaster );
+                setupMaterialToUseVTF( textureType, matCaster );
             }
         }
     }
@@ -274,6 +280,7 @@ namespace Ogre
             texHeight += 1;
 
         //Don't use 1D textures, as OGL goes crazy because the shader should be calling texture1D()...
+        //TextureType texType = texHeight == 1 ? TEX_TYPE_1D : TEX_TYPE_2D;
         TextureType texType = TEX_TYPE_2D;
 
         mMatrixTexture = TextureManager::getSingleton().createManual(
@@ -281,7 +288,6 @@ namespace Ogre
                                         (uint)texWidth, (uint)texHeight,
                                         0, PF_FLOAT32_RGBA, TU_DYNAMIC_WRITE_ONLY_DISCARDABLE );
 
-        OgreAssert(mMatrixTexture->getFormat() == PF_FLOAT32_RGBA, "float texture support required");
         //Set our cloned material to use this custom texture!
         setupMaterialToUseVTF( texType, mMaterial );
     }
@@ -419,6 +425,11 @@ namespace Ogre
     void BaseInstanceBatchVTF::getWorldTransforms( Matrix4* xform ) const
     {
         *xform = Matrix4::IDENTITY;
+    }
+    //-----------------------------------------------------------------------
+    unsigned short BaseInstanceBatchVTF::getNumWorldTransforms(void) const
+    {
+        return 1;
     }
     //-----------------------------------------------------------------------
     void BaseInstanceBatchVTF::_updateRenderQueue(RenderQueue* queue)

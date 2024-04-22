@@ -1,8 +1,13 @@
-varying vec3 oViewPos;
+#version 150
+
+in vec3 oViewPos;
+    
+out vec4 oColor;
+    
 uniform float cFarDistance;
 
 void main()
 {
     float depth = length(oViewPos) / cFarDistance;
-    gl_FragColor = vec4(depth, depth, depth, 1.0);
+    oColor = vec4(depth, depth, depth, 1.0);
 }

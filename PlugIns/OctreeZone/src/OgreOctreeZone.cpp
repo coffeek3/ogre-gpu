@@ -293,7 +293,6 @@ namespace Ogre
                             }
                         }
                         break;
-                    case Light::LT_RECTLIGHT:
                     case Light::LT_SPOTLIGHT:
                         // spotlights - just check if within illumination range
                         // Technically, we should check if the portal is within
@@ -344,7 +343,7 @@ namespace Ogre
             Portal * p = *it;
             bool portalNeedUpdate = p->needUpdate();
 
-            Real pRadius = p->getDerivedRadius();
+            Real pRadius = p->getRadius();
 
             // First we check against portals in the SAME zone (and only if they have a 
             // target zone different from the home zone)
@@ -368,7 +367,7 @@ namespace Ogre
                 // Skip portal if it's pointing to the same target zone as this portal points to
                 if (p2->getTargetZone() == p->getTargetZone()) continue;
 
-                if (pRadius > p2->getDerivedRadius())
+                if (pRadius > p2->getRadius())
                 {
                     // Portal#1 is bigger than Portal#2, check for crossing
                     if (p2->getCurrentHomeZone() != p->getTargetZone() && p2->crossedPortal(p))
@@ -378,7 +377,7 @@ namespace Ogre
                         transferPortalList.push_back(p2);
                     }
                 }
-                else if (pRadius < p2->getDerivedRadius())
+                else if (pRadius < p2->getRadius())
                 {
                     // Portal #2 is bigger than Portal #1, check for crossing
                     if (p->getCurrentHomeZone() != p2->getTargetZone() && p->crossedPortal(p2))
@@ -401,7 +400,7 @@ namespace Ogre
                 if (!portalNeedUpdate && !ap->needUpdate()) continue;
 
                 // only check for crossing if AntiPortal smaller than portal.
-                if (pRadius > ap->getDerivedRadius())
+                if (pRadius > ap->getRadius())
                 {
                     // Portal#1 is bigger than AntiPortal, check for crossing
                     if (ap->crossedPortal(p))
@@ -425,7 +424,7 @@ namespace Ogre
                 {
                     Portal * p3 = (*it3);
                     // only check against bigger regular portals
-                    if (pRadius < p3->getDerivedRadius())
+                    if (pRadius < p3->getRadius())
                     {
                         // Portal#3 is bigger than Portal#1, check for crossing
                         if (p->getCurrentHomeZone() != p3->getTargetZone() && p->crossedPortal(p3))
@@ -734,9 +733,14 @@ namespace Ogre
                         // add it to the list of visible nodes
                         visibleNodeList.push_back( sn );
                         // if we are displaying nodes, add the node renderable to the queue
-                        if ( mPCZSM->getDebugDrawer() )
+                        if ( displayNodes )
                         {
-                            mPCZSM->getDebugDrawer()->drawSceneNode(sn);
+                            queue -> addRenderable( sn->getDebugRenderable() );
+                        }
+                        // if the scene manager or the node wants the bounding box shown, add it to the queue
+                        if (sn->getShowBoundingBox() || showBoundingBoxes)
+                        {
+                            sn->_addBoundingBoxToQueue(queue);
                         }
                         // flag the node as being visible this frame
                         sn->setLastVisibleFrame(mLastVisibleFrame);

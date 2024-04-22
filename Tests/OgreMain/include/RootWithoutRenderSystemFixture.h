@@ -39,8 +39,8 @@ public:
     Ogre::Root* mRoot;
     Ogre::HardwareBufferManager* mHBM;
     Ogre::FileSystemLayer* mFSLayer;
-    void SetUp() override;
-    void TearDown() override;
+    void SetUp();
+    void TearDown();
 };
 
 #endif /* TESTS_OGREMAIN_INCLUDE_ROOTWITHOUTRENDERSYSTEMFIXTURE_H_ */

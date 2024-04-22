@@ -43,10 +43,6 @@ namespace Ogre {
         destroyAllResourcePools();
         removeAll();
     }
-    void ResourceManager::parseScript(DataStreamPtr& stream, const String& groupName)
-    {
-        ScriptCompilerManager::getSingleton().parseScript(stream, groupName);
-    }
     //-----------------------------------------------------------------------
     ResourcePtr ResourceManager::createResource(const String& name, const String& group,
         bool isManual, ManualResourceLoader* loader, const NameValuePairList* params)
@@ -142,8 +138,8 @@ namespace Ogre {
             }
             else
             {
-                auto resgroup = mResourcesWithGroup.emplace(res->getGroup(), ResourceMap()).first;
-                result = resgroup->second.emplace(res->getName(), res);
+                ResourceWithGroupMap::iterator itGroup = mResourcesWithGroup.find(res->getGroup());
+                result = itGroup->second.emplace(res->getName(), res);
             }
         }
 
@@ -166,12 +162,6 @@ namespace Ogre {
     void ResourceManager::removeImpl(const ResourcePtr& res )
     {
         OgreAssert(res, "attempting to remove nullptr");
-
-#if OGRE_RESOURCEMANAGER_STRICT
-        if (res->getCreator() != this)
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Resource '" + res->getName() + "' was not created by the '" +
-                                                          getResourceType() + "' ResourceManager");
-#endif
 
         OGRE_LOCK_AUTO_MUTEX;
 
@@ -227,9 +217,7 @@ namespace Ogre {
         ResourcePtr res = getResourceByName(name, group);
 
 #if OGRE_RESOURCEMANAGER_STRICT
-        if (!res)
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "attempting to unload unknown resource: " + name + " in group " + group);
+        OgreAssert(res, ("attempting to unload unknown resource: "+name+" in group "+group).c_str());
 #endif
 
         if (res)
@@ -258,13 +246,16 @@ namespace Ogre {
 
         bool reloadableOnly = (flags & Resource::LF_INCLUDE_NON_RELOADABLE) == 0;
         bool unreferencedOnly = (flags & Resource::LF_ONLY_UNREFERENCED) != 0;
-        for (auto& r : mResources)
+
+        ResourceMap::iterator i, iend;
+        iend = mResources.end();
+        for (i = mResources.begin(); i != iend; ++i)
         {
             // A use count of 3 means that only RGM and RM have references
             // RGM has one (this one) and RM has 2 (by name and by handle)
-            if (!unreferencedOnly || r.second.use_count() == ResourceGroupManager::RESOURCE_SYSTEM_NUM_REFERENCE_COUNTS)
+            if (!unreferencedOnly || i->second.use_count() == ResourceGroupManager::RESOURCE_SYSTEM_NUM_REFERENCE_COUNTS)
             {
-                Resource* res = r.second.get();
+                Resource* res = i->second.get();
                 if (!reloadableOnly || res->isReloadable())
                 {
                     res->unload();
@@ -279,13 +270,16 @@ namespace Ogre {
 
         bool reloadableOnly = (flags & Resource::LF_INCLUDE_NON_RELOADABLE) == 0;
         bool unreferencedOnly = (flags & Resource::LF_ONLY_UNREFERENCED) != 0;
-        for (auto& r : mResources)
+
+        ResourceMap::iterator i, iend;
+        iend = mResources.end();
+        for (i = mResources.begin(); i != iend; ++i)
         {
             // A use count of 3 means that only RGM and RM have references
             // RGM has one (this one) and RM has 2 (by name and by handle)
-            if (!unreferencedOnly || r.second.use_count() == ResourceGroupManager::RESOURCE_SYSTEM_NUM_REFERENCE_COUNTS)
+            if (!unreferencedOnly || i->second.use_count() == ResourceGroupManager::RESOURCE_SYSTEM_NUM_REFERENCE_COUNTS)
             {
-                Resource* res = r.second.get();
+                Resource* res = i->second.get();
                 if (!reloadableOnly || res->isReloadable())
                 {
                     res->reload(flags);
@@ -304,9 +298,7 @@ namespace Ogre {
         ResourcePtr res = getResourceByName(name, group);
 
 #if OGRE_RESOURCEMANAGER_STRICT
-        if (!res)
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "attempting to remove unknown resource: " + name + " in group " + group);
+        OgreAssert(res, ("attempting to remove unknown resource: "+name+" in group "+group).c_str());
 #endif
 
         if (res)
@@ -331,7 +323,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void ResourceManager::removeAll(void)
     {
-        OGRE_LOCK_AUTO_MUTEX;
+            OGRE_LOCK_AUTO_MUTEX;
 
         mResources.clear();
         mResourcesWithGroup.clear();
@@ -346,7 +338,7 @@ namespace Ogre {
 
         ResourceMap::iterator i, iend;
         iend = mResources.end();
-        for (i = mResources.begin(); i != iend;)
+        for (i = mResources.begin(); i != iend; )
         {
             // A use count of 3 means that only RGM and RM have references
             // RGM has one (this one) and RM has 2 (by name and by handle)
@@ -355,16 +347,17 @@ namespace Ogre {
                 Resource* res = (i++)->second.get();
                 if (!reloadableOnly || res->isReloadable())
                 {
-                    remove(res->getHandle());
+                    remove( res->getHandle() );
                 }
             }
-            else {
+            else
+            {
                 ++i;
             }
         }
     }
     //-----------------------------------------------------------------------
-    ResourcePtr ResourceManager::getResourceByName(const String& name, const String& groupName) const
+    ResourcePtr ResourceManager::getResourceByName(const String& name, const String& groupName /* = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME */)
     {
         OGRE_LOCK_AUTO_MUTEX;
 
@@ -373,7 +366,7 @@ namespace Ogre {
 
         if(isGlobal)
         {
-            auto it = mResources.find(name);
+            ResourceMap::iterator it = mResources.find(name);
             if( it != mResources.end())
             {
                 return it->second;
@@ -383,11 +376,13 @@ namespace Ogre {
         // look in all grouped pools
         if (groupName == ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME)
         {
-            for (auto& r : mResourcesWithGroup)
+            ResourceWithGroupMap::iterator iter = mResourcesWithGroup.begin();
+            ResourceWithGroupMap::iterator iterE = mResourcesWithGroup.end();
+            for ( ; iter != iterE ; ++iter )
             {
-                auto resMapIt = r.second.find(name);
+                ResourceMap::iterator resMapIt = iter->second.find(name);
 
-                if( resMapIt != r.second.end())
+                if( resMapIt != iter->second.end())
                 {
                     return resMapIt->second;
                 }
@@ -396,10 +391,10 @@ namespace Ogre {
         else if (!isGlobal)
         {
             // look in the grouped pool
-            auto itGroup = mResourcesWithGroup.find(groupName);
-            if (itGroup != mResourcesWithGroup.end())
+            ResourceWithGroupMap::iterator itGroup = mResourcesWithGroup.find(groupName);
+            if( itGroup != mResourcesWithGroup.end())
             {
-                auto it = itGroup->second.find(name);
+                ResourceMap::iterator it = itGroup->second.find(name);
 
                 if( it != itGroup->second.end())
                 {
@@ -409,7 +404,7 @@ namespace Ogre {
 
 #if !OGRE_RESOURCEMANAGER_STRICT
             // fall back to global
-            auto it = mResources.find(name);
+            ResourceMap::iterator it = mResources.find(name);
             if( it != mResources.end())
             {
                 return it->second;
@@ -420,10 +415,10 @@ namespace Ogre {
         return ResourcePtr();
     }
     //-----------------------------------------------------------------------
-    ResourcePtr ResourceManager::getByHandle(ResourceHandle handle) const
+    ResourcePtr ResourceManager::getByHandle(ResourceHandle handle)
     {
         OGRE_LOCK_AUTO_MUTEX;
-        auto it = mResourcesByHandle.find(handle);
+        ResourceHandleMap::iterator it = mResourcesByHandle.find(handle);
         return it == mResourcesByHandle.end() ? ResourcePtr() : it->second;
     }
     //-----------------------------------------------------------------------
@@ -489,7 +484,8 @@ namespace Ogre {
     //---------------------------------------------------------------------
     void ResourceManager::destroyResourcePool(ResourcePool* pool)
     {
-        OgreAssert(pool, "Cannot destroy a null ResourcePool");
+        if(!pool)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot destroy a null ResourcePool.", "ResourceManager::destroyResourcePool");
 
         OGRE_LOCK_AUTO_MUTEX;
 
@@ -518,8 +514,9 @@ namespace Ogre {
     {
         OGRE_LOCK_AUTO_MUTEX;
 
-        for (auto & i : mResourcePoolMap)
-            OGRE_DELETE i.second;
+        for (ResourcePoolMap::iterator i = mResourcePoolMap.begin(); 
+            i != mResourcePoolMap.end(); ++i)
+            OGRE_DELETE i->second;
 
         mResourcePoolMap.clear();
     }
@@ -544,9 +541,9 @@ namespace Ogre {
     void ResourceManager::ResourcePool::clear()
     {
             OGRE_LOCK_AUTO_MUTEX;
-        for (auto & i : mItems)
+        for (ItemList::iterator i = mItems.begin(); i != mItems.end(); ++i)
         {
-            i->getCreator()->remove(i->getHandle());
+            (*i)->getCreator()->remove((*i)->getHandle());
         }
         mItems.clear();
     }

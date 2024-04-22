@@ -22,6 +22,7 @@ if (APPLE_IOS)
   set(OGRE_SET_BUILD_PLATFORM_APPLE_IOS 1)
   set(OGRE_STATIC TRUE)
   set(OGRE_STATIC_LIB TRUE)
+  set(OGRE_CONFIG_ENABLE_PVRTC TRUE)
 endif()
 
 # should we build static libs?
@@ -54,24 +55,31 @@ if (OGRE_CONFIG_THREADS)
 		set(OGRE_THREAD_LIBRARIES ${POCO_LIBRARIES})
 	endif ()
 
+	if (OGRE_CONFIG_THREAD_PROVIDER STREQUAL "tbb")
+		set(OGRE_THREAD_PROVIDER 3)
+		include_directories(${TBB_INCLUDE_DIRS})
+
+		set(OGRE_THREAD_LIBRARIES ${TBB_LIBRARIES})
+	endif ()
+
 	if (OGRE_CONFIG_THREAD_PROVIDER STREQUAL "std")
 		set(OGRE_THREAD_PROVIDER 4)
 	endif ()
 
 endif()
 
-set(OGRE_ASSERT_MODE 2 CACHE STRING
-	"Enable Ogre asserts. Possible values:
+set(OGRE_ASSERT_MODE 1 CACHE STRING 
+	"Enable Ogre asserts and exceptions. Possible values:
 	0 - Standard asserts in debug builds, nothing in release builds.
 	1 - Standard asserts in debug builds, exceptions in release builds.
-	2 - Exceptions in debug & release builds."
+	2 - Exceptions in debug builds, exceptions in release builds."
 )
 set_property(CACHE OGRE_ASSERT_MODE PROPERTY STRINGS 0 1 2)
 
 # determine config values depending on build options
 set(OGRE_STATIC_LIB ${OGRE_STATIC})
 set(OGRE_DOUBLE_PRECISION ${OGRE_CONFIG_DOUBLE})
-set(OGRE_NODE_INHERIT_TRANSFORM ${OGRE_CONFIG_NODE_INHERIT_TRANSFORM})
+set(OGRE_NODE_INHERIT_TRANSFORM ${OGRE_SET_NODE_INHERIT_TRANSFORM})
 set(OGRE_SET_ASSERT_MODE ${OGRE_ASSERT_MODE})
 set(OGRE_SET_THREADS ${OGRE_CONFIG_THREADS})
 set(OGRE_SET_THREAD_PROVIDER ${OGRE_THREAD_PROVIDER})
@@ -93,6 +101,9 @@ endif()
 if (NOT OGRE_CONFIG_ENABLE_ZIP)
   set(OGRE_NO_ZIP_ARCHIVE 1)
 endif()
+if (NOT OGRE_CONFIG_ENABLE_VIEWPORT_ORIENTATIONMODE)
+  set(OGRE_NO_VIEWPORT_ORIENTATIONMODE 1)
+endif()
 if (NOT OGRE_CONFIG_ENABLE_GLES2_CG_SUPPORT)
   set(OGRE_NO_GLES2_CG_SUPPORT 1)
 endif()
@@ -113,21 +124,14 @@ if (OGRE_TEST_BIG_ENDIAN)
 else ()
   set(OGRE_CONFIG_LITTLE_ENDIAN 1)
 endif ()
-set(RTSHADER_SYSTEM_BUILD_CORE_SHADERS ${OGRE_BUILD_RTSHADERSYSTEM_SHADERS})
-set(RTSHADER_SYSTEM_BUILD_EXT_SHADERS ${OGRE_BUILD_RTSHADERSYSTEM_SHADERS})
+set(RTSHADER_SYSTEM_BUILD_CORE_SHADERS ${OGRE_BUILD_RTSHADERSYSTEM_CORE_SHADERS})
+set(RTSHADER_SYSTEM_BUILD_EXT_SHADERS ${OGRE_BUILD_RTSHADERSYSTEM_EXT_SHADERS})
 if (NOT OGRE_CONFIG_ENABLE_QUAD_BUFFER_STEREO)
   set(OGRE_NO_QUAD_BUFFER_STEREO 1)
 endif()
 if(SDL2_FOUND OR EMSCRIPTEN)
     set(OGRE_BITES_HAVE_SDL 1)
 endif()
-
-# determine if strtol_l is supported
-include(CheckFunctionExists)
-CHECK_FUNCTION_EXISTS(strtol_l HAVE_STRTOL_L)
-if (NOT HAVE_STRTOL_L)
-  set(OGRE_NO_LOCALE_STRCONVERT 1)
-endif ()
 
 # generate OgreBuildSettings.h
 configure_file(${OGRE_TEMPLATES_DIR}/OgreComponents.h.in ${PROJECT_BINARY_DIR}/include/OgreComponents.h @ONLY)
@@ -145,19 +149,20 @@ if (BUILD_TYPE_LOWER STREQUAL "debug" AND WIN32)
 endif ()
 
 # Create the pkg-config package files on Unix systems
-if (UNIX OR MINGW)
-  if (MINGW)
-    set(OGRE_PLUGIN_EXT ".dll")
-  else()
-    set(OGRE_PLUGIN_EXT ".so")
-  endif()
+if (UNIX)
+  set(OGRE_PLUGIN_PREFIX "")
+  set(OGRE_PLUGIN_EXT ".so")
   set(OGRE_PAGING_ADDITIONAL_PACKAGES "")
   if (OGRE_STATIC)
+    set(OGRE_PLUGIN_PREFIX "lib")
     set(OGRE_PLUGIN_EXT ".a")
   endif ()
 
   set(OGRE_ADDITIONAL_LIBS "")
-
+  set(OGRE_ADDITIONAL_INCLUDE_DIRS "")
+  if (APPLE AND NOT APPLE_IOS)
+    set(OGRE_ADDITIONAL_INCLUDE_DIRS "-I\${includedir}/OGRE/OSX")
+  endif ()
   set(OGRE_CFLAGS "")
   set(OGRE_PREFIX_PATH ${CMAKE_INSTALL_PREFIX})
   if (OGRE_CONFIG_THREADS GREATER 0)
@@ -165,19 +170,11 @@ if (UNIX OR MINGW)
     set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} -lpthread")
   endif ()
   if (OGRE_STATIC)
-    if (OGRE_CONFIG_THREADS AND OGRE_CONFIG_THREAD_PROVIDER STREQUAL "boost")
-      if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} ${Boost_THREAD_LIBRARY_DEBUG}")
-      else()
-        set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} ${Boost_THREAD_LIBRARY_RELEASE}")
-      endif()
+    if (OGRE_CONFIG_THREADS)
+      set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} -lboost-thread-mt")
     endif ()
     # there is no pkgconfig file for freeimage, so we need to add that lib manually
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-      set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} ${FreeImage_LIBRARY_DBG}")
-    else()
-      set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} ${FreeImage_LIBRARY_REL}")
-    endif()
+    set(OGRE_ADDITIONAL_LIBS "${OGRE_ADDITIONAL_LIBS} -lfreeimage")
     configure_file(${OGRE_TEMPLATES_DIR}/OGREStatic.pc.in ${PROJECT_BINARY_DIR}/pkgconfig/OGRE.pc @ONLY)
   else ()
     configure_file(${OGRE_TEMPLATES_DIR}/OGRE.pc.in ${PROJECT_BINARY_DIR}/pkgconfig/OGRE.pc @ONLY)
@@ -235,6 +232,11 @@ if (UNIX OR MINGW)
     endif ()
     configure_file(${OGRE_TEMPLATES_DIR}/OGRE-Bites.pc.in ${PROJECT_BINARY_DIR}/pkgconfig/OGRE-Bites.pc @ONLY)
     install(FILES ${PROJECT_BINARY_DIR}/pkgconfig/OGRE-Bites.pc DESTINATION ${OGRE_LIB_DIRECTORY}/pkgconfig)
+  endif ()
+
+  if (OGRE_BUILD_COMPONENT_HLMS)
+    configure_file(${OGRE_TEMPLATES_DIR}/OGRE-HLMS.pc.in ${PROJECT_BINARY_DIR}/pkgconfig/OGRE-HLMS.pc @ONLY)
+    install(FILES ${PROJECT_BINARY_DIR}/pkgconfig/OGRE-HLMS.pc DESTINATION ${OGRE_LIB_DIRECTORY}/pkgconfig)
   endif ()
 endif ()
 

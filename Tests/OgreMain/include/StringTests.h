@@ -43,8 +43,8 @@ protected:
     Ogre::String testFileAbsolutePathUnix;
 
 public:
-    void SetUp() override;
-    void TearDown() override;
+    void SetUp();
+    void TearDown();
 };
 
 #endif

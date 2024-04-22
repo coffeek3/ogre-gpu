@@ -163,9 +163,9 @@ namespace Ogre
             return true;
 
         // if any zones affected by this light have updated portals, then this light needs updating too
-        for (auto & iter : affectedZonesList)
+        for (ZoneList::iterator iter = affectedZonesList.begin() ; iter != affectedZonesList.end(); iter++)
         { 
-            if(iter->getPortalsUpdated()) return true;   // return immediately to prevent further iterating
+            if((*iter)->getPortalsUpdated()) return true;   // return immediately to prevent further iterating
         }
 
         return false;   // light hasn't moved, and no zones have updated portals. no light update.
@@ -186,6 +186,11 @@ namespace Ogre
 
         return OGRE_NEW PCZLight(name);
 
+    }
+    //-----------------------------------------------------------------------
+    void PCZLightFactory::destroyInstance( MovableObject* obj)
+    {
+        OGRE_DELETE obj;
     }
 
 } // Namespace

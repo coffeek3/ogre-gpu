@@ -31,12 +31,10 @@ THE SOFTWARE.
 #include "OgreD3D9Prerequisites.h"
 #include "OgreHighLevelGpuProgram.h"
 
-#include <d3dx9.h>
-
 namespace Ogre {
     /** Specialisation of HighLevelGpuProgram to provide support for D3D9 
         High-Level Shader Language (HLSL).
-
+    @remarks
         Note that the syntax of D3D9 HLSL is identical to nVidia's Cg language, therefore
         unless you know you will only ever be deploying on Direct3D, or you have some specific
         reason for not wanting to use the Cg plugin, I suggest you use Cg instead since that
@@ -45,8 +43,22 @@ namespace Ogre {
     class _OgreD3D9Export D3D9HLSLProgram : public HighLevelGpuProgram
     {
     public:
+        /// Command object for setting entry point
+        class CmdEntryPoint : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
         /// Command object for setting target assembler
         class CmdTarget : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
+        /// Command object for setting macro defines
+        class CmdPreprocessorDefines : public ParamCommand
         {
         public:
             String doGet(const void* target) const;
@@ -93,27 +105,32 @@ namespace Ogre {
 
     protected:
 
+        static CmdEntryPoint msCmdEntryPoint;
         static CmdTarget msCmdTarget;
+        static CmdPreprocessorDefines msCmdPreprocessorDefines;
         static CmdColumnMajorMatrices msCmdColumnMajorMatrices;
         static CmdOptimisation msCmdOptimisation;
         static CmdMicrocode msCmdMicrocode;
         static CmdAssemblerCode msCmdAssemblerCode;
         static CmdBackwardsCompatibility msCmdBackwardsCompatibility;
 
-        void prepareImpl();
-        void loadFromSource() {} // all done in prepare
+        /** Internal load implementation, must be implemented by subclasses.
+        */
+        void loadFromSource(void);
         /** Internal method for creating an appropriate low-level program from this
         high-level program, must be implemented by subclasses. */
         void createLowLevelImpl(void);
         /// Internal unload implementation, must be implemented by subclasses
         void unloadHighLevelImpl(void);
         /// Populate the passed parameters with name->index map, must be overridden
-        void buildConstantDefinitions() override;
+        void buildConstantDefinitions() const;
 
         // Recursive utility method for buildParamNameMap
         void processParamElement(LPD3DXCONSTANTTABLE pConstTable, D3DXHANDLE parent, String prefix, unsigned int index);
         void populateDef(D3DXCONSTANT_DESC& d3dDesc, GpuConstantDefinition& def) const;
 
+        String mTarget;
+        String mEntryPoint;
         bool mColumnMajorMatrices;
         bool mBackwardsCompatibility;
 
@@ -161,7 +178,7 @@ namespace Ogre {
         /** Sets the shader target to compile down to, e.g. 'vs_1_1'. */
         void setTarget(const String& target);
         /** Gets the shader target to compile down to, e.g. 'vs_1_1'. */
-        const String& getTarget(void) const;
+        const String& getTarget(void) const { return mTarget; }
         /** Sets whether matrix packing in column-major order. */ 
         void setColumnMajorMatrices(bool columnMajor) { mColumnMajorMatrices = columnMajor; }
         /** Gets whether matrix packed in column-major order. */
@@ -178,6 +195,8 @@ namespace Ogre {
         /** Gets the optimisation level to use. */
         OptimisationLevel getOptimisationLevel() const { return mOptimisationLevel; }
 
+        /// Overridden from GpuProgram
+        bool isSupported(void) const;
         /// Overridden from GpuProgram
         GpuProgramParametersSharedPtr createParameters(void);
         /// Overridden from GpuProgram

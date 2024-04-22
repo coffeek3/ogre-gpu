@@ -46,19 +46,6 @@ HardwareSkinningFactory& HardwareSkinningFactory::getSingleton(void)
 }
 
 String HardwareSkinning::Type = "SGX_HardwareSkinning";
-const String SRS_HARDWARE_SKINNING = "SGX_HardwareSkinning";
-
-ushort HardwareSkinningFactory::mMaxCalculableBoneCount = 70;
-
-#define HS_MAX_WEIGHT_COUNT 4
-
-/// A set of custom shadow caster materials
-static MaterialPtr mCustomShadowCasterMaterialsLinear[HS_MAX_WEIGHT_COUNT];
-static MaterialPtr mCustomShadowCasterMaterialsDualQuaternion[HS_MAX_WEIGHT_COUNT];
-
-/// A set of custom shadow receiver materials
-static MaterialPtr mCustomShadowReceiverMaterialsLinear[HS_MAX_WEIGHT_COUNT];
-static MaterialPtr mCustomShadowReceiverMaterialsDualQuaternion[HS_MAX_WEIGHT_COUNT];
 
 /************************************************************************/
 /*                                                                      */
@@ -72,7 +59,7 @@ HardwareSkinning::HardwareSkinning() :
 //-----------------------------------------------------------------------
 const String& HardwareSkinning::getType() const
 {
-    return SRS_HARDWARE_SKINNING;
+    return Type;
 }
 
 //-----------------------------------------------------------------------
@@ -82,39 +69,32 @@ int HardwareSkinning::getExecutionOrder() const
 }
 
 //-----------------------------------------------------------------------
-bool HardwareSkinning::setParameter(const String& name, const String& value)
+void HardwareSkinning::setHardwareSkinningParam(ushort boneCount, ushort weightCount, SkinningType skinningType, bool correctAntipodalityHandling, bool scalingShearingSupport)
 {
-    if (name == "type")
+    mSkinningType = skinningType;
+    
+    if(skinningType == ST_DUAL_QUATERNION)
     {
-        if (value == "dual_quaternion")
+        if(!mDualQuat)
         {
-            mSkinningType = ST_DUAL_QUATERNION;
-            if (!mDualQuat)
-            {
-                mDualQuat.reset(OGRE_NEW DualQuaternionSkinning);
-            }
-
-            mActiveTechnique = mDualQuat;
-            return true;
+            mDualQuat.reset(OGRE_NEW DualQuaternionSkinning);
         }
-        else if(value == "linear")
-        {
-            mSkinningType = ST_LINEAR;
-            if (!mLinear)
-            {
-                mLinear.reset(OGRE_NEW LinearSkinning);
-            }
 
-            mActiveTechnique = mLinear;
-            return true;
-        }
+        mActiveTechnique = mDualQuat;
     }
-    else if(mActiveTechnique)
+    else //if(skinningType == ST_LINEAR)
     {
-        return mActiveTechnique->setParameter(name, value);
+        if(!mLinear)
+        {
+            mLinear.reset(OGRE_NEW LinearSkinning);
+        }
+
+        mActiveTechnique = mLinear;
     }
-    return false;
+    
+    mActiveTechnique->setHardwareSkinningParam(boneCount, weightCount, correctAntipodalityHandling, scalingShearingSupport);
 }
+
 //-----------------------------------------------------------------------
 ushort HardwareSkinning::getBoneCount()
 {
@@ -164,6 +144,17 @@ void HardwareSkinning::copyFrom(const SubRenderState& rhs)
 }
 
 //-----------------------------------------------------------------------
+void operator<<(std::ostream& o, const HardwareSkinning::SkinningData& data)
+{
+    o << data.isValid;
+    o << data.maxBoneCount;
+    o << data.maxWeightCount;
+    o << data.skinningType;
+    o << data.correctAntipodalityHandling;
+    o << data.scalingShearingSupport;
+}
+
+//-----------------------------------------------------------------------
 bool HardwareSkinning::preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass)
 {
     bool isValid = true;
@@ -177,15 +168,14 @@ bool HardwareSkinning::preAddToRenderState(const RenderState* renderState, Pass*
         
         //If the skinning data is being passed through the material, we need to create an instance of the appropriate
         //skinning type and set its parameters here
-        setParameter("type", pData.skinningType == ST_LINEAR ? "linear" : "dual_quaternion");
-        mActiveTechnique->setHardwareSkinningParam(pData.maxBoneCount, pData.maxWeightCount,
-                                                   pData.correctAntipodalityHandling, pData.scalingShearingSupport);
+        setHardwareSkinningParam(pData.maxBoneCount, pData.maxWeightCount, pData.skinningType, 
+                     pData.correctAntipodalityHandling, pData.scalingShearingSupport);
     }
 
     //If there is no associated technique, default to linear skinning as a pass-through
     if(!mActiveTechnique)
     {
-        setParameter("type", "linear");
+        setHardwareSkinningParam(0, 0, ST_LINEAR, false, false);
     }
 
     int boneCount = mActiveTechnique->getBoneCount();
@@ -196,24 +186,15 @@ bool HardwareSkinning::preAddToRenderState(const RenderState* renderState, Pass*
         (weightCount != 0) && (weightCount <= 4) &&
         ((mCreator == NULL) || (boneCount <= mCreator->getMaxCalculableBoneCount()));
 
-    // This requires GLES3.0
-    if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles" &&
-        !GpuProgramManager::getSingleton().isSyntaxSupported("glsl300es"))
-        doBoneCalculations = false;
-
     mActiveTechnique->setDoBoneCalculations(doBoneCalculations);
-    mActiveTechnique->setDoLightCalculations(srcPass->getLightingEnabled());
 
     if ((doBoneCalculations) && (mCreator))
     {
         //update the receiver and caster materials
         if (!dstPass->getParent()->getShadowCasterMaterial())
         {
-            auto casterMat = mCreator->getCustomShadowCasterMaterial(mSkinningType, weightCount - 1);
-
-            // if the caster material itsefl uses RTSS hardware skinning
-            if(casterMat.get() != dstPass->getParent()->getParent())
-                dstPass->getParent()->setShadowCasterMaterial(casterMat);
+            dstPass->getParent()->setShadowCasterMaterial(
+                mCreator->getCustomShadowCasterMaterial(mSkinningType, weightCount - 1));
         }
 
         if (!dstPass->getParent()->getShadowReceiverMaterial())
@@ -248,7 +229,8 @@ bool HardwareSkinning::addFunctionInvocations(ProgramSet* programSet)
 }
 
 //-----------------------------------------------------------------------
-HardwareSkinningFactory::HardwareSkinningFactory()
+HardwareSkinningFactory::HardwareSkinningFactory() :
+    mMaxCalculableBoneCount(70)
 {
 
 }
@@ -258,7 +240,7 @@ HardwareSkinningFactory::~HardwareSkinningFactory() {}
 //-----------------------------------------------------------------------
 const String& HardwareSkinningFactory::getType() const
 {
-    return SRS_HARDWARE_SKINNING;
+    return HardwareSkinning::Type;
 }
 
 //-----------------------------------------------------------------------
@@ -266,47 +248,62 @@ SubRenderState* HardwareSkinningFactory::createInstance(ScriptCompiler* compiler
 {
     if (prop->name == "hardware_skinning")
     {
-        String skinningType = "linear";
+        bool hasError = false;
+        uint32 boneCount = 0;
+        uint32 weightCount = 0;
+        String skinningType = "";
+        SkinningType skinType = ST_LINEAR;
+        bool correctAntipodalityHandling = false;
+        bool scalingShearingSupport = false;
         
-        if(prop->values.size() < 2)
-            return NULL;
-
-        std::map<String, String> params;
-        AbstractNodeList::iterator it = prop->values.begin();
-        params["max_bone_count"] = (*it)->getString();
-        ++it;
-        params["weight_count"] = (*it)->getString();
-
-        if(prop->values.size() >= 3)
+        if(prop->values.size() >= 2)
         {
+            AbstractNodeList::iterator it = prop->values.begin();
+            if(false == SGScriptTranslator::getUInt(*it, &boneCount))
+                hasError = true;
+
             ++it;
-            skinningType = (*it)->getString();
-        }
+            if(false == SGScriptTranslator::getUInt(*it, &weightCount))
+                hasError = true;
 
-        if(skinningType != "dual_quaternion" && skinningType != "linear")
-            return NULL;
-
-        if(prop->values.size() >= 5)
-        {
-            ++it;
-            params["correct_antipodality"] = (*it)->getString();
-            ++it;
-            params["scale_shearing"] = (*it)->getString();
-        }
-
-        //create and update the hardware skinning sub render state
-        SubRenderState* subRenderState = createOrRetrieveInstance(translator);
-        subRenderState->setParameter("type", skinningType);
-
-        for(const auto& p : params)
-        {
-            if(!subRenderState->setParameter(p.first, p.second))
+            if(prop->values.size() >= 5)
             {
-                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line, p.second);
+                ++it;
+                SGScriptTranslator::getString(*it, &skinningType);
+
+                ++it;
+                SGScriptTranslator::getBoolean(*it, &correctAntipodalityHandling);
+
+                ++it;
+                SGScriptTranslator::getBoolean(*it, &scalingShearingSupport);
+            }
+
+            //If the skinningType is not specified or is specified incorrectly, default to linear skinning.
+            if(skinningType == "dual_quaternion")
+            {
+                skinType = ST_DUAL_QUATERNION;
+            }
+            else
+            {
+                skinType = ST_LINEAR;
             }
         }
 
-        return subRenderState;
+        if (hasError == true)
+        {
+            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line, "Expected the format: hardware_skinning <bone count> <weight count> [skinning type] [correct antipodality handling] [scaling/shearing support]");
+            return NULL;
+        }
+        else
+        {
+            //create and update the hardware skinning sub render state
+            SubRenderState* subRenderState = createOrRetrieveInstance(translator);
+            HardwareSkinning* hardSkinSrs = static_cast<HardwareSkinning*>(subRenderState);
+            hardSkinSrs->setHardwareSkinningParam(boneCount, weightCount, skinType, correctAntipodalityHandling, scalingShearingSupport);
+            
+            return subRenderState;
+        }
+
     }
 
     return NULL;
@@ -381,7 +378,7 @@ void HardwareSkinningFactory::setCustomShadowReceiverMaterials(const SkinningTyp
 }
 
 //-----------------------------------------------------------------------
-const MaterialPtr& HardwareSkinningFactory::getCustomShadowCasterMaterial(const SkinningType skinningType, ushort index)
+const MaterialPtr& HardwareSkinningFactory::getCustomShadowCasterMaterial(const SkinningType skinningType, ushort index) const
 {
     assert(index < HS_MAX_WEIGHT_COUNT);
 
@@ -396,7 +393,7 @@ const MaterialPtr& HardwareSkinningFactory::getCustomShadowCasterMaterial(const 
 }
 
 //-----------------------------------------------------------------------
-const MaterialPtr& HardwareSkinningFactory::getCustomShadowReceiverMaterial(const SkinningType skinningType, ushort index)
+const MaterialPtr& HardwareSkinningFactory::getCustomShadowReceiverMaterial(const SkinningType skinningType, ushort index) const
 {
     assert(index < HS_MAX_WEIGHT_COUNT);
 
@@ -410,18 +407,34 @@ const MaterialPtr& HardwareSkinningFactory::getCustomShadowReceiverMaterial(cons
     }
 }
 
-//----------------------------------------------------------------------
-/**
-    @brief
-        Extracts the maximum amount of bones and weights used in an specific subentity of given entity.
+//-----------------------------------------------------------------------
+void HardwareSkinningFactory::prepareEntityForSkinning(const Entity* pEntity, SkinningType skinningType, 
+                               bool correctAntidpodalityHandling, bool shearScale)
+{
+    if (pEntity != NULL) 
+    {
+        size_t lodLevels = pEntity->getNumManualLodLevels() + 1;
+        for(size_t indexLod = 0 ; indexLod < lodLevels ; ++indexLod)
+        {
+            const Entity* pCurEntity = pEntity;
+            if (indexLod > 0) pCurEntity = pEntity->getManualLodLevel(indexLod - 1);
 
-    @param pEntity The entity from which the information needs to be extracted.
-    @param subEntityIndex The index of subentity from which the information needs to be extracted.
-    @param boneCount The maximum number of bones used by the entity.
-    @param weightCount The maximum number of weights used by the entity.
-    @return Returns true if the entity can use HS. False if not.
-*/
-static bool extractSkeletonData(const Entity* pEntity, size_t subEntityIndex, ushort& boneCount, ushort& weightCount)
+            size_t numSubEntities = pCurEntity->getNumSubEntities();
+            for(size_t indexSub = 0 ; indexSub < numSubEntities ; ++indexSub)
+            {
+                ushort boneCount = 0,weightCount = 0;
+                bool isValid = extractSkeletonData(pCurEntity, indexSub, boneCount, weightCount);
+
+                SubEntity* pSubEntity = pCurEntity->getSubEntity(indexSub);
+                const MaterialPtr& pMat = pSubEntity->getMaterial();
+                imprintSkeletonData(pMat, isValid, boneCount, weightCount, skinningType, correctAntidpodalityHandling, shearScale);
+            }
+        }
+    }
+}
+
+//-----------------------------------------------------------------------
+bool HardwareSkinningFactory::extractSkeletonData(const Entity* pEntity, size_t subEntityIndex, ushort& boneCount, ushort& weightCount)
 {
     bool isValidData = false;
     boneCount = 0;
@@ -435,7 +448,7 @@ static bool extractSkeletonData(const Entity* pEntity, size_t subEntityIndex, us
     if (!hasVertexAnim && pEntity->hasSkeleton())
     {
         //get weights count
-        const MeshPtr& pMesh = pEntity->getMesh();
+        MeshPtr pMesh = pEntity->getMesh();
 
         RenderOperation ro;
         SubMesh* pSubMesh = pMesh->getSubMesh(subEntityIndex);
@@ -477,17 +490,8 @@ static bool extractSkeletonData(const Entity* pEntity, size_t subEntityIndex, us
     return isValidData;
 }
 
-/**
-    @brief
-        Updates an entity's the skeleton data onto one of it's materials.
-
-    @param pMaterial The material to update with the information.
-    @param isValid Tells if the material can be used with HS.
-    @param boneCount The maximum number of bones used by the entity.
-    @param weightCount The maximum number of weights used by the entity.
-    @return Returns true if the data was updated on the material. False if not.
-*/
-static bool imprintSkeletonData(const MaterialPtr& pMaterial, bool isVaild,
+//-----------------------------------------------------------------------
+bool HardwareSkinningFactory::imprintSkeletonData(const MaterialPtr& pMaterial, bool isVaild, 
                 ushort boneCount, ushort weightCount, SkinningType skinningType, bool correctAntidpodalityHandling, bool scalingShearingSupport)
 {
     bool isUpdated = false;
@@ -519,7 +523,7 @@ static bool imprintSkeletonData(const MaterialPtr& pMaterial, bool isVaild,
 
             //update the data in the material and invalidate it in the RTShader system
             //do it will be regenerated
-            binding.setUserAny(HS_DATA_BIND_NAME, data);
+            binding.setUserAny(HS_DATA_BIND_NAME, Any(data));
 
             size_t schemeCount = ShaderGenerator::getSingleton().getRTShaderSchemeCount();
             for(size_t i = 0 ; i < schemeCount ; ++i)
@@ -527,7 +531,9 @@ static bool imprintSkeletonData(const MaterialPtr& pMaterial, bool isVaild,
                 //invalidate the material so it will be recreated with the correct
                 //amount of bones and weights
                 const String& schemeName = ShaderGenerator::getSingleton().getRTShaderScheme(i);
-                ShaderGenerator::getSingleton().invalidateMaterial(schemeName, *pMaterial);
+                ShaderGenerator::getSingleton().invalidateMaterial(
+                    schemeName, pMaterial->getName(), pMaterial->getGroup());
+
             }
 
         }
@@ -536,35 +542,6 @@ static bool imprintSkeletonData(const MaterialPtr& pMaterial, bool isVaild,
 
 }
 
-void HardwareSkinningFactory::prepareEntityForSkinning(const Entity* pEntity, SkinningType skinningType,
-                               bool correctAntidpodalityHandling, bool shearScale)
-{
-    // This requires GLES3.0
-    if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles" &&
-        !GpuProgramManager::getSingleton().isSyntaxSupported("glsl300es"))
-        return;
-
-    if (pEntity != NULL)
-    {
-        size_t lodLevels = pEntity->getNumManualLodLevels() + 1;
-        for(size_t indexLod = 0 ; indexLod < lodLevels ; ++indexLod)
-        {
-            const Entity* pCurEntity = pEntity;
-            if (indexLod > 0) pCurEntity = pEntity->getManualLodLevel(indexLod - 1);
-
-            size_t numSubEntities = pCurEntity->getNumSubEntities();
-            for(size_t indexSub = 0 ; indexSub < numSubEntities ; ++indexSub)
-            {
-                ushort boneCount = 0,weightCount = 0;
-                bool isValid = extractSkeletonData(pCurEntity, indexSub, boneCount, weightCount);
-
-                SubEntity* pSubEntity = pCurEntity->getSubEntity(indexSub);
-                const MaterialPtr& pMat = pSubEntity->getMaterial();
-                imprintSkeletonData(pMat, isValid, boneCount, weightCount, skinningType, correctAntidpodalityHandling, shearScale);
-            }
-        }
-    }
-}
 
 }
 }

@@ -57,14 +57,19 @@ class TargetRenderState;
 class SubRenderState;
 class SubRenderStateAccessor;
 class SubRenderStateFactory;
+class ProgramManager;
 class Program;
+class ProgramProcessor;
 class ProgramSet;
 class RenderState;
 class Parameter;
 class UniformParameter;
 class Function;
 class FunctionStageRef;
+class FFPRenderStateBuilder;
 class ShaderGenerator;
+class SGMaterialSerializerListener;
+class ProgramWriterFactory;
 class ProgramWriterManager;
 
 typedef shared_ptr<Parameter>        ParameterPtr;
@@ -78,6 +83,13 @@ enum VSOutputCompactPolicy
     VSOCP_MEDIUM    = 1,        // VS Outputs will be compacted always without parameter splits.
     VSOCP_HIGH      = 2         // VS Outputs will be compacted always including parameter splits.
 };
+
+enum SkinningType
+{
+    ST_LINEAR,
+    ST_DUAL_QUATERNION
+};
+
 
 }
 }

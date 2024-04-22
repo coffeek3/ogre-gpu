@@ -99,9 +99,9 @@ namespace Ogre {
     void LodStrategyManager::removeAllStrategies()
     {
         // Get beginning iterator
-        for (auto & s : mStrategies)
+        for (StrategyMap::iterator it = mStrategies.begin(); it != mStrategies.end(); ++it)
         {
-            OGRE_DELETE s.second;
+            OGRE_DELETE it->second;
         }
         mStrategies.clear();
     }

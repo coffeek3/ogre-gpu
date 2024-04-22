@@ -32,16 +32,27 @@ THE SOFTWARE.
 #include "OgreGLPrerequisites.h"
 #include "OgreGLStateCacheManagerCommon.h"
 #include "OgreStdHeaders.h"
+#include "OgreIteratorWrappers.h"
 
 namespace Ogre
 {
     class _OgreGLExport GLStateCacheManager : public GLStateCacheManagerCommon
     {
     protected:
+        struct TextureUnitParams
+        {
+            TexParameteriMap mTexParameteriMap;
+        };
+
+        typedef std::unordered_map<GLuint, TextureUnitParams> TexUnitsMap;
+
         /* These variables are used for caching OpenGL state.
          They are cached because state changes can be quite expensive,
          which is especially important on mobile or embedded systems.
          */
+
+        /// Stores textures currently bound to each texture stage
+        std::unordered_map <GLenum, GLuint> mBoundTextures;
 
         struct TexGenParams
         {
@@ -50,6 +61,8 @@ namespace Ogre
         /// Stores the currently enabled texcoord generation types per texture unit
         std::unordered_map <GLenum, TexGenParams> mTextureCoordGen;
 
+        /// A map of texture parameters for each texture unit
+        TexUnitsMap mTexUnitsMap;
         /// Stores the current polygon rendering mode
         GLenum mPolygonMode;
         /// Stores the last bound texture id
@@ -81,8 +94,9 @@ namespace Ogre
         /** Bind an OpenGL buffer of any type.
          @param target The buffer target.
          @param buffer The buffer ID.
+         @param force Optional parameter to force an update.
          */
-        void bindGLBuffer(GLenum target, GLuint buffer);
+        void bindGLBuffer(GLenum target, GLuint buffer, bool force = false);
 
         /** Delete an OpenGL buffer of any type.
          @param target The buffer target.
@@ -172,6 +186,7 @@ namespace Ogre
         void setStencilMask(GLuint mask);
 
         /** Enables a piece of OpenGL functionality.
+         @param flag The function to enable.
          */
         void setEnabled(GLenum flag, bool enabled);
 
@@ -209,7 +224,7 @@ namespace Ogre
         void setPointSize(GLfloat size);
         void setPointParameters(const GLfloat* attenuation, float minSize = -1, float maxSize = -1);
 
-        void setViewport(const Rect& r);
+        void setViewport(GLint x, GLint y, GLsizei width, GLsizei height);
 
     };
 }

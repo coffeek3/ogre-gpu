@@ -35,11 +35,6 @@ THE SOFTWARE.
 #ifndef __OgreStableHeaders__
 #define __OgreStableHeaders__
 
-extern "C" {
-#   include <sys/types.h>
-#   include <sys/stat.h>
-}
-
 #include "OgreConfig.h"
 #include "OgreExports.h"
 #include "OgrePrerequisites.h"
@@ -54,7 +49,6 @@ extern "C" {
 #include "OgreBitwise.h"
 #include "OgreBone.h"
 #include "OgreCamera.h"
-#include "OgreCodec.h"
 #include "OgreColourValue.h"
 #include "OgreCommon.h"
 #include "OgreDataStream.h"
@@ -63,7 +57,6 @@ extern "C" {
 #include "OgreFileSystem.h"
 #include "OgreFrustum.h"
 #include "OgreHardwareBufferManager.h"
-#include "OgreLight.h"
 #include "OgreLog.h"
 #include "OgreLogManager.h"
 #include "OgreManualObject.h"
@@ -83,10 +76,7 @@ extern "C" {
 #include "OgrePlatformInformation.h"
 #include "OgreProfiler.h"
 #include "OgreQuaternion.h"
-#include "OgreRadixSort.h"
 #include "OgreRay.h"
-#include "OgreRectangle2D.h"
-#include "OgreBuiltinMovableFactories.h"
 #include "OgreRenderSystem.h"
 #include "OgreResourceGroupManager.h"
 #include "OgreResource.h"
@@ -111,31 +101,12 @@ extern "C" {
 #include "OgreTextureManager.h"
 #include "Threading/OgreThreadHeaders.h"
 #include "OgreUserObjectBindings.h"
-#include "OgreVector.h"
+#include "OgreVector2.h"
+#include "OgreVector3.h"
+#include "OgreVector4.h"
+#include "OgreWireBoundingBox.h"
 #if OGRE_NO_ZIP_ARCHIVE == 0
 #   include "OgreZip.h"
 #endif
-
-#define FOURCC(c0, c1, c2, c3) (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24))
-
-#if OGRE_COMPILER == OGRE_COMPILER_MSVC
-#define OGRE_IGNORE_DEPRECATED_BEGIN __pragma(warning(push)) \
-    __pragma(warning(disable:4996))
-#define OGRE_IGNORE_DEPRECATED_END __pragma(warning(pop))
-#else
-#define OGRE_IGNORE_DEPRECATED_BEGIN _Pragma("GCC diagnostic push") \
-    _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
-#define OGRE_IGNORE_DEPRECATED_END _Pragma("GCC diagnostic pop")
-#endif
-
-#ifndef OGRE_SERIALIZER_VALIDATE_CHUNKSIZE
-#define OGRE_SERIALIZER_VALIDATE_CHUNKSIZE OGRE_DEBUG_MODE
-#endif
-
-namespace Ogre
-{
-void logMaterialNotFound(const String& name, const String& groupName, const String& destType, const String& destName,
-                         LogMessageLevel lml = LML_CRITICAL);
-}
 
 #endif 

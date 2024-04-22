@@ -45,7 +45,7 @@ namespace Ogre {
     *  @{
     */
     /** Defines a part of a complete mesh.
-
+        @remarks
             Meshes which make up the definition of a discrete 3D object
             are made up of potentially multiple parts. This is because
             different parts of the mesh may use different materials or
@@ -67,8 +67,15 @@ namespace Ogre {
         SubMesh();
         ~SubMesh();
 
-        /** Dedicated vertex data (only valid if useSharedVertices = false).
 
+        /// Indicates if this submesh shares vertex data with other meshes or whether it has it's own vertices.
+        bool useSharedVertices;
+
+        /// The render operation type used to render this submesh
+        RenderOperation::OperationType operationType;
+
+        /** Dedicated vertex data (only valid if useSharedVertices = false).
+            @remarks
                 This data is completely owned by this submesh.
             @par
                 The use of shared or non-shared buffers is determined when
@@ -76,22 +83,11 @@ namespace Ogre {
         */
         VertexData *vertexData;
 
-        /// replace the vertex data with a new one
-        void resetVertexData(VertexData* data = nullptr)
-        {
-            delete vertexData;
-            vertexData = data;
-            useSharedVertices = data == nullptr;
-        }
-
-        /// Creates a new local vertex data object
-        void createVertexData(HardwareBufferManagerBase* mgr = nullptr) { resetVertexData(new VertexData(mgr)); }
-
         /// Face index data
         IndexData *indexData;
 
         /** Dedicated index map for translate blend index to bone index (only valid if useSharedVertices = false).
-
+            @remarks
                 This data is completely owned by this submesh.
             @par
                 We collect actually used bones of all bone assignments, and build the
@@ -116,7 +112,7 @@ namespace Ogre {
         LODFaceList mLodFaceList;
 
         /** A list of extreme points on the submesh (optional).
-
+            @remarks
                 These points are some arbitrary points on the mesh that are used
                 by engine to better sort submeshes by depth. This doesn't matter
                 much for non-transparent submeshes, as Z-buffer takes care of invisible
@@ -139,18 +135,15 @@ namespace Ogre {
         /// Reference to parent Mesh (not a smart pointer so child does not keep parent alive).
         Mesh* parent;
 
-        /// Indicates if this submesh shares vertex data with other meshes or whether it has it's own vertices.
-        bool useSharedVertices;
-
-        /// The render operation type used to render this submesh
-        RenderOperation::OperationType operationType;
-
         /// Sets the name of the Material which this SubMesh will use
         void setMaterialName(const String& matName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME );
         const String& getMaterialName(void) const;
 
         void setMaterial(const MaterialPtr& mat) { mMaterial = mat; }
         const MaterialPtr& getMaterial() const { return mMaterial; }
+
+        /// @deprecated use getMaterial() instead
+        OGRE_DEPRECATED bool isMatInitialised(void) const { return bool(mMaterial); }
 
         /** Returns a RenderOperation structure required to render this mesh.
             @param 
@@ -161,7 +154,7 @@ namespace Ogre {
         void _getRenderOperation(RenderOperation& rend, ushort lodIndex = 0);
 
         /** Assigns a vertex to a bone with a given weight, for skeletal animation. 
-
+        @remarks    
             This method is only valid after calling setSkeletonName.
             Since this is a one-off process there exists only 'addBoneAssignment' and
             'clearBoneAssignments' methods, no 'editBoneAssignment'. You should not need
@@ -185,16 +178,63 @@ namespace Ogre {
         typedef std::multimap<size_t, VertexBoneAssignment> VertexBoneAssignmentList;
         typedef MapIterator<VertexBoneAssignmentList> BoneAssignmentIterator;
 
-        /// @deprecated use getBoneAssignments
-        OGRE_DEPRECATED BoneAssignmentIterator getBoneAssignmentIterator(void);
+        /** Gets an iterator for access all bone assignments. 
+        @remarks
+            Only valid if this SubMesh has dedicated geometry.
+        */
+        BoneAssignmentIterator getBoneAssignmentIterator(void);
 
         /** Gets a const reference to the list of bone assignments
         */
-        const VertexBoneAssignmentList& getBoneAssignments() const { return mBoneAssignments; }
+        const VertexBoneAssignmentList& getBoneAssignments() { return mBoneAssignments; }
 
 
         /** Must be called once to compile bone assignments into geometry buffer. */
         void _compileBoneAssignments(void);
+
+        typedef ConstMapIterator<AliasTextureNamePairList> AliasTextureIterator;
+        /** Gets an constant iterator to access all texture alias names assigned to this submesh. 
+
+        */
+        AliasTextureIterator getAliasTextureIterator(void) const;
+        /** Adds the alias or replaces an existing one and associates the texture name to it.
+        @remarks
+          The submesh uses the texture alias to replace textures used in the material applied
+          to the submesh.
+        @param
+            aliasName is the name of the alias.
+        @param
+            textureName is the name of the texture to be associated with the alias
+
+        */
+        void addTextureAlias(const String& aliasName, const String& textureName);
+        /** Remove a specific texture alias name from the sub mesh
+        @param
+            aliasName is the name of the alias to be removed.  If it is not found 
+            then it is ignored.
+        */
+        void removeTextureAlias(const String& aliasName);
+        /** removes all texture aliases from the sub mesh
+        */
+        void removeAllTextureAliases(void);
+        /** returns true if the sub mesh has texture aliases
+        */
+        bool hasTextureAliases(void) const { return !mTextureAliases.empty(); }
+        /** Gets the number of texture aliases assigned to the sub mesh.
+        */
+        size_t getTextureAliasCount(void) const { return mTextureAliases.size(); }
+
+        /**  The current material used by the submesh is copied into a new material
+            and the submesh's texture aliases are applied if the current texture alias
+            names match those found in the original material.
+        @remarks
+            The submesh's texture aliases must be setup prior to calling this method.
+            If a new material has to be created, the subMesh autogenerates the new name.
+            The new name is the old name + "_" + number.
+        @return 
+            True if texture aliases were applied and a new material was created.
+        */
+        bool updateMaterialUsingTextureAliases(void);
 
         /** Get the type of any vertex animation used by dedicated geometry.
         */
@@ -223,7 +263,15 @@ namespace Ogre {
          */
         SubMesh * clone(const String& newName, Mesh *parentMesh = 0);
 
-    private:
+    protected:
+
+        /// the material this SubMesh uses.
+        MaterialPtr mMaterial;
+
+        /// paired list of texture aliases and texture names
+        AliasTextureNamePairList mTextureAliases;
+
+        VertexBoneAssignmentList mBoneAssignments;
 
         /// Flag indicating that bone assignments need to be recompiled
         bool mBoneAssignmentsOutOfDate;
@@ -236,11 +284,6 @@ namespace Ogre {
 
         /// Is Build Edges Enabled
         bool mBuildEdgesEnabled;
-
-        /// the material this SubMesh uses.
-        MaterialPtr mMaterial;
-
-        VertexBoneAssignmentList mBoneAssignments;
 
         /// Internal method for removing LOD data
         void removeLodLevels(void);

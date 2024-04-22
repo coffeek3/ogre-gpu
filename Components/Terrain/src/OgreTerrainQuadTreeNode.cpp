@@ -45,9 +45,9 @@ namespace Ogre
     unsigned short TerrainQuadTreeNode::DELTA_BUFFER = 1;
 
     //---------------------------------------------------------------------
-    TerrainQuadTreeNode::TerrainQuadTreeNode(Terrain* terrain,
-        TerrainQuadTreeNode* parent, uint16 xoff, uint16 yoff, uint16 size,
-        uint16 lod, uint16 depth)
+    TerrainQuadTreeNode::TerrainQuadTreeNode(Terrain* terrain, 
+        TerrainQuadTreeNode* parent, uint16 xoff, uint16 yoff, uint16 size, 
+        uint16 lod, uint16 depth, uint16 quadrant)
         : mTerrain(terrain)
         , mParent(parent)
         , mOffsetX(xoff)
@@ -57,14 +57,18 @@ namespace Ogre
         , mSize(size)
         , mBaseLod(lod)
         , mDepth(depth)
+        , mQuadrant(quadrant)
         , mBoundingRadius(0)
         , mCurrentLod(-1)
+        , mMaterialLodIndex(0)
         , mLodTransition(0)
         , mChildWithMaxHeightDelta(0)
         , mSelfOrChildRendered(false)
         , mNodeWithVertexData(0)
         , mVertexDataRecord(0)
+        , mMovable(0)
         , mLocalNode(0)
+        , mRend(0)
     {
         if (terrain->getMaxBatchSize() < size)
         {
@@ -73,10 +77,10 @@ namespace Ogre
             uint16 childLod = lod - 1; // LOD levels decrease down the tree (higher detail)
             uint16 childDepth = depth + 1;
             // create children
-            mChildren[0] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff, yoff, childSize, childLod, childDepth);
-            mChildren[1] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff + childOff, yoff, childSize, childLod, childDepth);
-            mChildren[2] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff, yoff + childOff, childSize, childLod, childDepth);
-            mChildren[3] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff + childOff, yoff + childOff, childSize, childLod, childDepth);
+            mChildren[0] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff, yoff, childSize, childLod, childDepth, 0);
+            mChildren[1] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff + childOff, yoff, childSize, childLod, childDepth, 1);
+            mChildren[2] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff, yoff + childOff, childSize, childLod, childDepth, 2);
+            mChildren[3] = OGRE_NEW TerrainQuadTreeNode(terrain, this, xoff + childOff, yoff + childOff, childSize, childLod, childDepth, 3);
 
             LodLevel* ll = OGRE_NEW LodLevel();
             // non-leaf nodes always render with minBatchSize vertices
@@ -111,11 +115,11 @@ namespace Ogre
                 if (ownLod)
                     sz = (uint16)(((sz - 1) * 0.5) + 1);
             }
-
+            
             assert(sz == terrain->getMinBatchSize());
 
         }
-
+        
         // Local centre calculation
         // Because of pow2 + 1 there is always a middle point
         uint16 midoffset = (size - 1) / 2;
@@ -125,10 +129,22 @@ namespace Ogre
         // TODO - what if we actually centred this at the terrain height at this point?
         // would this be better?
         mTerrain->getPoint(midpointx, midpointy, 0, &mLocalCentre);
+
+        mMovable = OGRE_NEW Movable(this);
+        mRend = OGRE_NEW Rend(this);
+
+    
     }
     //---------------------------------------------------------------------
     TerrainQuadTreeNode::~TerrainQuadTreeNode()
     {
+        if (mMovable->isAttached())
+            mLocalNode->detachObject(mMovable);
+        OGRE_DELETE mMovable;
+        mMovable = 0;
+        OGRE_DELETE mRend;
+        mRend = 0;
+
         if (mLocalNode)
         {
             mTerrain->_getRootSceneNode()->removeAndDestroyChild(mLocalNode);
@@ -184,14 +200,15 @@ namespace Ogre
     void TerrainQuadTreeNode::prepare(StreamSerialiser& stream)
     {
         // load LOD data we need
-        for (auto *l : mLodLevels)
+        for (LodLevelList::iterator i = mLodLevels.begin(); i != mLodLevels.end(); ++i)
         {
+            LodLevel* ll = *i;
             // only read 'calc' and then copy to final (separation is only for
             // real-time calculation
             // Basically this is what finaliseHeightDeltas does in calc path
-            stream.read(&l->calcMaxHeightDelta);
-            l->maxHeightDelta = l->calcMaxHeightDelta;
-            l->lastCFactor = 0;
+            stream.read(&ll->calcMaxHeightDelta);
+            ll->maxHeightDelta = ll->calcMaxHeightDelta;
+            ll->lastCFactor = 0;
         }
 
         if (!isLeaf())
@@ -213,8 +230,11 @@ namespace Ogre
     void TerrainQuadTreeNode::save(StreamSerialiser& stream)
     {
         // save LOD data we need
-        for (const auto *l : mLodLevels)
-            stream.write(&l->maxHeightDelta);
+        for (LodLevelList::iterator i = mLodLevels.begin(); i != mLodLevels.end(); ++i)
+        {
+            LodLevel* ll = *i;
+            stream.write(&ll->maxHeightDelta);
+        }
 
         if (!isLeaf())
         {
@@ -251,11 +271,8 @@ namespace Ogre
         if (!mLocalNode)
             mLocalNode = mTerrain->_getRootSceneNode()->createChildSceneNode(mLocalCentre);
 
-        if (!isAttached())
-            mLocalNode->attachObject(this);
-
-        mQueryFlags = mTerrain->getQueryFlags();
-        mVisibilityFlags = mTerrain->getVisibilityFlags();
+        if (!mMovable->isAttached())
+            mLocalNode->attachObject(mMovable);
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::unload()
@@ -265,7 +282,9 @@ namespace Ogre
                 mChildren[i]->unload();
 
         destroyGpuVertexData();
-        detachFromParent();
+
+        if (mMovable->isAttached())
+            mLocalNode->detachObject(mMovable);
     }
 
     void TerrainQuadTreeNode::unload(uint16 treeDepthStart, uint16 treeDepthEnd)
@@ -280,7 +299,9 @@ namespace Ogre
         if (mDepth >= treeDepthStart && mDepth < treeDepthEnd)
         {
             destroyGpuVertexData();
-            detachFromParent();
+            if (mMovable->isAttached())
+                mLocalNode->detachObject(mMovable);
+
         }
     }
     //---------------------------------------------------------------------
@@ -314,14 +335,14 @@ namespace Ogre
 
             // if the rect covers the whole node, reset the max height
             // this means that if you recalculate the deltas progressively, end up keeping
-            // a max height that's no longer the case (ie more conservative lod),
-            // but that's the price for not recaculating the whole node. If a
+            // a max height that's no longer the case (ie more conservative lod), 
+            // but that's the price for not recaculating the whole node. If a 
             // complete recalculation is required, just dirty the entire node. (or terrain)
 
             // Note we use the 'calc' field here to avoid interfering with any
             // ongoing LOD calculations (this can be in the background)
 
-            if (rect.left <= mOffsetX && rect.right > mBoundaryX
+            if (rect.left <= mOffsetX && rect.right > mBoundaryX 
                 && rect.top <= mOffsetY && rect.bottom > mBoundaryY)
             {
                 for (LodLevelList::iterator i = mLodLevels.begin(); i != mLodLevels.end(); ++i)
@@ -340,7 +361,7 @@ namespace Ogre
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::notifyDelta(uint16 x, uint16 y, uint16 lod, Real delta)
     {
-        if (x >= mOffsetX && x < mBoundaryX
+        if (x >= mOffsetX && x < mBoundaryX 
             && y >= mOffsetY && y < mBoundaryY)
         {
             // within our bounds, check it's our LOD level
@@ -407,8 +428,8 @@ namespace Ogre
                 {
                     // the next LOD after this one should have a higher delta
                     // otherwise it won't come into affect further back like it should!
-                    mLodLevels[i+1]->calcMaxHeightDelta =
-                        std::max(mLodLevels[i+1]->calcMaxHeightDelta,
+                    mLodLevels[i+1]->calcMaxHeightDelta = 
+                        std::max(mLodLevels[i+1]->calcMaxHeightDelta, 
                             mLodLevels[i]->calcMaxHeightDelta * (Real)1.05);
                 }
 
@@ -436,17 +457,19 @@ namespace Ogre
             }
 
             // Self
-            for (auto *l : mLodLevels)
+            for (LodLevelList::iterator i = mLodLevels.begin(); i != mLodLevels.end(); ++i)
             {
                 // copy from 'calc' area to runtime value
-                l->maxHeightDelta = l->calcMaxHeightDelta;
+                (*i)->maxHeightDelta = (*i)->calcMaxHeightDelta;
                 // also trash stored cfactor
-                l->lastCFactor = 0;
+                (*i)->lastCFactor = 0;
             }
+
         }
+
     }
     //---------------------------------------------------------------------
-    void TerrainQuadTreeNode::assignVertexData(uint16 treeDepthStart,
+    void TerrainQuadTreeNode::assignVertexData(uint16 treeDepthStart, 
         uint16 treeDepthEnd, uint16 resolution, uint sz)
     {
         assert(treeDepthStart >= mDepth && "Should not be calling this");
@@ -474,48 +497,55 @@ namespace Ogre
 
             for (int i = 0; i < 4; ++i)
                 mChildren[i]->assignVertexData(treeDepthStart, treeDepthEnd, resolution, sz);
-
+            
         }
 
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::useAncestorVertexData(TerrainQuadTreeNode* owner, uint16 treeDepthEnd, uint16 resolution)
     {
-        mNodeWithVertexData = owner;
+        mNodeWithVertexData = owner; 
         mVertexDataRecord = 0;
 
         if (!isLeaf() && treeDepthEnd > (mDepth + 1)) // treeDepthEnd is exclusive, and this is children
         {
             for (int i = 0; i < 4; ++i)
                 mChildren[i]->useAncestorVertexData(owner, treeDepthEnd, resolution);
+
         }
     }
     //---------------------------------------------------------------------
-    void TerrainQuadTreeNode::updateVertexData(bool positions, bool deltas,
+    void TerrainQuadTreeNode::updateVertexData(bool positions, bool deltas, 
         const Rect& rect, bool cpuData)
     {
-        //Check that we really intersect the dirty rect. This avoid assertion errors further down the line.
-        Rect updateRect = rect.intersect(Rect(mOffsetX, mOffsetY, mBoundaryX, mBoundaryY));
-        if (!updateRect.isNull())
+        if (rect.left <= mBoundaryX || rect.right > mOffsetX
+            || rect.top <= mBoundaryY || rect.bottom > mOffsetY)
         {
             // Do we have vertex data?
             if (mVertexDataRecord)
             {
+                // Trim to our bounds
+                Rect updateRect(mOffsetX, mOffsetY, mBoundaryX, mBoundaryY);
+                updateRect.left = std::max(updateRect.left, rect.left);
+                updateRect.right = std::min(updateRect.right, rect.right);
+                updateRect.top = std::max(updateRect.top, rect.top);
+                updateRect.bottom = std::min(updateRect.bottom, rect.bottom);
+
                 // update the GPU buffer directly
                 // TODO: do we have no use for CPU vertex data after initial load?
-                // if so, destroy it to free RAM, this should be fast enough to
+                // if so, destroy it to free RAM, this should be fast enough to 
                 // to direct
                 HardwareVertexBufferSharedPtr posbuf, deltabuf;
                 VertexData* targetVertexData = mVertexDataRecord->cpuVertexData;
                 if(!cpuData)
                 {
-                    if(mVertexDataRecord->gpuVertexData == NULL)
+                    if(mVertexDataRecord->gpuVertexData == NULL) 
                         createGpuVertexData();
                     assert(mVertexDataRecord->gpuVertexData);
                     targetVertexData = mVertexDataRecord->gpuVertexData;
                 }
 
-                if (positions)
+                if (positions) 
                     posbuf = targetVertexData->vertexBufferBinding->getBuffer(POSITION_BUFFER);
                 if (deltas)
                     deltabuf = targetVertexData->vertexBufferBinding->getBuffer(DELTA_BUFFER);
@@ -530,7 +560,7 @@ namespace Ogre
                     mChildren[i]->updateVertexData(positions, deltas, rect, cpuData);
 
                     // merge bounds from children
-                    AxisAlignedBox childBox = mChildren[i]->getBoundingBox();
+                    AxisAlignedBox childBox = mChildren[i]->getAABB();
                     // this box is relative to child centre
                     Vector3 boxoffset = mChildren[i]->getLocalCentre() - getLocalCentre();
                     childBox.setMinimum(childBox.getMinimum() + boxoffset);
@@ -540,8 +570,8 @@ namespace Ogre
 
             }
             // Make sure node knows to update
-            if (isAttached())
-                mLocalNode->needUpdate();
+            if (mMovable && mMovable->isAttached())
+                mMovable->getParentSceneNode()->needUpdate();
 
 
 
@@ -568,7 +598,7 @@ namespace Ogre
 
             // Vertex declaration
             size_t offset = 0;
-
+            
             if (mTerrain->_getUseVertexCompression())
             {
                 // 16 bytes per vertex, shaders only
@@ -582,10 +612,10 @@ namespace Ogre
                 // float2(delta, deltaLODthreshold)
                 dcl->addElement(DELTA_BUFFER, 0, VET_FLOAT2, VES_TEXTURE_COORDINATES, 1).getSize();
             }
-            else
+            else 
             {
                 // 28 bytes per vertex, compatibility
-                // POSITION
+                // POSITION 
                 // float3(x, y, z)
                 offset += dcl->addElement(POSITION_BUFFER, offset, VET_FLOAT3, VES_POSITION).getSize();
                 // UV0
@@ -602,9 +632,9 @@ namespace Ogre
             size_t numVerts = baseNumVerts;
             // Now add space for skirts
             // Skirts will be rendered as copies of the edge vertices translated downwards
-            // Some people use one big fan with only 3 vertices at the bottom,
+            // Some people use one big fan with only 3 vertices at the bottom, 
             // but this requires creating them much bigger that necessary, meaning
-            // more unnecessary overdraw, so we'll use more vertices
+            // more unnecessary overdraw, so we'll use more vertices 
             // You need 2^levels + 1 rows of full resolution (max 129) vertex copies, plus
             // the same number of columns. There are common vertices at intersections
             uint16 levels = mVertexDataRecord->treeLevels;
@@ -613,17 +643,14 @@ namespace Ogre
             numVerts += mVertexDataRecord->size * mVertexDataRecord->numSkirtRowsCols;
             numVerts += mVertexDataRecord->size * mVertexDataRecord->numSkirtRowsCols;
             // manually create CPU-side buffer
-            auto pos_sz = dcl->getVertexSize(POSITION_BUFFER);
-            auto posbuf = std::make_shared<HardwareVertexBuffer>(nullptr, pos_sz, numVerts,
-                                                                 new DefaultHardwareBuffer(pos_sz * numVerts));
-
-            auto delta_sz = dcl->getVertexSize(DELTA_BUFFER);
-            auto deltabuf = std::make_shared<HardwareVertexBuffer>(nullptr, delta_sz, numVerts,
-                                                                   new DefaultHardwareBuffer(delta_sz * numVerts));
+            HardwareVertexBufferSharedPtr posbuf(
+                OGRE_NEW DefaultHardwareVertexBuffer(dcl->getVertexSize(POSITION_BUFFER), numVerts, HardwareBuffer::HBU_STATIC_WRITE_ONLY));
+            HardwareVertexBufferSharedPtr deltabuf(
+                OGRE_NEW DefaultHardwareVertexBuffer(dcl->getVertexSize(DELTA_BUFFER), numVerts, HardwareBuffer::HBU_STATIC_WRITE_ONLY));
 
             mVertexDataRecord->cpuVertexData->vertexStart = 0;
             mVertexDataRecord->cpuVertexData->vertexCount = numVerts;
-
+            
             Rect updateRect(mOffsetX, mOffsetY, mBoundaryX, mBoundaryY);
             updateVertexBuffer(posbuf, deltabuf, updateRect);
             bufbind->setBinding(POSITION_BUFFER, posbuf);
@@ -632,10 +659,10 @@ namespace Ogre
         }
     }
     //----------------------------------------------------------------------
-    void TerrainQuadTreeNode::updateVertexBuffer(const HardwareVertexBufferPtr& posbuf,
-        const HardwareVertexBufferPtr& deltabuf, const Rect& rect)
+    void TerrainQuadTreeNode::updateVertexBuffer(HardwareVertexBufferSharedPtr& posbuf, 
+        HardwareVertexBufferSharedPtr& deltabuf, const Rect& rect)
     {
-        assert (rect.left >= mOffsetX && rect.right <= mBoundaryX &&
+        assert (rect.left >= mOffsetX && rect.right <= mBoundaryX && 
             rect.top >= mOffsetY && rect.bottom <= mBoundaryY);
 
         // potentially reset our bounds depending on coverage of the update
@@ -646,7 +673,7 @@ namespace Ogre
         long destOffsetX = rect.left <= mOffsetX ? 0 : (rect.left - mOffsetX) / inc;
         long destOffsetY = rect.top <= mOffsetY ? 0 : (rect.top - mOffsetY) / inc;
         // Fill the buffers
-
+        
         HardwareBuffer::LockOptions lockMode;
         if (destOffsetX || destOffsetY || rect.width() < mSize
             || rect.height() < mSize)
@@ -685,9 +712,9 @@ namespace Ogre
             pRowDeltaBuf += destOffsetY * destDeltaRowSkip + destOffsetX * deltabuf->getVertexSize();
         }
         Vector3 pos;
-
+        
         bool vcompress = mTerrain->_getUseVertexCompression();
-
+        
         for (uint16 y = rect.top; y < rect.bottom; y += inc)
         {
             const float* pHeight = pBaseHeight;
@@ -704,10 +731,10 @@ namespace Ogre
                     mergeIntoBounds(x, y, pos);
                     // relative to local centre
                     pos -= mLocalCentre;
-
+            
                     writePosVertex(vcompress, x, y, *pHeight, pos, uvScale, &pPosBuf);
                     pHeight += inc;
-
+                    
 
                 }
 
@@ -717,14 +744,14 @@ namespace Ogre
                     // we want delta to apply to LODs no higher than this value
                     // at runtime this will be combined with a per-renderable parameter
                     // to ensure we only apply morph to the correct LOD
-                    writeDeltaVertex(vcompress, x, y, *pDelta,
-                        (float)mTerrain->getLODLevelWhenVertexEliminated(x, y) - 1.0f,
+                    writeDeltaVertex(vcompress, x, y, *pDelta, 
+                        (float)mTerrain->getLODLevelWhenVertexEliminated(x, y) - 1.0f, 
                         &pDeltaBuf);
                     pDelta += inc;
 
                 }
 
-
+                
             }
             pBaseHeight += rowskip;
             pBaseDelta += rowskip;
@@ -743,19 +770,19 @@ namespace Ogre
 
         // skirt rows
         // clamp rows to skirt spacing (round up)
-        int skirtStartX = rect.left;
-        int skirtStartY = rect.top;
+        long skirtStartX = rect.left;
+        long skirtStartY = rect.top;
         // for rows, clamp Y to skirt frequency, X to inc (LOD resolution vs top)
         if (skirtStartY % skirtSpacing)
             skirtStartY += skirtSpacing - (skirtStartY % skirtSpacing);
         if (skirtStartX % inc)
             skirtStartX += inc - (skirtStartX % inc);
-        skirtStartY = std::max(skirtStartY, (int)mOffsetY);
+        skirtStartY = std::max(skirtStartY, (long)mOffsetY);
         pBaseHeight = mTerrain->getHeightData(skirtStartX, skirtStartY);
         if (posbuf)
         {
             // position dest buffer just after the main vertex data
-            pRowPosBuf = pRootPosBuf + posbuf->getVertexSize()
+            pRowPosBuf = pRootPosBuf + posbuf->getVertexSize() 
                 * mVertexDataRecord->size * mVertexDataRecord->size;
             // move it onwards to skip the skirts we don't need to update
             pRowPosBuf += destPosRowSkip * ((skirtStartY - mOffsetY) / skirtSpacing);
@@ -764,7 +791,7 @@ namespace Ogre
         if (deltabuf)
         {
             // position dest buffer just after the main vertex data
-            pRowDeltaBuf = pRootDeltaBuf + deltabuf->getVertexSize()
+            pRowDeltaBuf = pRootDeltaBuf + deltabuf->getVertexSize() 
                 * mVertexDataRecord->size * mVertexDataRecord->size;
             // move it onwards to skip the skirts we don't need to update
             pRowDeltaBuf += destDeltaRowSkip * (skirtStartY - mOffsetY) / skirtSpacing;
@@ -787,7 +814,7 @@ namespace Ogre
 
                     pHeight += inc;
 
-
+                    
 
                 }
 
@@ -813,11 +840,11 @@ namespace Ogre
         skirtStartY = rect.top;
         if (skirtStartY % inc)
             skirtStartY += inc - (skirtStartY % inc);
-        skirtStartX = std::max(skirtStartX, (int)mOffsetX);
+        skirtStartX = std::max(skirtStartX, (long)mOffsetX);
         if (posbuf)
         {
             // position dest buffer just after the main vertex data and skirt rows
-            pRowPosBuf = pRootPosBuf + posbuf->getVertexSize()
+            pRowPosBuf = pRootPosBuf + posbuf->getVertexSize() 
                 * mVertexDataRecord->size * mVertexDataRecord->size;
             // skip the row skirts
             pRowPosBuf += mVertexDataRecord->numSkirtRowsCols * mVertexDataRecord->size * posbuf->getVertexSize();
@@ -828,7 +855,7 @@ namespace Ogre
         if (deltabuf)
         {
             // Delta dest buffer just after the main vertex data and skirt rows
-            pRowDeltaBuf = pRootDeltaBuf + deltabuf->getVertexSize()
+            pRowDeltaBuf = pRootDeltaBuf + deltabuf->getVertexSize() 
                 * mVertexDataRecord->size * mVertexDataRecord->size;
             // skip the row skirts
             pRowDeltaBuf += mVertexDataRecord->numSkirtRowsCols * mVertexDataRecord->size * deltabuf->getVertexSize();
@@ -836,7 +863,7 @@ namespace Ogre
             pRowDeltaBuf += destDeltaRowSkip * (skirtStartX - mOffsetX) / skirtSpacing;
             pRowDeltaBuf += deltabuf->getVertexSize() * (skirtStartY - mOffsetY) / inc;
         }
-
+        
         for (uint16 x = skirtStartX; x < rect.right; x += skirtSpacing)
         {
             float* pPosBuf = static_cast<float*>(static_cast<void*>(pRowPosBuf));
@@ -850,7 +877,7 @@ namespace Ogre
                     // relative to local centre
                     pos -= mLocalCentre;
                     pos += skirtOffset;
-
+                    
                     writePosVertex(vcompress, x, y, height - mTerrain->getSkirtSize(), pos, uvScale, &pPosBuf);
 
                 }
@@ -871,14 +898,14 @@ namespace Ogre
             posbuf->unlock();
         if (deltabuf)
             deltabuf->unlock();
-
+        
     }
     //---------------------------------------------------------------------
-    void TerrainQuadTreeNode::writePosVertex(bool compress, uint16 x, uint16 y, float height,
+    void TerrainQuadTreeNode::writePosVertex(bool compress, uint16 x, uint16 y, float height, 
         const Vector3& pos, float uvScale, float** ppPos)
     {
         float* pPosBuf = *ppPos;
-
+        
         if (compress)
         {
             short* pPosShort = static_cast<short*>(static_cast<void*>(pPosBuf));
@@ -888,22 +915,22 @@ namespace Ogre
 
             *pPosBuf++ = height;
         }
-        else
+        else 
         {
             *pPosBuf++ = pos.x;
             *pPosBuf++ = pos.y;
             *pPosBuf++ = pos.z;
-
+            
             // UVs - base UVs vary from 0 to 1, all other values
             // will be derived using scalings
             *pPosBuf++ = x * uvScale;
             *pPosBuf++ = 1.0f - (y * uvScale);
         }
-
+        
         *ppPos = pPosBuf;
     }
     //---------------------------------------------------------------------
-    void TerrainQuadTreeNode::writeDeltaVertex(bool compress, uint16 x, uint16 y,
+    void TerrainQuadTreeNode::writeDeltaVertex(bool compress, uint16 x, uint16 y, 
         float delta, float deltaThresh, float** ppDelta)
     {
         *(*ppDelta)++ = delta;
@@ -916,7 +943,7 @@ namespace Ogre
         // row / col in main vertex resolution
         uint16 row = mainIndex / vdr->size;
         uint16 col = mainIndex % vdr->size;
-
+        
         // skrits are after main vertices, so skip them
         uint16 base = vdr->size * vdr->size;
 
@@ -926,7 +953,7 @@ namespace Ogre
         // 2. column skirts
         //    numSkirtRowsCols cols of resolution vertices each
 
-        // No offsets used here, this is an index into the current vertex data,
+        // No offsets used here, this is an index into the current vertex data, 
         // which is already relative
         if (isCol)
         {
@@ -939,7 +966,7 @@ namespace Ogre
             uint16 skirtNum = row / vdr->skirtRowColSkip;
             return base + vdr->size * skirtNum + col;
         }
-
+        
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::destroyCpuVertexData()
@@ -976,13 +1003,13 @@ namespace Ogre
         uint16 vdatasizeOffsetX = (mOffsetX - mNodeWithVertexData->mOffsetX) / resolutionRatio;
         uint16 vdatasizeOffsetY = (mOffsetY - mNodeWithVertexData->mOffsetY) / resolutionRatio;
 
-        destData->indexBuffer = mTerrain->getGpuBufferAllocator()->getSharedIndexBuffer(batchSize, vdr->size,
-            vertexIncrement, vdatasizeOffsetX, vdatasizeOffsetY,
+        destData->indexBuffer = mTerrain->getGpuBufferAllocator()->getSharedIndexBuffer(batchSize, vdr->size, 
+            vertexIncrement, vdatasizeOffsetX, vdatasizeOffsetY, 
             vdr->numSkirtRowsCols, vdr->skirtRowColSkip);
         destData->indexStart = 0;
         destData->indexCount = destData->indexBuffer->getNumIndexes();
 
-        // shared index buffer is pre-populated
+        // shared index buffer is pre-populated     
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::createGpuVertexData()
@@ -998,9 +1025,9 @@ namespace Ogre
             // copy vertex buffers
             // get new buffers
             HardwareVertexBufferSharedPtr destPosBuf, destDeltaBuf;
-            mTerrain->getGpuBufferAllocator()->allocateVertexBuffers(mTerrain, srcData->vertexCount,
+            mTerrain->getGpuBufferAllocator()->allocateVertexBuffers(mTerrain, srcData->vertexCount, 
                 destPosBuf, destDeltaBuf);
-
+                
             // copy data
             destPosBuf->copyData(*srcData->vertexBufferBinding->getBuffer(POSITION_BUFFER));
             destDeltaBuf->copyData(*srcData->vertexBufferBinding->getBuffer(DELTA_BUFFER));
@@ -1008,24 +1035,29 @@ namespace Ogre
             // set bindings
             destData->vertexBufferBinding->setBinding(POSITION_BUFFER, destPosBuf);
             destData->vertexBufferBinding->setBinding(DELTA_BUFFER, destDeltaBuf);
+
             // Basic vertex info
             destData->vertexStart = srcData->vertexStart;
             destData->vertexCount = srcData->vertexCount;
             // Copy elements
-            const VertexDeclaration::VertexElementList elems =
+            const VertexDeclaration::VertexElementList elems = 
                 srcData->vertexDeclaration->getElements();
-            for (auto& e : elems) {
+            VertexDeclaration::VertexElementList::const_iterator ei, eiend;
+            eiend = elems.end();
+            for (ei = elems.begin(); ei != eiend; ++ei)
+            {
                 destData->vertexDeclaration->addElement(
-                    e.getSource(),
-                    e.getOffset(),
-                    e.getType(),
-                    e.getSemantic(),
-                    e.getIndex()
-                );
+                    ei->getSource(),
+                    ei->getOffset(),
+                    ei->getType(),
+                    ei->getSemantic(),
+                    ei->getIndex() );
             }
+
             // We don't need the CPU copy anymore
             destroyCpuVertexData();
         }
+
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::updateGpuVertexData()
@@ -1046,7 +1078,7 @@ namespace Ogre
         {
             // Before we delete, free up the vertex buffers for someone else
             mTerrain->getGpuBufferAllocator()->freeVertexBuffers(
-                mVertexDataRecord->gpuVertexData->vertexBufferBinding->getBuffer(POSITION_BUFFER),
+                mVertexDataRecord->gpuVertexData->vertexBufferBinding->getBuffer(POSITION_BUFFER), 
                 mVertexDataRecord->gpuVertexData->vertexBufferBinding->getBuffer(DELTA_BUFFER));
             OGRE_DELETE mVertexDataRecord->gpuVertexData;
             mVertexDataRecord->gpuVertexData = 0;
@@ -1067,7 +1099,9 @@ namespace Ogre
                 ll->gpuIndexData = OGRE_NEW IndexData();
                 populateIndexData(ll->batchSize, ll->gpuIndexData);
             }
+
         }
+
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::destroyGpuIndexData()
@@ -1089,7 +1123,7 @@ namespace Ogre
             Vector3 localPos = pos - mLocalCentre;
             mAABB.merge(localPos);
             mBoundingRadius = std::max(mBoundingRadius, localPos.length());
-
+            
             if (!isLeaf())
             {
                 for (int i = 0; i < 4; ++i)
@@ -1104,14 +1138,14 @@ namespace Ogre
         {
             mAABB.setNull();
             mBoundingRadius = 0;
-
+            
             if (!isLeaf())
             {
                 for (int i = 0; i < 4; ++i)
                     mChildren[i]->resetBounds(rect);
             }
 
-
+            
         }
     }
     //---------------------------------------------------------------------
@@ -1129,8 +1163,13 @@ namespace Ogre
     //---------------------------------------------------------------------
     bool TerrainQuadTreeNode::pointIntersectsNode(long x, long y)
     {
-        return x >= mOffsetX && x < mBoundaryX &&
+        return x >= mOffsetX && x < mBoundaryX && 
             y >= mOffsetY && y < mBoundaryY;
+    }
+    //---------------------------------------------------------------------
+    const AxisAlignedBox& TerrainQuadTreeNode::getAABB() const
+    {
+        return mAABB;
     }
     //---------------------------------------------------------------------
     Real TerrainQuadTreeNode::getBoundingRadius() const
@@ -1172,7 +1211,7 @@ namespace Ogre
         mSelfOrChildRendered = false;
 
         // early-out
-        if (!cam->isVisible(getWorldBoundingBox(true)))
+        if (!cam->isVisible(mMovable->getWorldBoundingBox(true)))
         {
             mCurrentLod = -1;
             return mSelfOrChildRendered;
@@ -1191,7 +1230,7 @@ namespace Ogre
         }
 
         // this node not loaded yet so skip
-        if (!isAttached())
+        if (!mMovable->isAttached())
         {
             mCurrentLod = -1;
             return mSelfOrChildRendered;
@@ -1219,7 +1258,7 @@ namespace Ogre
             {
                 // distance to tile centre
                 dist = localPos.length();
-                // deduct half the radius of the box, assume that on average the
+                // deduct half the radius of the box, assume that on average the 
                 // worst case is best approximated by this
                 dist -= (mBoundingRadius * 0.5f);
             }
@@ -1227,13 +1266,13 @@ namespace Ogre
             // Do material LOD
             MaterialPtr material = getMaterial();
             const LodStrategy *materialStrategy = material->getLodStrategy();
-            Real lodValue = materialStrategy->getValue(this, cam);
+            Real lodValue = materialStrategy->getValue(mMovable, cam);
             // Get the index at this biased depth
             mMaterialLodIndex = material->getLodIndex(lodValue);
 
 
             // For each LOD, the distance at which the LOD will transition *downwards*
-            // is given by
+            // is given by 
             // distTransition = maxDelta * cFactor;
             uint lodLvl = 0;
             mCurrentLod = -1;
@@ -1272,9 +1311,9 @@ namespace Ogre
                         if (mTerrain->_getMorphRequired())
                         {
                             // calculate the transition percentage
-                            // we need a percentage of the total distance for just this LOD,
+                            // we need a percentage of the total distance for just this LOD, 
                             // which means taking off the distance for the next higher LOD
-                            // which is either the previous entry in the LOD list,
+                            // which is either the previous entry in the LOD list, 
                             // or the largest of any children. In both cases these will
                             // have been calculated before this point, since we process
                             // children first. Distances at lower LODs are guaranteed
@@ -1307,12 +1346,13 @@ namespace Ogre
 
                             // Pass both the transition % and target LOD (GLOBAL current + 1)
                             // this selectively applies the morph just to the
-                            // vertices which would drop out at this LOD, even
+                            // vertices which would drop out at this LOD, even 
                             // while using the single shared vertex data
-                            setCustomParameter(Terrain::LOD_MORPH_CUSTOM_PARAM,
-                                               Vector4f(mLodTransition, mCurrentLod + mBaseLod + 1, 0, 0));
+                            mRend->setCustomParameter(Terrain::LOD_MORPH_CUSTOM_PARAM, 
+                                Vector4(mLodTransition, mCurrentLod + mBaseLod + 1, 0, 0));
+
                         }
-                        // since LODs are ordered from highest to lowest detail,
+                        // since LODs are ordered from highest to lowest detail, 
                         // we can stop looking now
                         break;
                     }
@@ -1321,14 +1361,14 @@ namespace Ogre
             }
 
         }
-        else
+        else 
         {
             // we should not render ourself
             mCurrentLod = -1;
-            mSelfOrChildRendered = true;
+            mSelfOrChildRendered = true; 
             if (childRenderedCount < 4)
             {
-                // only *some* children decided to render on their own, but either
+                // only *some* children decided to render on their own, but either 
                 // none or all need to render, so set the others manually to their lowest
                 for (int i = 0; i < 4; ++i)
                 {
@@ -1351,14 +1391,20 @@ namespace Ogre
     void TerrainQuadTreeNode::setCurrentLod(int lod)
     {
          mCurrentLod = lod;
-         setCustomParameter(Terrain::LOD_MORPH_CUSTOM_PARAM,
-                            Vector4f(mLodTransition, mCurrentLod + mBaseLod + 1, 0, 0));
+         mRend->setCustomParameter(Terrain::LOD_MORPH_CUSTOM_PARAM, 
+             Vector4(mLodTransition, mCurrentLod + mBaseLod + 1, 0, 0));
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::setLodTransition(float t)
     {
-        mLodTransition = t;
-        setCustomParameter(Terrain::LOD_MORPH_CUSTOM_PARAM, Vector4f(mLodTransition, mCurrentLod + mBaseLod + 1, 0, 0));
+        mLodTransition = t;                         
+        mRend->setCustomParameter(Terrain::LOD_MORPH_CUSTOM_PARAM, 
+            Vector4(mLodTransition, mCurrentLod + mBaseLod + 1, 0, 0));
+    }
+    //---------------------------------------------------------------------
+    Renderable *TerrainQuadTreeNode::_getRenderable()
+    {
+        return mRend;
     }
     //---------------------------------------------------------------------
     bool TerrainQuadTreeNode::isRenderedAtCurrentLod() const
@@ -1371,18 +1417,17 @@ namespace Ogre
         return mSelfOrChildRendered;
     }
     //---------------------------------------------------------------------
-    void TerrainQuadTreeNode::_updateRenderQueue(RenderQueue* queue)
+    void TerrainQuadTreeNode::updateRenderQueue(RenderQueue* queue)
     {
         if (isRenderedAtCurrentLod())
         {
-            mNodeWithVertexData->updateGpuVertexData();
-            queue->addRenderable(this, mTerrain->getRenderQueueGroup());
+            queue->addRenderable(mRend, mTerrain->getRenderQueueGroup());           
         }
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::visitRenderables(Renderable::Visitor* visitor,  bool debugRenderables)
     {
-        visitor->visit(this, 0, false);
+        visitor->visit(mRend, 0, false);
     }
     //---------------------------------------------------------------------
     const MaterialPtr& TerrainQuadTreeNode::getMaterial(void) const
@@ -1391,12 +1436,14 @@ namespace Ogre
     }
     //---------------------------------------------------------------------
     Technique* TerrainQuadTreeNode::getTechnique(void) const
-    {
-        return getMaterial()->getBestTechnique(mMaterialLodIndex, this);
+    { 
+        return getMaterial()->getBestTechnique(mMaterialLodIndex, mRend); 
     }
     //---------------------------------------------------------------------
     void TerrainQuadTreeNode::getRenderOperation(RenderOperation& op)
     {
+        mNodeWithVertexData->updateGpuVertexData();
+
         op.indexData = mLodLevels[mCurrentLod]->gpuIndexData;
         op.operationType = RenderOperation::OT_TRIANGLE_STRIP;
         op.useIndexes = true;
@@ -1410,32 +1457,43 @@ namespace Ogre
             // vertex data is generated in terrain space
             *xform = Matrix4::IDENTITY;
             xform->setTrans(mTerrain->getPosition());
-
+            
         }
-        else
+        else 
         {
             // the vertex data is relative to the node that owns the vertex data
-            *xform = mNodeWithVertexData->_getParentNodeFullTransform();
+            *xform = mNodeWithVertexData->mMovable->_getParentNodeFullTransform();          
         }
 
     }
     //---------------------------------------------------------------------
     Real TerrainQuadTreeNode::getSquaredViewDepth(const Camera* cam) const
     {
-        return mLocalNode->getSquaredViewDepth(cam);
+        return mMovable->getParentSceneNode()->getSquaredViewDepth(cam);
     }
     //---------------------------------------------------------------------
     const LightList& TerrainQuadTreeNode::getLights(void) const
     {
-        return queryLights();
+        return mMovable->queryLights();
     }
     //---------------------------------------------------------------------
-    bool TerrainQuadTreeNode::getCastShadows(void) const
+    bool TerrainQuadTreeNode::getCastsShadows(void) const
     {
         return TerrainGlobalOptions::getSingleton().getCastsDynamicShadows();
     }
     //---------------------------------------------------------------------
-    const String& TerrainQuadTreeNode::getMovableType(void) const
+    //---------------------------------------------------------------------
+    TerrainQuadTreeNode::Movable::Movable(TerrainQuadTreeNode* parent)
+        : mParent(parent)
+    {
+    }
+    //---------------------------------------------------------------------
+    TerrainQuadTreeNode::Movable::~Movable()
+    {
+
+    }
+    //---------------------------------------------------------------------
+    const String& TerrainQuadTreeNode::Movable::getMovableType(void) const
     {
         static String stype("OgreTerrainNodeMovable");
 
@@ -1443,12 +1501,101 @@ namespace Ogre
 
     }
     //---------------------------------------------------------------------
-    bool TerrainQuadTreeNode::isVisible(void) const
+    const AxisAlignedBox& TerrainQuadTreeNode::Movable::getBoundingBox(void) const
     {
-        if (getCurrentLod() == -1)
+        return mParent->getAABB();
+    }
+    //---------------------------------------------------------------------
+    Real TerrainQuadTreeNode::Movable::getBoundingRadius(void) const
+    {
+        return mParent->getBoundingRadius();
+    }
+    //---------------------------------------------------------------------
+    bool TerrainQuadTreeNode::Movable::isVisible(void) const
+    {
+        if (mParent->getCurrentLod() == -1)
             return false;
         else
             return MovableObject::isVisible();
     }
+    //---------------------------------------------------------------------
+    uint32 TerrainQuadTreeNode::Movable::getVisibilityFlags(void) const
+    {
+        // Combine own vis (in case anyone sets this) and terrain overall
+        return mVisibilityFlags & mParent->getTerrain()->getVisibilityFlags();
+    }
+    //---------------------------------------------------------------------
+    uint32 TerrainQuadTreeNode::Movable::getQueryFlags(void) const
+    {
+        // Combine own vis (in case anyone sets this) and terrain overall
+        return mQueryFlags & mParent->getTerrain()->getQueryFlags();
+    }
+    //------------------------------------------------------------------------
+    void TerrainQuadTreeNode::Movable::_updateRenderQueue(RenderQueue* queue)
+    {
+        mParent->updateRenderQueue(queue);      
+    }
+    //------------------------------------------------------------------------
+    void TerrainQuadTreeNode::Movable::visitRenderables(Renderable::Visitor* visitor,  bool debugRenderables)
+    {
+        mParent->visitRenderables(visitor, debugRenderables);   
+    }
+    //---------------------------------------------------------------------
+    bool TerrainQuadTreeNode::Movable::getCastShadows(void) const
+    {
+        return mParent->getCastsShadows();
+    }
+    //------------------------------------------------------------------------
+    //---------------------------------------------------------------------
+    TerrainQuadTreeNode::Rend::Rend(TerrainQuadTreeNode* parent)
+        :mParent(parent)
+    {
+    }
+    //---------------------------------------------------------------------
+    TerrainQuadTreeNode::Rend::~Rend()
+    {
+    }
+    //---------------------------------------------------------------------
+    const MaterialPtr& TerrainQuadTreeNode::Rend::getMaterial(void) const
+    {
+        return mParent->getMaterial();
+    }
+    //---------------------------------------------------------------------
+    Technique* TerrainQuadTreeNode::Rend::getTechnique() const
+    {
+        return mParent->getTechnique();
+    }
+    //---------------------------------------------------------------------
+    void TerrainQuadTreeNode::Rend::getRenderOperation(RenderOperation& op)
+    {
+        mParent->getRenderOperation(op);
+    }
+    //---------------------------------------------------------------------
+    void TerrainQuadTreeNode::Rend::getWorldTransforms(Matrix4* xform) const
+    {
+        mParent->getWorldTransforms(xform);
+    }
+    //---------------------------------------------------------------------
+    Real TerrainQuadTreeNode::Rend::getSquaredViewDepth(const Camera* cam) const
+    {
+        return mParent->getSquaredViewDepth(cam);
+    }
+    //---------------------------------------------------------------------
+    const LightList& TerrainQuadTreeNode::Rend::getLights(void) const
+    {
+        return mParent->getLights();
+    }
+    //---------------------------------------------------------------------
+    bool TerrainQuadTreeNode::Rend::getCastsShadows(void) const
+    {
+        return mParent->getCastsShadows();
+    }
+    //---------------------------------------------------------------------
+
+
+    
+
+
+
 }
 

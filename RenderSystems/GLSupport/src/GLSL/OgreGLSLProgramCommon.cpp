@@ -1,26 +1,144 @@
-// This file is part of the OGRE project.
-// It is subject to the license terms in the LICENSE file found in the top-level directory
-// of this distribution and at https://www.ogre3d.org/licensing.
-// SPDX-License-Identifier: MIT
+/*
+ * OgreGLSLProgramCommon.cpp
+ *
+ *  Created on: 15.01.2017
+ *      Author: pavel
+ */
 
 #include "OgreGLSLProgramCommon.h"
 #include "OgreStringConverter.h"
 
-#include <sstream>
-
 namespace Ogre
 {
-GLSLProgramCommon::GLSLProgramCommon(const GLShaderList& shaders)
-    : mShaders(shaders),
+VertexElementSemantic GLSLProgramCommon::getAttributeSemanticEnum(const String& type)
+{
+    size_t numAttribs = sizeof(msCustomAttributes)/sizeof(CustomAttribute);
+    for (size_t i = 0; i < numAttribs; ++i)
+    {
+        if (msCustomAttributes[i].name == type)
+            return msCustomAttributes[i].semantic;
+    }
+
+    OgreAssertDbg(false, "Missing attribute!");
+    return VertexElementSemantic(0);
+}
+
+GLSLProgramCommon::GLSLProgramCommon(GLSLShaderCommon* vertexShader)
+    : mVertexShader(vertexShader),
       mUniformRefsBuilt(false),
       mGLProgramHandle(0),
-      mLinked(false)
+      mLinked(false),
+      mSkeletalAnimation(false)
 {
-    // compute shader presence means no other shaders are allowed
-    if(shaders[GPT_COMPUTE_PROGRAM])
+    // init mCustomAttributesIndexes
+    for (size_t i = 0; i < VES_COUNT; i++)
     {
-        mShaders.fill(NULL);
-        mShaders[GPT_COMPUTE_PROGRAM] = shaders[GPT_COMPUTE_PROGRAM];
+        for (size_t j = 0; j < OGRE_MAX_TEXTURE_COORD_SETS; j++)
+        {
+            mCustomAttributesIndexes[i][j] = NULL_CUSTOM_ATTRIBUTES_INDEX;
+        }
+    }
+}
+
+const char* GLSLProgramCommon::getAttributeSemanticString(VertexElementSemantic semantic)
+{
+    if(semantic == VES_TEXTURE_COORDINATES)
+        return "uv";
+
+    size_t numAttribs = sizeof(msCustomAttributes)/sizeof(CustomAttribute);
+    for (size_t i = 0; i < numAttribs; ++i)
+    {
+        if (msCustomAttributes[i].semantic == semantic)
+            return msCustomAttributes[i].name;
+    }
+
+    OgreAssertDbg(false, "Missing attribute!");
+    return 0;
+}
+
+void GLSLProgramCommon::extractLayoutQualifiers(void)
+{
+    // Format is:
+    //      layout(location = 0) attribute vec4 vertex;
+
+    if (!mVertexShader)
+    {
+        return;
+    }
+
+    String shaderSource = mVertexShader->getSource();
+    String::size_type currPos = shaderSource.find("layout");
+    while (currPos != String::npos)
+    {
+        VertexElementSemantic semantic;
+        int index = 0;
+
+        String::size_type endPos = shaderSource.find(';', currPos);
+        if (endPos == String::npos)
+        {
+            // Problem, missing semicolon, abort.
+            break;
+        }
+
+        String line = shaderSource.substr(currPos, endPos - currPos);
+
+        // Skip over 'layout'.
+        currPos += 6;
+
+        // Skip until '='.
+        String::size_type eqPos = line.find('=');
+        String::size_type parenPos = line.find(')');
+
+        // Skip past '=' up to a ')' which contains an integer(the position).
+        // TODO This could be a definition, does the preprocessor do replacement?
+        String attrLocation = line.substr(eqPos + 1, parenPos - eqPos - 1);
+        StringUtil::trim(attrLocation);
+        int attrib = StringConverter::parseInt(attrLocation);
+
+        // The rest of the line is a standard attribute definition.
+        // Erase up to it then split the remainder by spaces.
+        line.erase(0, parenPos + 1);
+        StringUtil::trim(line);
+        StringVector parts = StringUtil::split(line, " ");
+
+        if (parts.size() < 3)
+        {
+            // This is a malformed attribute.
+            // It should contain 3 parts, i.e. "attribute vec4 vertex".
+            break;
+        }
+        size_t attrStart = 0;
+        if (parts.size() == 4)
+        {
+            if( parts[0] == "flat" || parts[0] == "smooth"|| parts[0] == "perspective")
+            {
+                // Skip the interpolation qualifier
+                attrStart = 1;
+            }
+        }
+
+        // Skip output attribute
+        if (parts[attrStart] != "out")
+        {
+            String attrName = parts[attrStart + 2];
+            String::size_type uvPos = attrName.find("uv");
+
+            if(uvPos == 0)
+                semantic = getAttributeSemanticEnum("uv0"); // treat "uvXY" as "uv0"
+            else
+                semantic = getAttributeSemanticEnum(attrName);
+
+            // Find the texture unit index.
+            if (uvPos == 0)
+            {
+                String uvIndex = attrName.substr(uvPos + 2, attrName.length() - 2);
+                index = StringConverter::parseInt(uvIndex);
+            }
+
+            mCustomAttributesIndexes[semantic - 1][index] = attrib;
+        }
+
+        currPos = shaderSource.find("layout", currPos);
     }
 }
 
@@ -121,32 +239,4 @@ int32 GLSLProgramCommon::getFixedAttributeIndex(VertexElementSemantic semantic, 
 
     return attributeIndex[semantic];
 }
-
-String GLSLProgramCommon::getCombinedName()
-{
-    StringStream ss;
-
-    for(auto s : mShaders)
-    {
-        if (s)
-        {
-            ss << s->getName() << "\n";
-        }
-    }
-
-    return ss.str();
-}
-
-uint32 GLSLProgramCommon::getCombinedHash()
-{
-    uint32 hash = 0;
-
-    for (auto p : mShaders)
-    {
-        if(!p) continue;
-        hash = p->_getHash(hash);
-    }
-    return hash;
-}
-
 } /* namespace Ogre */

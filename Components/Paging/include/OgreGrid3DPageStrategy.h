@@ -31,7 +31,7 @@ THE SOFTWARE.
 
 #include "OgrePagingPrerequisites.h"
 #include "OgrePageStrategy.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 
 namespace Ogre
 {
@@ -45,7 +45,7 @@ namespace Ogre
 
 
     /** Specialisation of PageStrategyData for Grid3DPageStrategy.
-
+    @remarks
         Structurally this data defines with a 3D grid of pages, with the logical 
         origin in the center of the entire grid.
         The grid cells are indexed from 0 as a 'centre' slot, supporting both 
@@ -103,6 +103,7 @@ namespace Ogre
     */
     class _OgrePagingExport Grid3DPageStrategyData : public PageStrategyData
     {
+    protected:
         /// Origin (world space)
         Vector3 mWorldOrigin;
         /// Origin (grid-aligned world space)
@@ -172,15 +173,15 @@ namespace Ogre
         virtual int32 getCellRangeMaxZ() const { return mMaxCellZ; }
 
         /// Load this data from a stream (returns true if successful)
-        bool load(StreamSerialiser& stream) override;
+        bool load(StreamSerialiser& stream);
         /// Save this data to a stream
-        void save(StreamSerialiser& stream) override;
+        void save(StreamSerialiser& stream);
 
         virtual void getMidPointGridSpace(int32 x, int32 y, int32 z, Vector3& mid);
         /// Get the (grid space) bottom-left of a cell
         virtual void getBottomLeftGridSpace(int32 x, int32 y, int z, Vector3& bl);
         /** Get the (grid space) corners of a cell.
-
+        @remarks
             Populates pEightPoints in anticlockwise order from the bottom left point.
         */
         virtual void getCornersGridSpace(int32 x, int32 y, int32 z, Vector3* pEightPoints);
@@ -194,7 +195,7 @@ namespace Ogre
 
 
     /** Page strategy which loads new pages based on a regular 3D grid.
-
+    @remarks
         The grid can be up to 1024 x 1024 x 1024 cells in size. PageIDs are generated
         like this: (slice*1024 + row) * 1024 + col. The grid is centred around the grid origin, such 
         that the boundaries of the cell around that origin are [-CellSize/2, CellSize/2)
@@ -207,11 +208,11 @@ namespace Ogre
         ~Grid3DPageStrategy();
 
         // Overridden members
-        void notifyCamera(Camera* cam, PagedWorldSection* section) override;
-        PageStrategyData* createData() override;
-        void destroyData(PageStrategyData* d) override;
-        void updateDebugDisplay(Page* p, SceneNode* sn) override;
-        PageID getPageID(const Vector3& worldPos, PagedWorldSection* section) override;
+        void notifyCamera(Camera* cam, PagedWorldSection* section);
+        PageStrategyData* createData();
+        void destroyData(PageStrategyData* d);
+        void updateDebugDisplay(Page* p, SceneNode* sn);
+        PageID getPageID(const Vector3& worldPos, PagedWorldSection* section);
     };
 
     /*@}*/

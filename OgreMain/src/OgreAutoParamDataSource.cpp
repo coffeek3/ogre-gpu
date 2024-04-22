@@ -64,13 +64,11 @@ namespace Ogre {
          mCurrentViewport(0), 
          mCurrentSceneManager(0),
          mMainCamBoundsInfo(0),
-         mCurrentPass(0),
-         mDummyNode(NULL)
+         mCurrentPass(0)
     {
         mBlankLight.setDiffuseColour(ColourValue::Black);
         mBlankLight.setSpecularColour(ColourValue::Black);
         mBlankLight.setAttenuation(0,1,0,0);
-        mDummyNode.attachObject(&mBlankLight);
         for(size_t i = 0; i < OGRE_MAX_SIMULTANEOUS_LIGHTS; ++i)
         {
             mTextureViewProjMatrixDirty[i] = true;
@@ -194,7 +192,7 @@ namespace Ogre {
         return scaled;
     }
     //-----------------------------------------------------------------------------
-    Vector3 AutoParamDataSource::getLightPosition(size_t index) const
+    const Vector3& AutoParamDataSource::getLightPosition(size_t index) const
     {
         return getLight(index).getDerivedPosition(true);
     }
@@ -204,7 +202,7 @@ namespace Ogre {
         return getLight(index).getAs4DVector(true);
     }
     //-----------------------------------------------------------------------------
-    Vector3 AutoParamDataSource::getLightDirection(size_t index) const
+    const Vector3& AutoParamDataSource::getLightDirection(size_t index) const
     {
         return getLight(index).getDerivedDirection();
     }
@@ -214,33 +212,22 @@ namespace Ogre {
         return getLight(index).getPowerScale();
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getLightAttenuation(size_t index) const
+    const Vector4f& AutoParamDataSource::getLightAttenuation(size_t index) const
     {
-        const Light& l = getLight(index);
-        if(l.getType() == Light::LT_RECTLIGHT)
-        {
-            auto rot = getViewMatrix().linear();
-            return Vector4f(Vector3f(rot * Vector3(l.getDerivedSourceHalfHeight())), 0.0);
-        }
         // range, const, linear, quad
-        return l.getAttenuation();
+        return getLight(index).getAttenuation();
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getSpotlightParams(size_t index) const
+    Vector4 AutoParamDataSource::getSpotlightParams(size_t index) const
     {
         // inner, outer, fallof, isSpot
         const Light& l = getLight(index);
         if (l.getType() == Light::LT_SPOTLIGHT)
         {
-            return Vector4f(Math::Cos(l.getSpotlightInnerAngle().valueRadians() * 0.5f),
+            return Vector4(Math::Cos(l.getSpotlightInnerAngle().valueRadians() * 0.5f),
                            Math::Cos(l.getSpotlightOuterAngle().valueRadians() * 0.5f),
                            l.getSpotlightFalloff(),
                            1.0);
-        }
-        else if(l.getType() == Light::LT_RECTLIGHT)
-        {
-            auto rot = getViewMatrix().linear();
-            return Vector4f(Vector3f(rot * Vector3(l.getDerivedSourceHalfWidth())), 2.0);
         }
         else
         {
@@ -251,7 +238,7 @@ namespace Ogre {
             // since pow(anything, 0) == 1
             // However we also need to ensure we don't overflow because of the division
             // therefore set x = 1 and y = 0 so divisor doesn't change scale
-            return Vector4f(1.0, 0.0, 0.0, 0.0); // since the main op is pow(.., vec4.z), this will result in 1.0
+            return Vector4(1.0, 0.0, 0.0, 0.0); // since the main op is pow(.., vec4.z), this will result in 1.0
         }
     }
     //-----------------------------------------------------------------------------
@@ -282,8 +269,7 @@ namespace Ogre {
             mWorldMatrixCount = mCurrentRenderable->getNumWorldTransforms();
             if (mCameraRelativeRendering && !mCurrentRenderable->getUseIdentityView())
             {
-                size_t worldMatrixCount = MeshManager::getBonesUseObjectSpace() ? 1 : mWorldMatrixCount;
-                for (size_t i = 0; i < worldMatrixCount; ++i)
+                for (size_t i = 0; i < mWorldMatrixCount; ++i)
                 {
                     mWorldMatrix[i].setTrans(mWorldMatrix[i].getTrans() - mCameraRelativePosition);
                 }
@@ -293,18 +279,18 @@ namespace Ogre {
         return mWorldMatrixArray[0];
     }
     //-----------------------------------------------------------------------------
-    size_t AutoParamDataSource::getBoneMatrixCount(void) const
+    size_t AutoParamDataSource::getWorldMatrixCount(void) const
     {
         // trigger derivation
         getWorldMatrix();
-        return mWorldMatrixCount == 1 ? 1 : mWorldMatrixCount - int(MeshManager::getBonesUseObjectSpace());
+        return mWorldMatrixCount;
     }
     //-----------------------------------------------------------------------------
-    const Affine3* AutoParamDataSource::getBoneMatrixArray(void) const
+    const Affine3* AutoParamDataSource::getWorldMatrixArray(void) const
     {
         // trigger derivation
         getWorldMatrix();
-        return mWorldMatrixArray + int(MeshManager::getBonesUseObjectSpace());
+        return mWorldMatrixArray;
     }
     //-----------------------------------------------------------------------------
     const Affine3& AutoParamDataSource::getViewMatrix(void) const
@@ -549,9 +535,9 @@ namespace Ogre {
         return mCurrentPass;
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getTextureSize(size_t index) const
+    Vector4 AutoParamDataSource::getTextureSize(size_t index) const
     {
-        Vector4f size = Vector4f(1,1,1,1);
+        Vector4 size = Vector4(1,1,1,1);
 
         if (index < mCurrentPass->getNumTextureUnitStates())
         {
@@ -559,26 +545,25 @@ namespace Ogre {
                 static_cast<unsigned short>(index))->_getTexturePtr();
             if (tex)
             {
-                size[0] = static_cast<float>(tex->getWidth());
-                size[1] = static_cast<float>(tex->getHeight());
-                size[2] = static_cast<float>(tex->getDepth());
-                size[3] = static_cast<float>(tex->getNumMipmaps());
+                size.x = static_cast<Real>(tex->getWidth());
+                size.y = static_cast<Real>(tex->getHeight());
+                size.z = static_cast<Real>(tex->getDepth());
             }
         }
 
         return size;
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getInverseTextureSize(size_t index) const
+    Vector4 AutoParamDataSource::getInverseTextureSize(size_t index) const
     {
-        Vector4f size = getTextureSize(index);
+        Vector4 size = getTextureSize(index);
         return 1 / size;
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getPackedTextureSize(size_t index) const
+    Vector4 AutoParamDataSource::getPackedTextureSize(size_t index) const
     {
-        Vector4f size = getTextureSize(index);
-        return Vector4f(size[0], size[1], 1 / size[0], 1 / size[1]);
+        Vector4 size = getTextureSize(index);
+        return Vector4(size.x, size.y, 1 / size.x, 1 / size.y);
     }
     //-----------------------------------------------------------------------------
     const ColourValue& AutoParamDataSource::getSurfaceAmbientColour(void) const
@@ -613,9 +598,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     ColourValue AutoParamDataSource::getDerivedAmbientLightColour(void) const
     {
-        auto result = getAmbientLightColour() * getSurfaceAmbientColour();
-        result.a = getSurfaceDiffuseColour().a;
-        return result;
+        return getAmbientLightColour() * getSurfaceAmbientColour();
     }
     //-----------------------------------------------------------------------------
     ColourValue AutoParamDataSource::getDerivedSceneColour(void) const
@@ -630,10 +613,10 @@ namespace Ogre {
     {
         (void)mode; // ignored
         mFogColour = colour;
-        mFogParams[0] = expDensity;
-        mFogParams[1] = linearStart;
-        mFogParams[2] = linearEnd;
-        mFogParams[3] = linearEnd != linearStart ? 1 / (linearEnd - linearStart) : 0;
+        mFogParams.x = expDensity;
+        mFogParams.y = linearStart;
+        mFogParams.z = linearEnd;
+        mFogParams.w = linearEnd != linearStart ? 1 / (linearEnd - linearStart) : 0;
     }
     //-----------------------------------------------------------------------------
     const ColourValue& AutoParamDataSource::getFogColour(void) const
@@ -641,7 +624,7 @@ namespace Ogre {
         return mFogColour;
     }
     //-----------------------------------------------------------------------------
-    const Vector4f& AutoParamDataSource::getFogParams(void) const
+    const Vector4& AutoParamDataSource::getFogParams(void) const
     {
         return mFogParams;
     }
@@ -653,7 +636,7 @@ namespace Ogre {
             mPointParams[0] *= getViewportHeight();
     }
 
-    const Vector4f& AutoParamDataSource::getPointParams() const
+    const Vector4& AutoParamDataSource::getPointParams() const
     {
         return mPointParams;
     }
@@ -672,9 +655,9 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     const Matrix4& AutoParamDataSource::getTextureViewProjMatrix(size_t index) const
     {
-        if (index < OGRE_MAX_SIMULTANEOUS_LIGHTS && mCurrentTextureProjector[index])
+        if (index < OGRE_MAX_SIMULTANEOUS_LIGHTS)
         {
-            if (mTextureViewProjMatrixDirty[index])
+            if (mTextureViewProjMatrixDirty[index] && mCurrentTextureProjector[index])
             {
                 if (mCameraRelativeRendering)
                 {
@@ -705,9 +688,9 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     const Matrix4& AutoParamDataSource::getTextureWorldViewProjMatrix(size_t index) const
     {
-        if (index < OGRE_MAX_SIMULTANEOUS_LIGHTS && mCurrentTextureProjector[index])
+        if (index < OGRE_MAX_SIMULTANEOUS_LIGHTS)
         {
-            if (mTextureWorldViewProjMatrixDirty[index])
+            if (mTextureWorldViewProjMatrixDirty[index] && mCurrentTextureProjector[index])
             {
                 mTextureWorldViewProjMatrix[index] = 
                     getTextureViewProjMatrix(index) * getWorldMatrix();
@@ -751,7 +734,15 @@ namespace Ogre {
                     // Use camera up
                     up = Vector3::UNIT_Z;
                 }
-                dummyNode.setOrientation(Math::lookRotation(dir, up));
+                // cross twice to rederive, only direction is unaltered
+                Vector3 left = dir.crossProduct(up);
+                left.normalise();
+                up = dir.crossProduct(left);
+                up.normalise();
+                // Derive quaternion from axes
+                Quaternion q;
+                q.FromAxes(left, up, dir);
+                dummyNode.setOrientation(q);
 
                 // The view matrix here already includes camera-relative changes if necessary
                 // since they are built into the frustum position
@@ -932,10 +923,10 @@ namespace Ogre {
         return std::tan(this->getTime_0_X(x));
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getTime_0_X_packed(Real x) const
+    Vector4 AutoParamDataSource::getTime_0_X_packed(Real x) const
     {
-        float t = this->getTime_0_X(x);
-        return Vector4f(t, std::sin(t), std::cos(t), std::tan(t));
+        Real t = this->getTime_0_X(x);
+        return Vector4(t, std::sin(t), std::cos(t), std::tan(t));
     }
     //-----------------------------------------------------------------------------
     Real AutoParamDataSource::getTime_0_1(Real x) const
@@ -958,10 +949,10 @@ namespace Ogre {
         return std::tan(this->getTime_0_1(x));
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getTime_0_1_packed(Real x) const
+    Vector4 AutoParamDataSource::getTime_0_1_packed(Real x) const
     {
-        float t = this->getTime_0_1(x);
-        return Vector4f(t, std::sin(t), std::cos(t), std::tan(t));
+        Real t = this->getTime_0_1(x);
+        return Vector4(t, std::sin(t), std::cos(t), std::tan(t));
     }
     //-----------------------------------------------------------------------------
     Real AutoParamDataSource::getTime_0_2Pi(Real x) const
@@ -984,10 +975,10 @@ namespace Ogre {
         return std::tan(this->getTime_0_2Pi(x));
     }
     //-----------------------------------------------------------------------------
-    Vector4f AutoParamDataSource::getTime_0_2Pi_packed(Real x) const
+    Vector4 AutoParamDataSource::getTime_0_2Pi_packed(Real x) const
     {
-        float t = this->getTime_0_2Pi(x);
-        return Vector4f(t, std::sin(t), std::cos(t), std::tan(t));
+        Real t = this->getTime_0_2Pi(x);
+        return Vector4(t, std::sin(t), std::cos(t), std::tan(t));
     }
     //-----------------------------------------------------------------------------
     Real AutoParamDataSource::getFrameTime(void) const
@@ -1064,10 +1055,6 @@ namespace Ogre {
     {
         ++mPassNumber;
     }
-    int AutoParamDataSource::getMaterialLodIndex() const
-    {
-        return mCurrentRenderable->_getMaterialLodIndex();
-    }
     //-----------------------------------------------------------------------------
     const Vector4& AutoParamDataSource::getSceneDepthRange() const
     {
@@ -1098,7 +1085,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     const Vector4& AutoParamDataSource::getShadowSceneDepthRange(size_t index) const
     {
-        static Vector4 dummy(0, 100000, 100000, 1.0f/100000);
+        static Vector4 dummy(0, 100000, 100000, 1/100000);
 
         if (!mCurrentSceneManager->isShadowTechniqueTextureBased())
             return dummy;

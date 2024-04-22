@@ -73,7 +73,7 @@ namespace Ogre {
         Real a, b, c, x, y, z;
 
         // Init dimensions
-        ParticleEmitter::_initParticle(pParticle);
+        pParticle->resetDimensions();
 
         // create two random angles alpha and beta
         // with these two angles, we are able to select any point on an

@@ -15,7 +15,7 @@ using namespace OgreBites;
 #define JUMP_ACCEL 30.0f       // character jump acceleration in upward units per squared second
 #define GRAVITY 90.0f          // gravity in downward units per squared second
 
-class SinbadCharacterController : public InputListener
+class SinbadCharacterController
 {
 private:
 
@@ -49,14 +49,14 @@ public:
         setupAnimations();
     }
 
-    void frameRendered(const FrameEvent& evt) override
+    void addTime(Real deltaTime)
     {
-        updateBody(evt.timeSinceLastFrame);
-        updateAnimations(evt.timeSinceLastFrame);
-        updateCamera(evt.timeSinceLastFrame);
+        updateBody(deltaTime);
+        updateAnimations(deltaTime);
+        updateCamera(deltaTime);
     }
 
-    bool keyPressed(const KeyboardEvent& evt) override
+    void injectKeyDown(const KeyboardEvent& evt)
     {
         Keycode key = evt.keysym.sym;
         if (key == 'q' && (mTopAnimID == ANIM_IDLE_TOP || mTopAnimID == ANIM_RUN_TOP))
@@ -105,11 +105,9 @@ public:
             setBaseAnimation(ANIM_RUN_BASE, true);
             if (mTopAnimID == ANIM_IDLE_TOP) setTopAnimation(ANIM_RUN_TOP, true);
         }
-
-        return true;
     }
 
-    bool keyReleased(const KeyboardEvent& evt) override
+    void injectKeyUp(const KeyboardEvent& evt)
     {
         Keycode key = evt.keysym.sym;
         // keep track of the player's intended direction
@@ -124,25 +122,21 @@ public:
             setBaseAnimation(ANIM_IDLE_BASE);
             if (mTopAnimID == ANIM_RUN_TOP) setTopAnimation(ANIM_IDLE_TOP);
         }
-
-        return true;
     }
 
-    bool mouseMoved(const MouseMotionEvent& evt) override
+    void injectMouseMove(const MouseMotionEvent& evt)
     {
         // update camera goal based on mouse movement
         updateCameraGoal(-0.05f * evt.xrel, -0.05f * evt.yrel, 0);
-        return true;
     }
 
-    bool mouseWheelRolled(const MouseWheelEvent& evt) override
+    void injectMouseWheel(const MouseWheelEvent& evt)
     {
         // update camera goal based on mouse movement
         updateCameraGoal(0, 0, -0.05f * evt.y);
-        return true;
     }
 
-    bool mousePressed(const MouseButtonEvent& evt) override
+    void injectMouseDown(const MouseButtonEvent& evt)
     {
         if (mSwordsDrawn && (mTopAnimID == ANIM_IDLE_TOP || mTopAnimID == ANIM_RUN_TOP))
         {
@@ -151,7 +145,6 @@ public:
             else if (evt.button == BUTTON_RIGHT) setTopAnimation(ANIM_SLICE_HORIZONTAL, true);
             mTimer = 0;
         }
-        return true;
     }
 
 private:
@@ -237,7 +230,7 @@ private:
         mCameraNode->setFixedYawAxis(true);
 
         // our model is quite small, so reduce the clipping planes
-        cam->setNearClipDistance(1);
+        cam->setNearClipDistance(0.1);
         cam->setFarClipDistance(100);
 
         mPivotPitch = 0;

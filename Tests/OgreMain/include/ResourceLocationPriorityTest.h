@@ -44,9 +44,9 @@ public:
 
     virtual ~DummyArchive() {}
 
-    bool exists(const Ogre::String& name) const override { return name == "dummyArchiveTest"; }
+    virtual bool exists(const Ogre::String& name) const { return name == "dummyArchiveTest"; }
 
-    Ogre::StringVectorPtr find(const Ogre::String& pattern, bool recursive = true, bool dirs = false) const override
+    virtual Ogre::StringVectorPtr find(const Ogre::String& pattern, bool recursive = true, bool dirs = false) const
     {
         Ogre::StringVectorPtr results = std::make_shared<Ogre::StringVector>();
         if (dirs) return results;
@@ -57,8 +57,8 @@ public:
         return results;
     }
 
-    Ogre::FileInfoListPtr findFileInfo(const Ogre::String& pattern, bool recursive = true,
-                                               bool dirs = false) const override
+    virtual Ogre::FileInfoListPtr findFileInfo(const Ogre::String& pattern, bool recursive = true,
+                                               bool dirs = false) const
     {
         Ogre::FileInfoListPtr results = std::make_shared<Ogre::FileInfoList>();
         if (dirs) return results;
@@ -69,11 +69,11 @@ public:
         return results;
     }
 
-    time_t getModifiedTime(const Ogre::String& filename) const override { return 0; }
+    virtual time_t getModifiedTime(const Ogre::String& filename) const { return 0; }
 
-    bool isCaseSensitive() const override { return true; }
+    virtual bool isCaseSensitive() const { return true; }
 
-    Ogre::StringVectorPtr list(bool recursive = true, bool dirs = false) const override
+    virtual Ogre::StringVectorPtr list(bool recursive = true, bool dirs = false) const
     {
         Ogre::StringVectorPtr results = std::make_shared<Ogre::StringVector>();
         if (dirs) return results;
@@ -81,7 +81,7 @@ public:
         return results;
     }
 
-    Ogre::FileInfoListPtr listFileInfo(bool recursive = true, bool dirs = false) const override
+    virtual Ogre::FileInfoListPtr listFileInfo(bool recursive = true, bool dirs = false) const
     {
         Ogre::FileInfoListPtr results = std::make_shared<Ogre::FileInfoList>();
         if (dirs) return results;
@@ -89,11 +89,11 @@ public:
         return results;
     }
 
-    void load() override {}
+    virtual void load() {}
 
-    void unload() override {}
+    virtual void unload() {}
 
-    Ogre::DataStreamPtr open(const Ogre::String& filename, bool readOnly = true) const override
+    virtual Ogre::DataStreamPtr open(const Ogre::String& filename, bool readOnly = true) const
     {
         if (filename == "dummyArchiveTest")
         {
@@ -120,14 +120,14 @@ class DummyArchiveFactory : public Ogre::ArchiveFactory
 public:
     virtual ~DummyArchiveFactory() {}
 
-    Ogre::Archive* createInstance(const Ogre::String& name, bool) override
+    virtual Ogre::Archive* createInstance(const Ogre::String& name, bool)
     {
         return OGRE_NEW DummyArchive(name, "DummyArchive");
     }
 
-    void destroyInstance(Ogre::Archive* ptr) override { OGRE_DELETE ptr; }
+    virtual void destroyInstance(Ogre::Archive* ptr) { OGRE_DELETE ptr; }
 
-    const Ogre::String& getType() const override
+    virtual const Ogre::String& getType() const
     {
         static Ogre::String type = "DummyArchive";
         return type;

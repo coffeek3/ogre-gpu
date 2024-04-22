@@ -34,14 +34,17 @@ THE SOFTWARE.
 #include "OgreViewport.h"
 
 #include <limits>
-#include <memory>
 
 namespace Ogre {
     const size_t BillboardChain::SEGMENT_EMPTY = std::numeric_limits<size_t>::max();
     //-----------------------------------------------------------------------
+    BillboardChain::Element::Element()
+    {
+    }
+    //-----------------------------------------------------------------------
     BillboardChain::Element::Element(const Vector3 &_position,
-        float _width,
-        float _texCoord,
+        Real _width,
+        Real _texCoord,
         const ColourValue &_colour,
         const Quaternion &_orientation) :
     position(_position),
@@ -59,6 +62,7 @@ namespace Ogre {
         mChainCount(numberOfChains),
         mUseTexCoords(useTextureCoords),
         mUseVertexColour(useColours),
+        mDynamic(dynamic),
         mVertexDeclDirty(true),
         mBuffersNeedRecreating(true),
         mBoundsDirty(true),
@@ -66,12 +70,12 @@ namespace Ogre {
         mVertexContentDirty(true),
         mRadius(0.0f),
         mTexCoordDir(TCD_U),
+        mVertexCameraUsed(0),
         mFaceCamera(true),
-        mNormalBase(Vector3::UNIT_X),
-        mVertexCameraUsed(0)
+        mNormalBase(Vector3::UNIT_X)
     {
-        mVertexData = std::make_unique<VertexData>();
-        mIndexData = std::make_unique<IndexData>();
+        mVertexData.reset(new VertexData());
+        mIndexData.reset(new IndexData());
 
         mOtherTexCoordRange[0] = 0.0f;
         mOtherTexCoordRange[1] = 1.0f;
@@ -116,11 +120,13 @@ namespace Ogre {
 
             size_t offset = 0;
             // Add a description for the buffer of the positions of the vertices
-            offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
+            decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
+            offset += VertexElement::getTypeSize(VET_FLOAT3);
 
             if (mUseVertexColour)
             {
-                offset += decl->addElement(0, offset, VET_UBYTE4_NORM, VES_DIFFUSE).getSize();
+                decl->addElement(0, offset, VET_COLOUR, VES_DIFFUSE);
+                offset += VertexElement::getTypeSize(VET_COLOUR);
             }
 
             if (mUseTexCoords)
@@ -150,7 +156,7 @@ namespace Ogre {
                 HardwareBufferManager::getSingleton().createVertexBuffer(
                 mVertexData->vertexDeclaration->getVertexSize(0),
                 mVertexData->vertexCount,
-                HBU_CPU_TO_GPU);
+                HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY_DISCARDABLE);
 
             // (re)Bind the buffer
             // Any existing buffer will lose its reference count and be destroyed
@@ -160,7 +166,7 @@ namespace Ogre {
                 HardwareBufferManager::getSingleton().createIndexBuffer(
                     HardwareIndexBuffer::IT_16BIT,
                     mChainCount * mMaxElementsPerChain * 6, // max we can use
-                    HBU_GPU_ONLY);
+                    mDynamic? HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY : HardwareBuffer::HBU_STATIC_WRITE_ONLY);
             // NB we don't set the indexCount on IndexData here since we will
             // probably use less than the maximum number of indices
 
@@ -208,15 +214,24 @@ namespace Ogre {
         mVertexDeclDirty = mBuffersNeedRecreating = true;
         mIndexContentDirty = mVertexContentDirty = true;
     }
-    void BillboardChain::setAutoUpdate(bool autoUpdate)
+    //-----------------------------------------------------------------------
+    void BillboardChain::setDynamic(bool dyn)
     {
-        mAutoUpdate = autoUpdate;
+        mDynamic = dyn;
+        mBuffersNeedRecreating = mIndexContentDirty = mVertexContentDirty = true;
     }
     //-----------------------------------------------------------------------
     void BillboardChain::addChainElement(size_t chainIndex,
         const BillboardChain::Element& dtls)
     {
-        ChainSegment& seg = mChainSegmentList.at(chainIndex);
+
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "chainIndex out of bounds",
+                "BillboardChain::addChainElement");
+        }
+        ChainSegment& seg = mChainSegmentList[chainIndex];
         if (seg.head == SEGMENT_EMPTY)
         {
             // Tail starts at end, head grows backwards
@@ -261,7 +276,13 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void BillboardChain::removeChainElement(size_t chainIndex)
     {
-        ChainSegment& seg = mChainSegmentList.at(chainIndex);
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "chainIndex out of bounds",
+                "BillboardChain::removeChainElement");
+        }
+        ChainSegment& seg = mChainSegmentList[chainIndex];
         if (seg.head == SEGMENT_EMPTY)
             return; // do nothing, nothing to remove
 
@@ -292,7 +313,13 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void BillboardChain::clearChain(size_t chainIndex)
     {
-        ChainSegment& seg = mChainSegmentList.at(chainIndex);
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "chainIndex out of bounds",
+                "BillboardChain::clearChain");
+        }
+        ChainSegment& seg = mChainSegmentList[chainIndex];
 
         // Just reset head & tail
         seg.tail = seg.head = SEGMENT_EMPTY;
@@ -326,8 +353,19 @@ namespace Ogre {
     void BillboardChain::updateChainElement(size_t chainIndex, size_t elementIndex,
         const BillboardChain::Element& dtls)
     {
-        ChainSegment& seg = mChainSegmentList.at(chainIndex);
-        OgreAssert(seg.head != SEGMENT_EMPTY, "Chain segment is empty");
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "chainIndex out of bounds",
+                "BillboardChain::updateChainElement");
+        }
+        ChainSegment& seg = mChainSegmentList[chainIndex];
+        if (seg.head == SEGMENT_EMPTY)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "Chain segment is empty",
+                "BillboardChain::updateChainElement");
+        }
 
         size_t idx = seg.head + elementIndex;
         // adjust for the edge and start
@@ -347,8 +385,20 @@ namespace Ogre {
     const BillboardChain::Element&
     BillboardChain::getChainElement(size_t chainIndex, size_t elementIndex) const
     {
-        const ChainSegment& seg = mChainSegmentList.at(chainIndex);
-        OgreAssert(seg.head != SEGMENT_EMPTY, "Chain segment is empty");
+
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "chainIndex out of bounds",
+                "BillboardChain::getChainElement");
+        }
+        const ChainSegment& seg = mChainSegmentList[chainIndex];
+        if (seg.head == SEGMENT_EMPTY)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "Chain segment is empty",
+                "BillboardChain::getChainElement");
+        }
 
         size_t idx = seg.head + elementIndex;
         // adjust for the edge and start
@@ -359,7 +409,13 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     size_t BillboardChain::getNumChainElements(size_t chainIndex) const
     {
-        const ChainSegment& seg = mChainSegmentList.at(chainIndex);
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "chainIndex out of bounds",
+                "BillboardChain::getNumChainElements");
+        }
+        const ChainSegment& seg = mChainSegmentList[chainIndex];
         
         if (seg.head == SEGMENT_EMPTY)
         {
@@ -381,8 +437,11 @@ namespace Ogre {
         {
             mAABB.setNull();
             Vector3 widthVector;
-            for (const auto& seg : mChainSegmentList)
+            for (ChainSegmentList::const_iterator segi = mChainSegmentList.begin();
+                segi != mChainSegmentList.end(); ++segi)
             {
+                const ChainSegment& seg = *segi;
+
                 if (seg.head != SEGMENT_EMPTY)
                 {
 
@@ -425,8 +484,11 @@ namespace Ogre {
     void BillboardChain::updateVertexBuffer(Camera* cam)
     {
         setupBuffers();
-
-        if (!mVertexContentDirty && !mAutoUpdate)
+        
+        // The contents of the vertex buffer are correct if they are not dirty
+        // and the camera used to build the vertex buffer is still the current 
+        // camera.
+        if (!mVertexContentDirty && mVertexCameraUsed == cam)
             return;
 
         HardwareVertexBufferSharedPtr pBuffer =
@@ -437,8 +499,11 @@ namespace Ogre {
         Vector3 eyePos = mParentNode->convertWorldToLocalPosition(camPos);
 
         Vector3 chainTangent;
-        for (auto& seg : mChainSegmentList)
+        for (ChainSegmentList::iterator segi = mChainSegmentList.begin();
+            segi != mChainSegmentList.end(); ++segi)
         {
+            ChainSegment& seg = *segi;
+
             // Skip 0 or 1 element segment counts
             if (seg.head != SEGMENT_EMPTY && seg.head != seg.tail)
             {
@@ -454,7 +519,7 @@ namespace Ogre {
                     uint16 baseIdx = static_cast<uint16>((e + seg.start) * 2);
 
                     // Determine base pointer to vertex #1
-                    float* pFloat = reinterpret_cast<float*>(
+                    void* pBase = static_cast<void*>(
                         static_cast<char*>(vertexLock.pData) +
                             pBuffer->getVertexSize() * baseIdx);
 
@@ -494,19 +559,25 @@ namespace Ogre {
                     Vector3 pos0 = elem.position - vPerpendicular;
                     Vector3 pos1 = elem.position + vPerpendicular;
 
+                    float* pFloat = static_cast<float*>(pBase);
                     // pos1
                     *pFloat++ = pos0.x;
                     *pFloat++ = pos0.y;
                     *pFloat++ = pos0.z;
 
+                    pBase = static_cast<void*>(pFloat);
+
                     if (mUseVertexColour)
                     {
-                        RGBA col = elem.colour.getAsBYTE();
-                        memcpy(pFloat++, &col, sizeof(RGBA));
+                        RGBA* pCol = static_cast<RGBA*>(pBase);
+                        Root::getSingleton().convertColourValue(elem.colour, pCol);
+                        pCol++;
+                        pBase = static_cast<void*>(pCol);
                     }
 
                     if (mUseTexCoords)
                     {
+                        pFloat = static_cast<float*>(pBase);
                         if (mTexCoordDir == TCD_U)
                         {
                             *pFloat++ = elem.texCoord;
@@ -517,21 +588,27 @@ namespace Ogre {
                             *pFloat++ = mOtherTexCoordRange[0];
                             *pFloat++ = elem.texCoord;
                         }
+                        pBase = static_cast<void*>(pFloat);
                     }
 
                     // pos2
+                    pFloat = static_cast<float*>(pBase);
                     *pFloat++ = pos1.x;
                     *pFloat++ = pos1.y;
                     *pFloat++ = pos1.z;
+                    pBase = static_cast<void*>(pFloat);
 
                     if (mUseVertexColour)
                     {
-                        RGBA col = elem.colour.getAsBYTE();
-                        memcpy(pFloat++, &col, sizeof(RGBA));
+                        RGBA* pCol = static_cast<RGBA*>(pBase);
+                        Root::getSingleton().convertColourValue(elem.colour, pCol);
+                        pCol++;
+                        pBase = static_cast<void*>(pCol);
                     }
 
                     if (mUseTexCoords)
                     {
+                        pFloat = static_cast<float*>(pBase);
                         if (mTexCoordDir == TCD_U)
                         {
                             *pFloat++ = elem.texCoord;
@@ -568,8 +645,11 @@ namespace Ogre {
             uint16* pShort = static_cast<uint16*>(indexLock.pData);
             mIndexData->indexCount = 0;
             // indexes
-            for (auto& seg : mChainSegmentList)
+            for (ChainSegmentList::iterator segi = mChainSegmentList.begin();
+                segi != mChainSegmentList.end(); ++segi)
             {
+                ChainSegment& seg = *segi;
+
                 // Skip 0 or 1 element segment counts
                 if (seg.head != SEGMENT_EMPTY && seg.head != seg.tail)
                 {
@@ -638,7 +718,10 @@ namespace Ogre {
 
         if (!mMaterial)
         {
-            logMaterialNotFound(name, groupName, "BillboardChain", mName);
+            LogManager::getSingleton().logMessage("Can't assign material " + name +
+                " to BillboardChain " + mName + " because this "
+                "Material does not exist in group "+groupName+". Have you forgotten to define it in a "
+                ".material script?", LML_CRITICAL);
             mMaterial = MaterialManager::getSingleton().getDefaultMaterial(false);
         }
         // Ensure new material loaded (will not load again if already loaded)
@@ -647,7 +730,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     const String& BillboardChain::getMovableType(void) const
     {
-        return MOT_BILLBOARD_CHAIN;
+        return BillboardChainFactory::FACTORY_TYPE_NAME;
     }
     //-----------------------------------------------------------------------
     void BillboardChain::_updateRenderQueue(RenderQueue* queue)
@@ -663,6 +746,7 @@ namespace Ogre {
             else
                 queue->addRenderable(this);
         }
+
     }
     //-----------------------------------------------------------------------
     void BillboardChain::getRenderOperation(RenderOperation& op)
@@ -704,11 +788,11 @@ namespace Ogre {
     }
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
-    const String MOT_BILLBOARD_CHAIN = "BillboardChain";
+    String BillboardChainFactory::FACTORY_TYPE_NAME = "BillboardChain";
     //-----------------------------------------------------------------------
     const String& BillboardChainFactory::getType(void) const
     {
-        return MOT_BILLBOARD_CHAIN;
+        return FACTORY_TYPE_NAME;
     }
     //-----------------------------------------------------------------------
     MovableObject* BillboardChainFactory::createInstanceImpl( const String& name,
@@ -747,9 +831,18 @@ namespace Ogre {
             {
                 dynamic = StringConverter::parseBool(ni->second);
             }
+
         }
 
         return OGRE_NEW BillboardChain(name, maxElements, numberOfChains, useTex, useCol, dynamic);
 
     }
+    //-----------------------------------------------------------------------
+    void BillboardChainFactory::destroyInstance( MovableObject* obj)
+    {
+        OGRE_DELETE  obj;
+    }
+
 }
+
+

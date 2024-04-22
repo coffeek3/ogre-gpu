@@ -32,23 +32,73 @@
 #include "OgreGLSLShader.h"
 #include "OgreRoot.h"
 #include "OgreGLSLExtSupport.h"
-#include "OgreLogManager.h"
 
 namespace Ogre {
 
-    GLSLProgram::GLSLProgram(const GLShaderList& shaders)
-        : GLSLProgramCommon(shaders)
+    GLSLProgram::GLSLProgram(GLSLShader* vertexShader,
+                             GLSLShader* hullShader,
+                             GLSLShader* domainShader,
+                             GLSLShader* geometryShader,
+                             GLSLShader* fragmentShader,
+                             GLSLShader* computeShader)
+        : GLSLProgramCommon(vertexShader)
+        , mHullShader(hullShader)
+        , mDomainShader(domainShader)
+        , mGeometryShader(geometryShader)
+        , mFragmentShader(fragmentShader)
+        , mComputeShader(computeShader)
     {
+        // compute shader presence means no other shaders are allowed
+        if(mComputeShader)
+            mVertexShader = mHullShader = mDomainShader = mGeometryShader = mFragmentShader = NULL;
+    }
+
+    Ogre::String GLSLProgram::getCombinedName()
+    {
+        String name;
+        if (mVertexShader)
+        {
+            name += "Vertex Shader: ";
+            name += mVertexShader->getName();
+            name += "\n";
+        }
+        if (mHullShader)
+        {
+            name += "Tessellation Control Shader: ";
+            name += mHullShader->getName();
+            name += "\n";
+        }
+        if (mDomainShader)
+        {
+            name += "Tessellation Evaluation Shader: ";
+            name += mDomainShader->getName();
+            name += "\n";
+        }
+        if (mGeometryShader)
+        {
+            name += "Geometry Shader: ";
+            name += mGeometryShader->getName();
+            name += "\n";
+        }
+        if (mFragmentShader)
+        {
+            name += "Fragment Shader: ";
+            name += mFragmentShader->getName();
+            name += "\n";
+        }
+        if (mComputeShader)
+        {
+            name += "Compute Shader: ";
+            name += mComputeShader->getName();
+            name += "\n";
+        }
+
+        return name;
     }
 
     void GLSLProgram::bindFixedAttributes(GLuint program)
     {
         GLint maxAttribs = Root::getSingleton().getRenderSystem()->getCapabilities()->getNumVertexAttributes();
-
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE
-        // must query active attributes on OSX to avoid warning spam
-        OGRE_CHECK_GL_ERROR(glLinkProgram( program ));
-#endif
 
         size_t numAttribs = sizeof(msCustomAttributes) / sizeof(CustomAttribute);
         for (size_t i = 0; i < numAttribs; ++i)
@@ -56,12 +106,23 @@ namespace Ogre {
             const CustomAttribute& a = msCustomAttributes[i];
             if (a.attrib < maxAttribs)
             {
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE
-                if(glGetAttribLocation(program, a.name) == -1) continue;
-#endif
+
                 OGRE_CHECK_GL_ERROR(glBindAttribLocation(program, a.attrib, a.name));
             }
         }
+    }
+
+    uint32 GLSLProgram::getCombinedHash()
+    {
+        uint32 hash = 0;
+        GpuProgram* progs[] = {mVertexShader, mFragmentShader, mGeometryShader,
+                               mHullShader,   mDomainShader,   mComputeShader};
+        for (auto p : progs)
+        {
+            if(!p) continue;
+            hash = p->_getHash(hash);
+        }
+        return hash;
     }
 
     void GLSLProgram::setTransformFeedbackVaryings(const std::vector<String>& nameStrings)
@@ -71,15 +132,15 @@ namespace Ogre {
         if (Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_SEPARATE_SHADER_OBJECTS))
         {
             //TODO include tessellation stages
-            auto glslGpuProgram = mShaders[GPT_GEOMETRY_PROGRAM];
+            GLSLShader* glslGpuProgram = getGeometryShader();
             if (!glslGpuProgram)
-                glslGpuProgram = mShaders[GPT_VERTEX_PROGRAM];
+                glslGpuProgram = getVertexShader();
 
             programId = glslGpuProgram->getGLProgramHandle();
 
             // force re-link
             GpuProgramManager::getSingleton().removeMicrocodeFromCache(glslGpuProgram->_getHash());
-            glslGpuProgram->resetLinked();
+            glslGpuProgram->setLinked(false);
         }
         else
         {
@@ -92,10 +153,9 @@ namespace Ogre {
 
         // Convert to const char * for GL
         std::vector<const char*> names;
-        names.reserve(nameStrings.size());
-for (const auto & nameString : nameStrings)
+        for (uint e = 0; e < nameStrings.size(); e++)
         {
-            names.push_back(nameString.c_str());
+            names.push_back(nameStrings[e].c_str());
         }
 
         // TODO replace glTransformFeedbackVaryings with in-shader specification (GL 4.4)
@@ -122,14 +182,8 @@ for (const auto & nameString : nameStrings)
 #endif
     }
 
-    bool GLSLProgram::getMicrocodeFromCache(uint32 id, GLuint programHandle)
+    void GLSLProgram::getMicrocodeFromCache(uint32 id)
     {
-        if (!GpuProgramManager::canGetCompiledShaderBuffer())
-            return false;
-
-        if (!GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(id))
-            return false;
-
         GpuProgramManager::Microcode cacheMicrocode =
             GpuProgramManager::getSingleton().getMicrocodeFromCache(id);
 
@@ -143,39 +197,25 @@ for (const auto & nameString : nameStrings)
         GLint binaryLength = static_cast<GLint>(cacheMicrocode->size() - sizeof(GLenum));
 
         // Load binary.
-        OGRE_CHECK_GL_ERROR(glProgramBinary(programHandle,
+        OGRE_CHECK_GL_ERROR(glProgramBinary(mGLProgramHandle,
                                             binaryFormat,
                                             cacheMicrocode->getCurrentPtr(),
                                             binaryLength));
 
         GLint success = 0;
-        OGRE_CHECK_GL_ERROR(glGetProgramiv(programHandle, GL_LINK_STATUS, &success));
+        OGRE_CHECK_GL_ERROR(glGetProgramiv(mGLProgramHandle, GL_LINK_STATUS, &success));
 
-        if(!success)
-            logObjectInfo("could not load from cache", programHandle);
-
-        return success;
-    }
-
-    void GLSLProgram::writeMicrocodeToCache(uint32 id, GLuint programHandle)
-    {
-        if (!GpuProgramManager::getSingleton().getSaveMicrocodesToCache())
+        if(success)
+        {
+            mLinked = true;
             return;
+        }
 
-        // get buffer size
-        GLint binaryLength = 0;
-        OGRE_CHECK_GL_ERROR(glGetProgramiv(programHandle, GL_PROGRAM_BINARY_LENGTH, &binaryLength));
-
-        // create microcode
-        auto newMicrocode = GpuProgramManager::createMicrocode(binaryLength + sizeof(GLenum));
-
-        // get binary
-        OGRE_CHECK_GL_ERROR(glGetProgramBinary(programHandle, binaryLength, NULL,
-                                               (GLenum*)newMicrocode->getPtr(),
-                                               newMicrocode->getPtr() + sizeof(GLenum)));
-
-        // add to the microcode to the cache
-        GpuProgramManager::getSingleton().addMicrocodeToCache(id, newMicrocode);
+        logObjectInfo("could not load from cache "+getCombinedName(), mGLProgramHandle);
+        // Something must have changed since the program binaries
+        // were cached away. Fallback to source shader loading path,
+        // and then retrieve and cache new program binaries once again.
+        compileAndLink();
     }
 
 } // namespace Ogre

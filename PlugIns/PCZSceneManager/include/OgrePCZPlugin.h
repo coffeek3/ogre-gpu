@@ -24,6 +24,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
+OgrePCZPlugin.h  -  Portal Connected Zone Scene Manager Plugin class
+
+-----------------------------------------------------------------------------
+begin                : Mon Feb 19 2007
+author               : Eric Cha
+email                : ericc@xenopi.com
+Code Style Update    :
+-----------------------------------------------------------------------------
 */
 
 #ifndef PCZPLUGIN_H
@@ -46,19 +54,19 @@ namespace Ogre
         PCZPlugin();
 
         /// @copydoc Plugin::getName
-        const String& getName() const override;
+        const String& getName() const;
 
         /// @copydoc Plugin::install
-        void install() override;
+        void install();
 
         /// @copydoc Plugin::initialise
-        void initialise() override;
+        void initialise();
 
         /// @copydoc Plugin::shutdown
-        void shutdown() override;
+        void shutdown();
 
         /// @copydoc Plugin::uninstall
-        void uninstall() override;
+        void uninstall();
     protected:
         PCZSceneManagerFactory* mPCZSMFactory;
         PCZoneFactoryManager* mPCZoneFactoryManager;

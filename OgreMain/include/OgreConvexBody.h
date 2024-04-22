@@ -44,7 +44,7 @@ namespace Ogre
     *  @{
     */
     /** Holds a solid representation of a convex body.
-
+        @remarks
             Administers a convex body. All polygons of the body are convex and
             planar. Several operations may be applied, ranging from intersection
             to join where each result it itself a convex body.
@@ -54,7 +54,7 @@ namespace Ogre
     public:
         typedef std::vector< Polygon* >    PolygonList;
 
-    private:
+    protected:
         PolygonList mPolygons;
 
         // Static 'free list' of polygons to save reallocation, shared between all bodies
@@ -94,7 +94,7 @@ namespace Ogre
 
         /** Extends the existing body to incorporate the passed in point as a
             convex hull.
-
+        @remarks
             You must already have constructed a basic body using a 'construct' 
             method.
         */
@@ -150,13 +150,16 @@ namespace Ogre
         */
         _OgreExport friend std::ostream& operator<< ( std::ostream& strm, const ConvexBody& body );
 
+        /** Log details of this body */
+        void logInfo() const;
+
         /// Initialise the internal polygon pool used to minimise allocations
         static void _initialisePool();
         /// Tear down the internal polygon pool used to minimise allocations
         static void _destroyPool();
 
 
-    private:
+    protected:
         /** Get a new polygon from the pool.
         */
         static Polygon* allocatePolygon();

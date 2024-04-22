@@ -43,7 +43,7 @@ namespace Ogre {
     *  @{
     */
     /** Abstract class defining the interface to be implemented by creators of ParticleEmitter subclasses.
-
+    @remarks
         Plugins or 3rd party applications can add new types of particle emitters to Ogre by creating
         subclasses of the ParticleEmitter class. Because multiple instances of these emitters may be
         required, a factory class to manage the instances is also required. 
@@ -56,7 +56,7 @@ namespace Ogre {
     class _OgreExport ParticleEmitterFactory : public FXAlloc
     {
     protected:
-        std::vector<ParticleEmitter*> mEmitters; //!< @deprecated do not use
+        std::vector<ParticleEmitter*> mEmitters;
     public:
         ParticleEmitterFactory() {}
         virtual ~ParticleEmitterFactory();
@@ -65,7 +65,7 @@ namespace Ogre {
         virtual String getName() const = 0;
 
         /** Creates a new emitter instance.
-
+        @remarks
             The subclass MUST add a pointer to the created instance to mEmitters.
         */
         virtual ParticleEmitter* createEmitter(ParticleSystem* psys) = 0;

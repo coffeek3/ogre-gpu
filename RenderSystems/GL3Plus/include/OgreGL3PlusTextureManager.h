@@ -59,7 +59,7 @@ namespace Ogre {
         virtual ~GL3PlusTextureManager();
 
         /// @copydoc TextureManager::getNativeFormat
-        PixelFormat getNativeFormat(TextureType ttype, PixelFormat format, int usage) override;
+        PixelFormat getNativeFormat(TextureType ttype, PixelFormat format, int usage);
 
         // void bindImages();
 
@@ -72,11 +72,11 @@ namespace Ogre {
         /// @copydoc ResourceManager::createImpl
         Resource* createImpl(const String& name, ResourceHandle handle,
                              const String& group, bool isManual, ManualResourceLoader* loader,
-                             const NameValuePairList* createParams) override;
+                             const NameValuePairList* createParams);
 
         GL3PlusRenderSystem* mRenderSystem;
 
-        SamplerPtr _createSamplerImpl() override;
+        SamplerPtr _createSamplerImpl();
 
     private:
         /// Register a texture as an image texture used in image load/store.

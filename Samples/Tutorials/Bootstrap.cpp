@@ -1,35 +1,42 @@
-// This file is part of the OGRE project.
-// It is subject to the license terms in the LICENSE file found in the top-level directory
-// of this distribution and at https://www.ogre3d.org/licensing.
-// SPDX-License-Identifier: MIT
-
 #include "Ogre.h"
 #include "OgreApplicationContext.h"
 
-//! [key_handler]
-class KeyHandler : public OgreBites::InputListener
+class MyTestApp : public OgreBites::ApplicationContext, public OgreBites::InputListener
 {
-    bool keyPressed(const OgreBites::KeyboardEvent& evt) override
-    {
-        if (evt.keysym.sym == OgreBites::SDLK_ESCAPE)
-        {
-            Ogre::Root::getSingleton().queueEndRendering();
-        }
-        return true;
-    }
+public:
+    MyTestApp();
+    void setup();
+    bool keyPressed(const OgreBites::KeyboardEvent& evt);
 };
-//! [key_handler]
 
-int main(int argc, char *argv[])
+//! [constructor]
+MyTestApp::MyTestApp() : OgreBites::ApplicationContext("OgreTutorialApp")
 {
+}
 //! [constructor]
-    OgreBites::ApplicationContext ctx("OgreTutorialApp");
-    ctx.initApp();
-//! [constructor]
+
+//! [key_handler]
+bool MyTestApp::keyPressed(const OgreBites::KeyboardEvent& evt)
+{
+    if (evt.keysym.sym == OgreBites::SDLK_ESCAPE)
+    {
+        getRoot()->queueEndRendering();
+    }
+    return true;
+}
+//! [key_handler]
 
 //! [setup]
+void MyTestApp::setup(void)
+{
+    // do not forget to call the base first
+    OgreBites::ApplicationContext::setup();
+    
+    // register for input events
+    addInputListener(this);
+
     // get a pointer to the already created root
-    Ogre::Root* root = ctx.getRoot();
+    Ogre::Root* root = getRoot();
     Ogre::SceneManager* scnMgr = root->createSceneManager();
 
     // register our scene with the RTSS
@@ -54,21 +61,22 @@ int main(int argc, char *argv[])
     camNode->attachObject(cam);
 
     // and tell it to render into the main window
-    ctx.getRenderWindow()->addViewport(cam);
+    getRenderWindow()->addViewport(cam);
 
     // finally something to render
     Ogre::Entity* ent = scnMgr->createEntity("Sinbad.mesh");
     Ogre::SceneNode* node = scnMgr->getRootSceneNode()->createChildSceneNode();
     node->attachObject(ent);
+}
 //! [setup]
 
 //! [main]
-    // register for input events
-    KeyHandler keyHandler;
-    ctx.addInputListener(&keyHandler);
-
-    ctx.getRoot()->startRendering();
-    ctx.closeApp();
-//! [main]
+int main(int argc, char *argv[])
+{
+    MyTestApp app;
+    app.initApp();
+    app.getRoot()->startRendering();
+    app.closeApp();
     return 0;
 }
+//! [main]

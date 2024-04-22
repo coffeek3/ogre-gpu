@@ -37,13 +37,13 @@ namespace Ogre {
     *  @{
     */
     /** \defgroup ParticleFX ParticleFX
-    * Provides Emmiter and Affector implementations for ParticleSystem
+    * Particle Effects (Emmiters, Affectors)
     *  @{
     */
 
     /** Particle emitter which emits particles randomly from points inside
         an area (box, sphere, ellipsoid whatever subclasses choose to be).
-
+    @remarks
         This is an empty superclass and needs to be subclassed. Basic particle
         emitter emits particles from/in an (unspecified) area. The
         initial direction of these particles can either be a single direction
@@ -52,36 +52,40 @@ namespace Ogre {
         is the angle across which to scatter the particles either side of the
         base direction of the emitter. 
     */
-    class AreaEmitter : public ParticleEmitter
+    class _OgreParticleFXExport AreaEmitter : public ParticleEmitter
     {
     public:
         /** Command object for area emitter size (see ParamCommand).*/
         class CmdWidth : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /** Command object for area emitter size (see ParamCommand).*/
         class CmdHeight : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /** Command object for area emitter size (see ParamCommand).*/
         class CmdDepth : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
 
         AreaEmitter(ParticleSystem* psys) : ParticleEmitter(psys) {}
 
+
+        /** See ParticleEmitter. */
+        unsigned short _getEmissionCount(Real timeElapsed);
+
         /** Overloaded to update the trans. matrix */
-        void setDirection( const Vector3& direction ) override;
+        void setDirection( const Vector3& direction );
 
         /** Sets the size of the area from which particles are emitted.
         @param

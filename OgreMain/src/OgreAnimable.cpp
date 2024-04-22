@@ -29,6 +29,9 @@ THE SOFTWARE.
 #include "OgreAnimable.h"
 
 namespace Ogre {
+    //--------------------------------------------------------------------------
+    AnimableObject::AnimableDictionaryMap AnimableObject::msAnimableDictionary;
+    //--------------------------------------------------------------------------
     void AnimableValue::resetToBaseValue(void)
     {
         switch(mType)
@@ -52,8 +55,11 @@ namespace Ogre {
             setValue(Quaternion(mBaseValueReal));
             break;
         case COLOUR:
-            setValue(ColourValue(mBaseValueReal[0], mBaseValueReal[1],
+            setValue(ColourValue(mBaseValueReal[0], mBaseValueReal[1], 
                 mBaseValueReal[2], mBaseValueReal[3]));
+            break;
+        case DEGREE:
+            setValue(Degree(mBaseValueReal[0]));
             break;
         case RADIAN:        
             setValue(Radian(mBaseValueReal[0]));
@@ -85,6 +91,9 @@ namespace Ogre {
             break;
         case COLOUR:
             setAsBaseValue(any_cast<ColourValue>(val));
+            break;
+        case DEGREE:
+            setAsBaseValue(any_cast<Degree>(val));
             break;
         case RADIAN:
             setAsBaseValue(any_cast<Radian>(val));
@@ -120,6 +129,9 @@ namespace Ogre {
         case RADIAN:
             setValue(any_cast<Radian>(val));
             break;
+        case DEGREE:
+            setValue(any_cast<Degree>(val));
+            break;
         }
     }
     //--------------------------------------------------------------------------
@@ -147,6 +159,9 @@ namespace Ogre {
             break;
         case COLOUR:
             applyDeltaValue(any_cast<ColourValue>(val));
+            break;
+        case DEGREE:
+            applyDeltaValue(any_cast<Degree>(val));
             break;
         case RADIAN:
             applyDeltaValue(any_cast<Radian>(val));

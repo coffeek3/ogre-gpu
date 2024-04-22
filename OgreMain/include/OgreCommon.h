@@ -29,11 +29,12 @@ THE SOFTWARE.
 #define __Common_H__
 // Common stuff
 
-#include "OgreVector.h"
 #include "OgreHeaderPrefix.h"
 #include "OgreMurmurHash3.h"
 
 namespace Ogre {
+
+    typedef _StringBase String;
 
     /** \addtogroup Core
     *  @{
@@ -58,7 +59,7 @@ namespace Ogre {
 
     /** Comparison functions used for the depth/stencil buffer operations and 
         others. */
-    enum CompareFunction : uint8
+    enum CompareFunction
     {
         CMPF_ALWAYS_FAIL,  //!< Never writes a pixel to the render target
         CMPF_ALWAYS_PASS,  //!< Always writes a pixel to the render target
@@ -98,7 +99,7 @@ namespace Ogre {
         FT_MIP
     };
     /** Filtering options for textures / mipmaps. */
-    enum FilterOptions : uint8
+    enum FilterOptions
     {
         /// No filtering, used for FT_MIP to turn off mipmapping
         FO_NONE,
@@ -114,7 +115,7 @@ namespace Ogre {
 
     /** Texture addressing modes - default is TAM_WRAP.
     */
-    enum TextureAddressingMode : uint8
+    enum TextureAddressingMode
     {
         /// %Any value beyond 1.0 wraps back to 0.0. %Texture is repeated.
         TAM_WRAP,
@@ -126,11 +127,13 @@ namespace Ogre {
         /// combined with filtering.
         TAM_CLAMP,
         /// %Texture coordinates outside the range [0.0, 1.0] are set to the border colour.
-        TAM_BORDER
+        TAM_BORDER,
+        /// Unknown
+        TAM_UNKNOWN = 99
     };
 
     /** %Light shading modes. */
-    enum ShadeOptions : uint8
+    enum ShadeOptions
     {
         SO_FLAT, //!< No interpolation takes place. Each face is shaded with a single colour determined from the first vertex in the face.
         SO_GOURAUD, //!< Colour at each vertex is linearly interpolated across the face.
@@ -138,7 +141,7 @@ namespace Ogre {
     };
 
     /** Fog modes. */
-    enum FogMode : uint8
+    enum FogMode
     {
         /// No fog. Duh.
         FOG_NONE,
@@ -152,7 +155,7 @@ namespace Ogre {
 
     /** Hardware culling modes based on vertex winding.
         This setting applies to how the hardware API culls triangles it is sent. */
-    enum CullingMode : uint8
+    enum CullingMode
     {
         /// Hardware never culls triangles and renders everything it receives.
         CULL_NONE = 1,
@@ -167,7 +170,7 @@ namespace Ogre {
         hardware API. This culling mode is used by scene managers which choose to implement it -
         normally those which deal with large amounts of fixed world geometry which is often 
         planar (software culling movable variable geometry is expensive). */
-    enum ManualCullingMode : uint8
+    enum ManualCullingMode
     {
         /// No culling so everything is sent to the hardware.
         MANUAL_CULL_NONE = 1,
@@ -196,7 +199,7 @@ namespace Ogre {
     };
 
     /** The polygon mode to use when rasterising. */
-    enum PolygonMode : uint8
+    enum PolygonMode
     {
         /// Only the points of each polygon are rendered.
         PM_POINTS = 1,
@@ -302,21 +305,12 @@ namespace Ogre {
         TVC_EMISSIVE    = 0x8
     };
 
-    /** Function used compute the camera-distance for sorting objects */
-    enum SortMode : uint8
+    /** Sort mode for billboard-set and particle-system */
+    enum SortMode
     {
-
-        /** Sort by direction of the camera
-         *
-         * The distance along the camera view as in `cam->getDerivedDirection().dotProduct(diff)`
-         * Best for @ref PT_ORTHOGRAPHIC
-         */
+        /** Sort by direction of the camera */
         SM_DIRECTION,
-        /** Sort by distance from the camera
-         *
-         * The euclidean distance as in `diff.squaredLength()`
-         * Best for @ref PT_PERSPECTIVE
-         */
+        /** Sort by distance from the camera */
         SM_DISTANCE
     };
 
@@ -333,6 +327,13 @@ namespace Ogre {
       CBT_BACK = 0x0,
       CBT_BACK_LEFT,
       CBT_BACK_RIGHT
+    };
+	
+	/** Defines the stereo mode types. */
+    enum StereoModeType
+    {
+      SMT_NONE = 0x0,
+      SMT_FRAME_SEQUENTIAL
     };
 
     /** Flags for the Instance Manager when calculating ideal number of instances per batch */
@@ -362,8 +363,221 @@ namespace Ogre {
         IM_USEALL       = IM_USE16BIT|IM_VTFBESTFIT|IM_USEONEWEIGHT
     };
     
+    
+    /** A hashed vector.
+    */
+    template <typename T>
+    class HashedVector
+    {
+    public:
+        typedef typename std::vector<T> VectorImpl;
+    protected:
+        VectorImpl mList;
+        mutable uint32 mListHash;
+        mutable bool mListHashDirty;
+
+        void addToHash(const T& newPtr) const
+        {
+            mListHash = FastHash((const char*)&newPtr, sizeof(T), mListHash);
+        }
+        void recalcHash() const
+        {
+            mListHash = 0;
+            for (const_iterator i = mList.begin(); i != mList.end(); ++i)
+                addToHash(*i);
+            mListHashDirty = false;
+            
+        }
+
+    public:
+        typedef typename VectorImpl::value_type value_type;
+        typedef typename VectorImpl::pointer pointer;
+        typedef typename VectorImpl::reference reference;
+        typedef typename VectorImpl::const_reference const_reference;
+        typedef typename VectorImpl::size_type size_type;
+        typedef typename VectorImpl::difference_type difference_type;
+        typedef typename VectorImpl::iterator iterator;
+        typedef typename VectorImpl::const_iterator const_iterator;
+        typedef typename VectorImpl::reverse_iterator reverse_iterator;
+        typedef typename VectorImpl::const_reverse_iterator const_reverse_iterator;
+
+        void dirtyHash()
+        {
+            mListHashDirty = true;
+        }
+        bool isHashDirty() const
+        {
+            return mListHashDirty;
+        }
+
+        iterator begin() 
+        { 
+            // we have to assume that hash needs recalculating on non-const
+            dirtyHash();
+            return mList.begin(); 
+        }
+        iterator end() { return mList.end(); }
+        const_iterator begin() const { return mList.begin(); }
+        const_iterator end() const { return mList.end(); }
+        reverse_iterator rbegin() 
+        { 
+            // we have to assume that hash needs recalculating on non-const
+            dirtyHash();
+            return mList.rbegin(); 
+        }
+        reverse_iterator rend() { return mList.rend(); }
+        const_reverse_iterator rbegin() const { return mList.rbegin(); }
+        const_reverse_iterator rend() const { return mList.rend(); }
+        size_type size() const { return mList.size(); }
+        size_type max_size() const { return mList.max_size(); }
+        size_type capacity() const { return mList.capacity(); }
+        bool empty() const { return mList.empty(); }
+        reference operator[](size_type n) 
+        { 
+            // we have to assume that hash needs recalculating on non-const
+            dirtyHash();
+            return mList[n]; 
+        }
+        const_reference operator[](size_type n) const { return mList[n]; }
+        reference at(size_type n) 
+        { 
+            // we have to assume that hash needs recalculating on non-const
+            dirtyHash();
+            return mList.const_iterator(n); 
+        }
+        const_reference at(size_type n) const { return mList.at(n); }
+        HashedVector() : mListHash(0), mListHashDirty(false) {}
+        HashedVector(size_type n) : mList(n), mListHash(0), mListHashDirty(n > 0) {}
+        HashedVector(size_type n, const T& t) : mList(n, t), mListHash(0), mListHashDirty(n > 0) {}
+        HashedVector(const HashedVector<T>& rhs) 
+            : mList(rhs.mList), mListHash(rhs.mListHash), mListHashDirty(rhs.mListHashDirty) {}
+
+        template <class InputIterator>
+        HashedVector(InputIterator a, InputIterator b)
+            : mList(a, b), mListHash(0), mListHashDirty(false)
+        {
+            dirtyHash();
+        }
+
+        ~HashedVector() {}
+        HashedVector<T>& operator=(const HashedVector<T>& rhs)
+        {
+            mList = rhs.mList;
+            mListHash = rhs.mListHash;
+            mListHashDirty = rhs.mListHashDirty;
+            return *this;
+        }
+
+        void reserve(size_t t) { mList.reserve(t); }
+        reference front() 
+        { 
+            // we have to assume that hash needs recalculating on non-const
+            dirtyHash();
+            return mList.front(); 
+        }
+        const_reference front() const { return mList.front(); }
+        reference back()  
+        { 
+            // we have to assume that hash needs recalculating on non-const
+            dirtyHash();
+            return mList.back(); 
+        }
+        const_reference back() const { return mList.back(); }
+        void push_back(const T& t)
+        { 
+            mList.push_back(t);
+            // Quick progressive hash add
+            if (!isHashDirty())
+                addToHash(t);
+        }
+        void pop_back()
+        {
+            mList.pop_back();
+            dirtyHash();
+        }
+        void swap(HashedVector<T>& rhs)
+        {
+            mList.swap(rhs.mList);
+            dirtyHash();
+        }
+        iterator insert(iterator pos, const T& t)
+        {
+            bool recalc = (pos != end());
+            iterator ret = mList.insert(pos, t);
+            if (recalc)
+                dirtyHash();
+            else
+                addToHash(t);
+            return ret;
+        }
+
+        template <class InputIterator>
+        void insert(iterator pos,
+            InputIterator f, InputIterator l)
+        {
+            mList.insert(pos, f, l);
+            dirtyHash();
+        }
+
+        void insert(iterator pos, size_type n, const T& x)
+        {
+            mList.insert(pos, n, x);
+            dirtyHash();
+        }
+
+        iterator erase(iterator pos)
+        {
+            iterator ret = mList.erase(pos);
+            dirtyHash();
+            return ret;
+        }
+        iterator erase(iterator first, iterator last)
+        {
+            iterator ret = mList.erase(first, last);
+            dirtyHash();
+            return ret;
+        }
+        void clear()
+        {
+            mList.clear();
+            mListHash = 0;
+            mListHashDirty = false;
+        }
+
+        void resize(size_type n, const T& t = T())
+        {
+            bool recalc = false;
+            if (n != size())
+                recalc = true;
+
+            mList.resize(n, t);
+            if (recalc)
+                dirtyHash();
+        }
+
+        bool operator==(const HashedVector<T>& b)
+        { return mListHash == b.mListHash; }
+
+        bool operator<(const HashedVector<T>& b)
+        { return mListHash < b.mListHash; }
+
+
+        /// Get the hash value
+        uint32 getHash() const 
+        { 
+            if (isHashDirty())
+                recalcHash();
+
+            return mListHash; 
+        }
+    public:
+
+
+
+    };
+
     class Light;
-    typedef std::vector<Light*> LightList;
+    typedef HashedVector<Light*> LightList;
 
 
     /// Constant blank string, useful for returning by ref where local does not exist
@@ -416,8 +630,6 @@ namespace Ogre {
           }
           TRect & merge(const TRect& rhs)
           {
-              assert(right >= left && bottom >= top);
-              assert(rhs.right >= rhs.left && rhs.bottom >= rhs.top);
               if (isNull())
               {
                   *this = rhs;
@@ -433,19 +645,8 @@ namespace Ogre {
               return *this;
 
           }
-
-          /**
-           * Returns the intersection of the two rectangles.
-           *
-           * Note that the rectangles extend downwards. I.e. a valid box will
-           * have "right > left" and "bottom > top".
-           * @param rhs Another rectangle.
-           * @return The intersection of the two rectangles. Zero size if they don't intersect.
-           */
           TRect intersect(const TRect& rhs) const
           {
-              assert(right >= left && bottom >= top);
-              assert(rhs.right >= rhs.left && rhs.bottom >= rhs.top);
               TRect ret;
               if (isNull() || rhs.isNull())
               {
@@ -469,11 +670,7 @@ namespace Ogre {
               return ret;
 
           }
-          bool operator==(const TRect& rhs) const
-          {
-              return left == rhs.left && right == rhs.right && top == rhs.top && bottom == rhs.bottom;
-          }
-          bool operator!=(const TRect& rhs) const { return !(*this == rhs); }
+
         };
         template<typename T>
         std::ostream& operator<<(std::ostream& o, const TRect<T>& r)
@@ -493,7 +690,7 @@ namespace Ogre {
 
         /** Structure used to define a rectangle in a 2-D integer space.
         */
-        typedef TRect< int32 > Rect;
+        typedef TRect< long > Rect;
 
         /** Structure used to define a box in a 3-D integer space.
             Note that the left, top, and front edges are included but the right,
@@ -525,10 +722,6 @@ namespace Ogre {
             {
                 assert(right >= left && bottom >= top && back >= front);
             }
-
-            /// @overload
-            template <typename T> explicit Box(const TRect<T>& r) : Box(r.left, r.top, r.right, r.bottom) {}
-
             /** Define a box from left, top, front, right, bottom and back
                 coordinates.
                 @param  l   x value of left edge
@@ -549,13 +742,7 @@ namespace Ogre {
             {
                 assert(right >= left && bottom >= top && back >= front);
             }
-
-            /// @overload
-            explicit Box(const Vector3i& size)
-                : left(0), top(0), right(size[0]), bottom(size[1]), front(0), back(size[2])
-            {
-            }
-
+            
             /// Return true if the other box is a part of this one
             bool contains(const Box &def) const
             {
@@ -569,11 +756,6 @@ namespace Ogre {
             uint32 getHeight() const { return bottom-top; }
             /// Get the depth of this box
             uint32 getDepth() const { return back-front; }
-
-            /// origin (top, left, front) of the box
-            Vector3i getOrigin() const { return Vector3i(left, top, front); }
-            /// size (width, height, depth) of the box
-            Vector3i getSize() const { return Vector3i(getWidth(), getHeight(), getDepth()); }
         };
 
     

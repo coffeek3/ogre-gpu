@@ -28,6 +28,9 @@ THE SOFTWARE.
 #include "OgreShaderPrecompiledHeaders.h"
 #ifdef RTSHADER_SYSTEM_BUILD_EXT_SHADERS
 
+#define HS_DATA_BIND_NAME "HS_SRS_DATA"
+
+
 namespace Ogre {
 
 namespace RTShader {
@@ -36,33 +39,269 @@ namespace RTShader {
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-bool LinearSkinning::resolveParameters(Program* vsProgram)
+LinearSkinning::LinearSkinning() : HardwareSkinningTechnique()
 {
+}
+
+//-----------------------------------------------------------------------
+bool LinearSkinning::resolveParameters(ProgramSet* programSet)
+{
+
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
     Function* vsMain = vsProgram->getEntryPointFunction();
-    mParamInWorldMatrices = vsProgram->resolveParameter(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY_3x4, mBoneCount);
-    mParamBlendMat = vsMain->resolveLocalParameter(GCT_MATRIX_3X4, "blendMat");
+
+    //if needed mark this vertex program as hardware skinned
+    if (mDoBoneCalculations == true)
+    {
+        vsProgram->setSkeletalAnimationIncluded(true);
+    }
+
+    //
+    // get the parameters we need whether we are doing bone calculations or not
+    //
+    // Note: in order to be consistent we will always output position, normal,
+    // tangent and binormal in both object and world space. And output position
+    // in projective space to cover the responsibility of the transform stage
+
+    //input param
+    mParamInPosition = vsMain->resolveInputParameter(Parameter::SPC_POSITION_OBJECT_SPACE);
+    mParamInNormal = vsMain->resolveInputParameter(Parameter::SPC_NORMAL_OBJECT_SPACE);
+    //mParamInBiNormal = vsMain->resolveInputParameter(Parameter::SPS_BINORMAL, 0, Parameter::SPC_BINORMAL_OBJECT_SPACE, GCT_FLOAT3);
+    //mParamInTangent = vsMain->resolveInputParameter(Parameter::SPS_TANGENT, 0, Parameter::SPC_TANGENT_OBJECT_SPACE, GCT_FLOAT3);
+
+    //local param
+    mParamLocalPositionWorld = vsMain->resolveLocalParameter(Parameter::SPC_POSITION_WORLD_SPACE, GCT_FLOAT4);
+    mParamLocalNormalWorld = vsMain->resolveLocalParameter(Parameter::SPC_NORMAL_WORLD_SPACE);
+    //mParamLocalTangentWorld = vsMain->resolveLocalParameter(Parameter::SPS_TANGENT, 0, Parameter::SPC_TANGENT_WORLD_SPACE, GCT_FLOAT3);
+    //mParamLocalBinormalWorld = vsMain->resolveLocalParameter(Parameter::SPS_BINORMAL, 0, Parameter::SPC_BINORMAL_WORLD_SPACE, GCT_FLOAT3);
+
+    //output param
+    mParamOutPositionProj = vsMain->resolveOutputParameter(Parameter::SPC_POSITION_PROJECTIVE_SPACE);
+
+    if (mDoBoneCalculations == true)
+    {
+        if (ShaderGenerator::getSingleton().getTargetLanguage() == "hlsl")
+        {
+            //set hlsl shader to use row-major matrices instead of column-major.
+            //it enables the use of 3x4 matrices in hlsl shader instead of full 4x4 matrix.
+            vsProgram->setUseColumnMajorMatrices(false);
+        }
+
+        //input parameters
+        mParamInNormal = vsMain->resolveInputParameter(Parameter::SPC_NORMAL_OBJECT_SPACE);
+        //mParamInBiNormal = vsMain->resolveInputParameter(Parameter::SPS_BINORMAL, 0, Parameter::SPC_BINORMAL_OBJECT_SPACE, GCT_FLOAT3);
+        //mParamInTangent = vsMain->resolveInputParameter(Parameter::SPS_TANGENT, 0, Parameter::SPC_TANGENT_OBJECT_SPACE, GCT_FLOAT3);
+        mParamInIndices = vsMain->resolveInputParameter(Parameter::SPC_BLEND_INDICES);
+        mParamInWeights = vsMain->resolveInputParameter(Parameter::SPC_BLEND_WEIGHTS);
+        mParamInWorldMatrices = vsProgram->resolveParameter(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY_3x4, mBoneCount);
+        mParamInInvWorldMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_INVERSE_WORLD_MATRIX);
+        mParamInViewProjMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_VIEWPROJ_MATRIX);
+
+        mParamTempFloat4 = vsMain->resolveLocalParameter("TempVal4", GCT_FLOAT4);
+        mParamTempFloat3 = vsMain->resolveLocalParameter("TempVal3", GCT_FLOAT3);
+    }
+    else
+    {
+        mParamInWorldMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_WORLD_MATRIX);
+        mParamInWorldViewProjMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_WORLDVIEWPROJ_MATRIX);
+    }
     return true;
 }
 
 //-----------------------------------------------------------------------
-void LinearSkinning::addPositionCalculations(const FunctionStageRef& stage)
+bool LinearSkinning::resolveDependencies(ProgramSet* programSet)
 {
-    // Construct a scaling and shearing matrix based on the blend weights
-    stage.callFunction("blendBonesMat3x4",
-                       {In(mParamInWorldMatrices), In(mParamInIndices), In(mParamInWeights), Out(mParamBlendMat)});
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    vsProgram->addDependency(FFP_LIB_COMMON);
+    vsProgram->addDependency(FFP_LIB_TRANSFORM);
 
-    // multiply position with world matrix
-    stage.callFunction(FFP_FUNC_TRANSFORM, mParamBlendMat, mParamInPosition, Out(mParamInPosition).xyz());
-    // set w value to 1
-    stage.assign(1, Out(mParamInPosition).w());
+    return true;
 }
 
 //-----------------------------------------------------------------------
-void LinearSkinning::addNormalRelatedCalculations(const FunctionStageRef& stage)
+bool LinearSkinning::addFunctionInvocations(ProgramSet* programSet)
 {
-    // multiply normal with world matrix and put into temporary param
-    stage.callFunction(FFP_FUNC_TRANSFORM, mParamBlendMat, mParamInNormal, mParamInNormal);
+
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    Function* vsMain = vsProgram->getEntryPointFunction();
+
+    //add functions to calculate position data in world, object and projective space
+    addPositionCalculations(vsMain);
+
+    //add functions to calculate normal and normal related data in world and object space
+    //addNormalRelatedCalculations(vsMain, mParamInTangent, mParamLocalTangentWorld, internalCounter);
+    //addNormalRelatedCalculations(vsMain, mParamInBiNormal, mParamLocalBinormalWorld, internalCounter);
+    return true;
 }
+
+//-----------------------------------------------------------------------
+void LinearSkinning::addPositionCalculations(Function* vsMain)
+{
+    FunctionInvocation* curFuncInvocation = NULL;
+
+    if (mDoBoneCalculations == true)
+    {
+        //set functions to calculate world position
+        for(int i = 0 ; i < getWeightCount() ; ++i)
+        {
+            addIndexedPositionWeight(vsMain, i);
+        }
+
+        //update back the original position relative to the object
+        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+
+        //update the projective position thereby filling the transform stage role
+        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamInViewProjMatrix, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamOutPositionProj, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+    else
+    {
+        //update from object to projective space
+        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamInWorldViewProjMatrix, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamOutPositionProj, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+}
+
+//-----------------------------------------------------------------------
+void LinearSkinning::addNormalRelatedCalculations(Function* vsMain,
+                                ParameterPtr& pNormalRelatedParam,
+                                ParameterPtr& pNormalWorldRelatedParam)
+{
+    FunctionInvocation* curFuncInvocation;
+
+    if (mDoBoneCalculations == true)
+    {
+        //set functions to calculate world normal
+        for(int i = 0 ; i < getWeightCount() ; ++i)
+        {
+            addIndexedNormalRelatedWeight(vsMain, pNormalRelatedParam, pNormalWorldRelatedParam, i);
+        }
+
+        //update back the original position relative to the object
+        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalRelatedParam, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+    else
+    {
+        //update from object to world space
+        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamInWorldMatrix, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalRelatedParam, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+
+}
+
+//-----------------------------------------------------------------------
+void LinearSkinning::addIndexedPositionWeight(Function* vsMain,
+                                int index)
+{
+    Operand::OpMask indexMask = indexToMask(index);
+
+    FunctionAtom* curFuncInvocation;
+
+    //multiply position with world matrix and put into temporary param
+    curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+    curFuncInvocation->pushOperand(mParamInWorldMatrices, Operand::OPS_IN);
+    curFuncInvocation->pushOperand(mParamInIndices, Operand::OPS_IN,  indexMask, 1);
+    curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_IN);
+    curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_OUT, Operand::OPM_XYZ);
+    vsMain->addAtomInstance(curFuncInvocation);
+
+    //set w value of temporary param to 1
+    curFuncInvocation = OGRE_NEW AssignmentAtom(FFP_VS_TRANSFORM);
+    curFuncInvocation->pushOperand(ParameterFactory::createConstParam(1.0f), Operand::OPS_IN);
+    curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_OUT, Operand::OPM_W);
+    vsMain->addAtomInstance(curFuncInvocation);
+
+    //multiply temporary param with  weight
+    curFuncInvocation = OGRE_NEW BinaryOpAtom('*', FFP_VS_TRANSFORM);
+    curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_IN);
+    curFuncInvocation->pushOperand(mParamInWeights, Operand::OPS_IN, indexMask);
+    curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_OUT);
+    vsMain->addAtomInstance(curFuncInvocation);
+
+    //check if on first iteration
+    if (index == 0)
+    {
+        //set the local param as the value of the world param
+        curFuncInvocation = OGRE_NEW AssignmentAtom(FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+    else
+    {
+        //add the local param as the value of the world param
+        curFuncInvocation = OGRE_NEW BinaryOpAtom('+', FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+}
+
+
+//-----------------------------------------------------------------------
+void LinearSkinning::addIndexedNormalRelatedWeight(Function* vsMain,
+                                ParameterPtr& pNormalParam,
+                                ParameterPtr& pNormalWorldRelatedParam,
+                                int index)
+{
+
+    FunctionAtom* curFuncInvocation;
+
+    Operand::OpMask indexMask = indexToMask(index);
+
+    //multiply position with world matrix and put into temporary param
+    curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM);
+    curFuncInvocation->pushOperand(mParamInWorldMatrices, Operand::OPS_IN, Operand::OPM_ALL);
+    curFuncInvocation->pushOperand(mParamInIndices, Operand::OPS_IN,  indexMask, 1);
+    curFuncInvocation->pushOperand(pNormalParam, Operand::OPS_IN);
+    curFuncInvocation->pushOperand(mParamTempFloat3, Operand::OPS_OUT);
+    vsMain->addAtomInstance(curFuncInvocation);
+
+    //multiply temporary param with weight
+    curFuncInvocation = OGRE_NEW BinaryOpAtom('*', FFP_VS_TRANSFORM);
+    curFuncInvocation->pushOperand(mParamTempFloat3, Operand::OPS_IN);
+    curFuncInvocation->pushOperand(mParamInWeights, Operand::OPS_IN, indexMask);
+    curFuncInvocation->pushOperand(mParamTempFloat3, Operand::OPS_OUT);
+    vsMain->addAtomInstance(curFuncInvocation);
+
+    //check if on first iteration
+    if (index == 0)
+    {
+        //set the local param as the value of the world normal
+        curFuncInvocation = OGRE_NEW AssignmentAtom(FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamTempFloat3, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+    else
+    {
+        //add the local param as the value of the world normal
+        curFuncInvocation = OGRE_NEW BinaryOpAtom('+', FFP_VS_TRANSFORM);
+        curFuncInvocation->pushOperand(mParamTempFloat3, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_IN);
+        curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_OUT);
+        vsMain->addAtomInstance(curFuncInvocation);
+    }
+}
+
 }
 }
 

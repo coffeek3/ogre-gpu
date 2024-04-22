@@ -38,7 +38,7 @@ namespace Ogre{
     /** \addtogroup Core
     *  @{
     */
-    /** \addtogroup Script
+    /** \addtogroup General
     *  @{
     */
     /** This class translates script AST (abstract syntax tree) into
@@ -120,7 +120,7 @@ namespace Ogre{
      *  ScriptCompilerManager tied to specific object types.
      *  Each manager may manage multiple types.
      */
-    class _OgreExport ScriptTranslatorManager : public ScriptTranslatorAlloc
+    class ScriptTranslatorManager : public ScriptTranslatorAlloc
     {
     public:
         // required - virtual destructor

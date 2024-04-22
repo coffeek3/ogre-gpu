@@ -62,33 +62,40 @@ public:
     /** 
     @see SubRenderState::getType.
     */
-    const String& getType() const override;
+    virtual const String& getType() const;
 
     /** 
     @see SubRenderState::getType.
     */
-    int getExecutionOrder() const override;
+    virtual int getExecutionOrder() const;
+
+    /** 
+    @see SubRenderState::updateGpuProgramsParams.
+    */
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
     */
-    void copyFrom(const SubRenderState& rhs) override;
+    virtual void copyFrom(const SubRenderState& rhs);
 
     /** 
     @see SubRenderState::preAddToRenderState.
     */
-    bool preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass) override;
+    virtual bool preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass);
     
     static String Type;
 
-private:
-    friend class LayeredBlending;
-
+// Protected types:
+protected:
+    
     // Per texture unit parameters.
-    struct TextureUnitParams
+    struct _OgreRTSSExport TextureUnitParams
     {
         // Texture unit state.
         TextureUnitState* mTextureUnitState;
+        // Texture projector.
+        const Frustum* mTextureProjector;
         // Texture sampler index.
         unsigned short mTextureSamplerIndex;
         // Texture sampler index.
@@ -117,6 +124,9 @@ private:
     typedef TextureUnitParamsList::iterator         TextureUnitParamsIterator;
     typedef TextureUnitParamsList::const_iterator   TextureUnitParamsConstIterator;
 
+// Protected methods
+protected:
+
     /** 
     Set the number of texture units this texturing sub state has to handle.
     @param count The number of texture unit states.
@@ -136,6 +146,11 @@ private:
     void setTextureUnit(unsigned short index, TextureUnitState* textureUnitState);
 
     /** 
+    @see SubRenderState::resolveParameters.
+    */
+    virtual bool resolveParameters(ProgramSet* programSet);
+
+    /** 
     Internal method that resolves uniform parameters of the given texture unit parameters.
     */
     bool resolveUniformParams(TextureUnitParams* textureUnitParams, ProgramSet* programSet);
@@ -145,25 +160,15 @@ private:
     */
     bool resolveFunctionsParams(TextureUnitParams* textureUnitParams, ProgramSet* programSet);
 
-//protected:
-    /**
-    @see SubRenderState::resolveParameters.
-    */
-    bool resolveParameters(ProgramSet* programSet) override;
-
     /** 
     @see SubRenderState::resolveDependencies.
     */
-    bool resolveDependencies(ProgramSet* programSet) override;
+    virtual bool resolveDependencies(ProgramSet* programSet);
 
-    virtual void addPSBlendInvocations(Function* psMain, ParameterPtr arg1, ParameterPtr arg2,
-                ParameterPtr texel,int samplerIndex, const LayerBlendModeEx& blendMode,
-                const int groupOrder, Operand::OpMask targetChannels);
-private:
     /** 
     @see SubRenderState::addFunctionInvocations.
     */
-    bool addFunctionInvocations(ProgramSet* programSet) override;
+    virtual bool addFunctionInvocations(ProgramSet* programSet);
 
 
     /** 
@@ -179,19 +184,34 @@ private:
     /** 
     Adds the fragment shader code which samples the texel color in the texture
     */
-    void addPSSampleTexelInvocation(TextureUnitParams* textureUnitParams, Function* psMain,
+    virtual void addPSSampleTexelInvocation(TextureUnitParams* textureUnitParams, Function* psMain, 
         const ParameterPtr& texel, int groupOrder);
 
     ParameterPtr getPSArgument(ParameterPtr texel, LayerBlendSource blendSrc, const ColourValue& colourValue,
                                Real alphaValue, bool isAlphaArgument) const;
+
+    virtual void addPSBlendInvocations(Function* psMain, ParameterPtr arg1, ParameterPtr arg2,
+                ParameterPtr texel,int samplerIndex, const LayerBlendModeEx& blendMode,
+                const int groupOrder, Operand::OpMask targetChannels);
     
+    /** 
+    Determines the texture coordinates calculation method of the given texture unit state.
+    */
+    TexCoordCalcMethod getTexCalcMethod(TextureUnitState* textureUnitState);
+
     /** 
     Determines if the given texture unit state need to use texture transformation matrix.
     */
     bool needsTextureMatrix(TextureUnitState* textureUnitState);
 
-    bool setParameter(const String& name, const String& value) override;
+    /** 
+    Determines whether a given texture unit needs to be processed by this srs
+    */
+    virtual bool isProcessingNeeded(TextureUnitState* texUnitState);
 
+
+// Attributes.
+protected:
     // Texture units list.      
     TextureUnitParamsList mTextureUnitParamsList;
     // World matrix parameter.
@@ -204,17 +224,49 @@ private:
     ParameterPtr mVSInputNormal;
     // Vertex shader input position parameter.      
     ParameterPtr mVSInputPos;
-//protected:
     // Pixel shader output colour.
     ParameterPtr mPSOutDiffuse;
-private:
     // Pixel shader diffuse colour.
     ParameterPtr mPSDiffuse;
     // Pixel shader specular colour.
     ParameterPtr mPSSpecular;
 
     bool mIsPointSprite;
-    bool mLateAddBlend;
+};
+
+
+/** 
+A factory that enables creation of FFPTexturing instances.
+@remarks Sub class of SubRenderStateFactory
+*/
+class _OgreRTSSExport FFPTexturingFactory : public SubRenderStateFactory
+{
+public:
+
+    /** 
+    @see SubRenderStateFactory::getType.
+    */
+    virtual const String& getType() const;
+
+    /** 
+    @see SubRenderStateFactory::createInstance.
+    */
+    virtual SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, Pass* pass, SGScriptTranslator* translator);
+
+    /** 
+    @see SubRenderStateFactory::writeInstance.
+    */
+    virtual void writeInstance(MaterialSerializer* ser, SubRenderState* subRenderState, Pass* srcPass, Pass* dstPass);
+
+    
+protected:
+
+    /** 
+    @see SubRenderStateFactory::createInstanceImpl.
+    */
+    virtual SubRenderState* createInstanceImpl();
+
+
 };
 
 /** @} */

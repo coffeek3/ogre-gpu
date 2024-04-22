@@ -42,7 +42,7 @@ public:
 
 protected:
 
-    Ogre::String getOutput() override
+    virtual Ogre::String getOutput()
     {
         StringStream output;
 

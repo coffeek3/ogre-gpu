@@ -31,11 +31,31 @@ THE SOFTWARE.
 #include "OgreGLPrerequisites.h"
 #include "OgreGLSLShaderCommon.h"
 #include "OgreRenderOperation.h"
-#include "OgreGLGpuProgram.h"
 
 namespace Ogre {
     namespace GLSL {
-    class _OgreGLExport GLSLProgram : public GLSLShaderCommon, public GLGpuProgramBase
+    /** Specialisation of HighLevelGpuProgram to provide support for OpenGL
+        Shader Language (GLSL).
+    @remarks
+        GLSL has no target assembler or entry point specification like DirectX 9 HLSL.
+        Vertex and Fragment shaders only have one entry point called "main".  
+        When a shader is compiled, microcode is generated but can not be accessed by
+        the application.
+        GLSL also does not provide assembler low level output after compiling.  The GL Render
+        system assumes that the Gpu program is a GL Gpu program so GLSLProgram will create a 
+        GLSLGpuProgram that is subclassed from GLGpuProgram for the low level implementation.
+        The GLSLProgram class will create a shader object and compile the source but will
+        not create a program object.  It's up to GLSLGpuProgram class to request a program object
+        to link the shader object to.
+
+    @note
+        GLSL supports multiple modular shader objects that can be attached to one program
+        object to form a single shader.  This is supported through the "attach" material script
+        command.  All the modules to be attached are listed on the same line as the attach command
+        separated by white space.
+        
+    */
+    class _OgreGLExport GLSLProgram : public GLSLShaderCommon
     {
     public:
         GLSLProgram(ResourceManager* creator, 
@@ -43,21 +63,25 @@ namespace Ogre {
             const String& group, bool isManual, ManualResourceLoader* loader);
         ~GLSLProgram();
 
-        void attachToProgramObject( const uint programObject ) override;
-        void detachFromProgramObject( const uint programObject ) override;
+        GLhandleARB getGLHandle() const { return mGLHandle; }
+        void attachToProgramObject( const GLhandleARB programObject );
+        void detachFromProgramObject( const GLhandleARB programObject );
 
         /// Overridden from GpuProgram
-        const String& getLanguage(void) const override;
+        const String& getLanguage(void) const;
 
-        bool getPassTransformStates(void) const override {
-            return mPassFFPStates;
+        bool getPassTransformStates(void) const {
+            return true;
         }
-        bool getPassSurfaceAndLightStates(void) const override {
-            return mPassFFPStates;
+        bool getPassSurfaceAndLightStates(void) const {
+            return true;
         }
-        bool getPassFogStates(void) const override {
-            return mPassFFPStates;
+        bool getPassFogStates(void) const {
+            return true;
         }
+
+        /// compile source into shader object
+        bool compile( bool checkErrors = true);
 
         /** Returns the operation type that this geometry program expects to
             receive as input
@@ -101,23 +125,29 @@ namespace Ogre {
         void setMaxOutputVertices(int maxOutputVertices)
         { mMaxOutputVertices = maxOutputVertices; }
 
-        void bindProgram() override;
-        void unbindProgram() override;
-        void bindProgramParameters(GpuProgramParametersSharedPtr params, uint16 mask) override;
-        bool isAttributeValid(VertexElementSemantic semantic, uint index) override;
     protected:
-        void loadFromSource() override;
+        /** Internal method for creating a dummy low-level program for this
+        high-level program. GLSL does not give access to the low level implementation of the
+        shader so this method creates an object sub-classed from GLGpuProgram just to be
+        compatible with GLRenderSystem.
+        */
+        void createLowLevelImpl(void);
         /// Internal unload implementation, must be implemented by subclasses
-        void unloadHighLevelImpl(void) override;
+        void unloadHighLevelImpl(void);
 
+        /// Populate the passed parameters with name->index map
+        void populateParameterNames(GpuProgramParametersSharedPtr params);
         /// Populate the passed parameters with name->index map, must be overridden
-        void buildConstantDefinitions() override;
+        void buildConstantDefinitions() const;
 
         // legacy GL_EXT_geometry_shader4 functionality
         RenderOperation::OperationType mInputOperationType;
         RenderOperation::OperationType mOutputOperationType;
         int mMaxOutputVertices;
-        bool mPassFFPStates;
+
+    private:
+        /// GL handle for shader object
+        GLhandleARB mGLHandle;
     };
     }
 }

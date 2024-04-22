@@ -40,7 +40,7 @@ THE SOFTWARE.
 namespace Ogre {
     //-----------------------------------------------------------------------
     uint GLSLShaderCommon::mShaderCount = 0;
-
+    GLSLShaderCommon::CmdPreprocessorDefines GLSLShaderCommon::msCmdPreprocessorDefines;
     GLSLShaderCommon::CmdAttach GLSLShaderCommon::msCmdAttach;
     GLSLShaderCommon::CmdColumnMajorMatrices GLSLShaderCommon::msCmdColumnMajorMatrices;
 
@@ -52,38 +52,17 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------
-    void GLSLShaderCommon::prepareImpl()
+    void GLSLShaderCommon::loadFromSource(void)
     {
-        HighLevelGpuProgram::prepareImpl(); // loads source
-
-        if(mSource.empty())
-            return; // nothing to do
-
         // Preprocess the GLSL shader in order to get a clean source
         CPreprocessor cpp;
 
         // Define "predefined" macros.
+        // TODO: decide, should we define __VERSION__, and with what value.
         if(getLanguage() == "glsles")
-            cpp.Define("GL_ES", 5, "1", 1);
+            cpp.Define("GL_ES", 5, 1);
 
-        size_t versionPos = mSource.find("#version");
-        if(versionPos != String::npos)
-        {
-            mShaderVersion = StringConverter::parseInt(mSource.substr(versionPos+9, 3));
-        }
-        String verStr = std::to_string(mShaderVersion);
-
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE
-        auto rsc = Root::getSingleton().getRenderSystem()->getCapabilities();
-        // OSX driver only supports glsl150+ in core profile, GL3+ will auto-upgrade code
-        if(mShaderVersion < 150 && getLanguage() == "glsl" && rsc->isShaderProfileSupported("glsl150"))
-            verStr = "150";
-#endif
-
-        cpp.Define("__VERSION__", 11, verStr.c_str(), verStr.size());
-
-        String defines = appendBuiltinDefines(mPreprocessorDefines);
-
+        String defines = mPreprocessorDefines;
         for(const auto& def : parseDefines(defines))
         {
             cpp.Define(def.first, strlen(def.first), def.second, strlen(def.second));
@@ -103,6 +82,26 @@ namespace Ogre {
         mSource = String (out, out_size);
         if (out < src || out > src + src_len)
             free (out);
+
+        compile(true);
+    }
+    //---------------------------------------------------------------------------
+    void GLSLShaderCommon::unloadImpl()
+    {
+        // We didn't create mAssemblerProgram through a manager, so override this
+        // implementation so that we don't try to remove it from one. Since getCreator()
+        // is used, it might target a different matching handle!
+        mAssemblerProgram.reset();
+
+        unloadHighLevel();
+    }
+
+    //-----------------------------------------------------------------------
+    void GLSLShaderCommon::populateParameterNames(GpuProgramParametersSharedPtr params)
+    {
+        getConstantDefinitions();
+        params->_setNamedConstants(mConstantDefs);
+        // Don't set logical / physical maps here, as we can't access parameters by logical index in GLHL.
     }
     //-----------------------------------------------------------------------
     GLSLShaderCommon::GLSLShaderCommon(ResourceManager* creator, 
@@ -112,9 +111,6 @@ namespace Ogre {
         , mColumnMajorMatrices(true)
         , mLinked(0)
         , mShaderID(++mShaderCount) // Increase shader counter and use as ID
-        , mGLShaderHandle(0)
-        , mGLProgramHandle(0)
-        , mShaderVersion(100)
     {
     }
     //-----------------------------------------------------------------------
@@ -135,6 +131,16 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
+    String GLSLShaderCommon::CmdPreprocessorDefines::doGet(const void *target) const
+    {
+        return static_cast<const GLSLShaderCommon*>(target)->getPreprocessorDefines();
+    }
+    void GLSLShaderCommon::CmdPreprocessorDefines::doSet(void *target, const String& val)
+    {
+        static_cast<GLSLShaderCommon*>(target)->setPreprocessorDefines(val);
+    }
+
+    //-----------------------------------------------------------------------
     void GLSLShaderCommon::attachChildShader(const String& name)
     {
         // is the name valid and already loaded?
@@ -151,7 +157,6 @@ namespace Ogre {
             // load the source and attach the child shader only if supported
             if (isSupported())
             {
-                childShader->safePrepare();
                 childShader->loadHighLevel();
                 // add to the container
                 mAttachedGLSLPrograms.push_back( childShader );

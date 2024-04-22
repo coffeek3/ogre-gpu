@@ -34,7 +34,12 @@ The wiki article explaining this demo can be found here :
 
 #include "SdkSample.h"
 
-#include "DeferredShading.h"
+#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+#define WIN32_LEAN_AND_MEAN
+#include "windows.h"
+#endif
+
+#include "SharedData.h"
 #include "OgreCompositorInstance.h"
 #include "OgreSceneManager.h"
 #include "OgreSceneNode.h"
@@ -53,7 +58,6 @@ const ColourValue SAMPLE_COLORS[] =
 class _OgreSampleClassExport Sample_DeferredShading : public SdkSample, public RenderTargetListener
 {
 protected:
-    Light* mMainLight;
     DeferredShadingSystem *mSystem;
     SelectMenu* mDisplayModeMenu;
     
@@ -69,8 +73,10 @@ public:
 
 protected:
     
-    void cleanupContent(void) override
+    void cleanupContent(void)
     {
+        delete ( SharedData::getSingletonPtr() );
+        
         delete mSystem;
     }
     
@@ -92,21 +98,23 @@ protected:
         mDisplayModeMenu->addItem("Debug depth / specular");
     }
     
-    void itemSelected(SelectMenu* menu) override
+    void itemSelected(SelectMenu* menu)
     {
         //Options are aligned with the mode enum
-        mSystem->setMode((DeferredShadingSystem::DSMode)menu->getSelectionIndex());
+        SharedData::getSingleton().iSystem->setMode(
+                                                    (DeferredShadingSystem::DSMode)menu->getSelectionIndex());
     }
     
-    void checkBoxToggled(CheckBox* box) override
+    void checkBoxToggled(CheckBox* box)
     {
         if (box->getName() == "SSAO")
         {
-            mSystem->setSSAO(box->isChecked());
+            SharedData::getSingleton().iSystem->setSSAO(box->isChecked());
         }
         else if (box->getName() == "GlobalLight")
         {
-            mMainLight->setVisible(box->isChecked());
+            SharedData::getSingleton().iGlobalActivate = box->isChecked();
+            SharedData::getSingleton().iMainLight->setVisible(box->isChecked());
         }
         else if (box->getName() == "Shadows")
         {
@@ -116,7 +124,7 @@ protected:
         }
         else if (box->getName() == "DeferredShading")
         {
-            mSystem->setActive(box->isChecked());
+            SharedData::getSingleton().iSystem->setActive(box->isChecked());
         }
     }
     
@@ -133,9 +141,12 @@ protected:
     void createAtheneScene(SceneNode* rootNode)
     {
         // Prepare athene mesh for normalmapping
-        MeshPtr pAthene = MeshManager::getSingleton().load("athene.mesh", RGN_DEFAULT);
-        pAthene->buildTangentVectors();
-
+        MeshPtr pAthene = MeshManager::getSingleton().load("athene.mesh", 
+                                                           ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+        unsigned short src, dest;
+        if (!pAthene->suggestTangentVectorBuildParams(VES_TANGENT, src, dest))
+            pAthene->buildTangentVectors(VES_TANGENT, src, dest);
+        
         //Create an athena statue
         Entity* athena = mSceneMgr->createEntity("Athena", "athene.mesh");
         athena->setMaterialName("DeferredDemo/DeferredAthena");
@@ -151,9 +162,12 @@ protected:
     void createKnotScene(SceneNode* rootNode)
     {
         // Prepare knot mesh for normal mapping
-        MeshPtr pKnot = MeshManager::getSingleton().load("knot.mesh", RGN_DEFAULT);
-        pKnot->buildTangentVectors();
-
+        MeshPtr pKnot = MeshManager::getSingleton().load("knot.mesh", 
+                                                         ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
+        unsigned short src, dest;
+        if (!pKnot->suggestTangentVectorBuildParams(VES_TANGENT, src, dest))
+            pKnot->buildTangentVectors(VES_TANGENT, src, dest);
+        
         // Create a bunch of knots with spotlights hanging from above
         Entity* knotEnt = mSceneMgr->createEntity("Knot", "knot.mesh");
         knotEnt->setMaterialName("DeferredDemo/RockWall");
@@ -219,8 +233,22 @@ protected:
         
     }
 
-    void testCapabilities(const RenderSystemCapabilities* caps) override
+    StringVector getRequiredPlugins()
     {
+        StringVector names;
+        if (!GpuProgramManager::getSingleton().isSyntaxSupported("glsles") && !GpuProgramManager::getSingleton().isSyntaxSupported("glsl150"))
+            names.push_back("Cg Program Manager");
+        return names;
+    }
+
+    void testCapabilities(const RenderSystemCapabilities* caps)
+    {
+        if (!caps->hasCapability(RSC_VERTEX_PROGRAM) || !(caps->hasCapability(RSC_FRAGMENT_PROGRAM)))
+        {
+            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Your card does not support vertex and fragment programs, so cannot "
+                        "run this demo. Sorry!", 
+                        "DeferredShading::testCapabilities");
+        }
         if (caps->getNumMultiRenderTargets()<2)
         {
             OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Your card does not support at least two simultaneous render targets, so cannot "
@@ -228,13 +256,22 @@ protected:
                         "DeferredShading::testCapabilities");
         }
 
-        requireMaterial("DeferredShading/AmbientLight");
+        if (!GpuProgramManager::getSingleton().isSyntaxSupported("vs_1_1") &&
+            !GpuProgramManager::getSingleton().isSyntaxSupported("arbvp1") &&
+            !GpuProgramManager::getSingleton().isSyntaxSupported("vs_4_0") &&
+            !GpuProgramManager::getSingleton().isSyntaxSupported("glsl300es") &&
+            !GpuProgramManager::getSingleton().isSyntaxSupported("glsl150"))
+        {
+            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Your graphics card does not support advanced vertex"
+                        " programs, so you cannot run this sample. Sorry!", "DeferredShading::testCapabilities");
+        }
     }
 
     // Just override the mandatory create scene method
-    void setupContent(void) override
+    void setupContent(void)
     {
         mCameraMan->setTopSpeed(20.0);
+        new SharedData();
         mSystem = 0;
 
         // Set ambient light
@@ -245,15 +282,12 @@ protected:
         Light* l1 = mSceneMgr->createLight();
         l1->setType(Light::LT_DIRECTIONAL);
         l1->setDiffuseColour(0.5f, 0.45f, 0.1f);
+        l1->setDirection(1, -0.5, -0.2);
         l1->setShadowFarClipDistance(250);
         l1->setShadowFarDistance(75);
         //Turn this on to have the directional light cast shadows
         l1->setCastShadows(false);
         
-        auto ln = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-        ln->setDirection(Vector3(1, -0.5, -0.2));
-        ln->attachObject(l1);
-
         mCameraNode->setPosition(25, 5, 0);
         mCameraNode->lookAt(Vector3::ZERO, Node::TS_PARENT);
         mCamera->setFarClipDistance(1000.0);
@@ -261,9 +295,16 @@ protected:
         setDragLook(true);
         
         mSystem = new DeferredShadingSystem(mWindow->getViewport(0), mSceneMgr, mCamera);
+        SharedData::getSingleton().iSystem = mSystem;
         mSystem->initialize();
         
-        mMainLight = l1;
+        // safely setup application's (not postfilter!) shared data
+        SharedData::getSingleton().iCamera = mCamera;
+        SharedData::getSingleton().iRoot = mRoot;
+        SharedData::getSingleton().iWindow = mWindow;
+        SharedData::getSingleton().iActivate = true;
+        SharedData::getSingleton().iGlobalActivate = true;
+        SharedData::getSingleton().iMainLight = l1;
         
         //Create the scene
         // Create "root" node
@@ -375,6 +416,9 @@ protected:
             static_cast<SceneNode*>(light->getParentNode())->attachObject(ent);
             ent->setVisible(true);
         }       
+        
+        // Store nodes for hiding/showing
+        SharedData::getSingleton().mLightNodes = nodes;
         
         // Do some animation for node a-f
         // Generate helix structure

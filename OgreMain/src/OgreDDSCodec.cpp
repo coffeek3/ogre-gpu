@@ -33,6 +33,8 @@ THE SOFTWARE.
 
 namespace Ogre {
     // Internal DDS structure definitions
+#define FOURCC(c0, c1, c2, c3) (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24))
+    
 #if OGRE_COMPILER == OGRE_COMPILER_MSVC
 #pragma pack (push, 1)
 #else
@@ -119,7 +121,6 @@ namespace Ogre {
 #pragma pack ()
 #endif
 
-namespace {
     const uint32 DDS_MAGIC = FOURCC('D', 'D', 'S', ' ');
     const uint32 DDS_PIXELFORMAT_SIZE = 8 * sizeof(uint32);
     const uint32 DDS_CAPS_SIZE = 4 * sizeof(uint32);
@@ -157,7 +158,7 @@ namespace {
     const uint32 D3DFMT_R32F            = 114;
     const uint32 D3DFMT_G32R32F         = 115;
     const uint32 D3DFMT_A32B32G32R32F   = 116;
-}
+
 
     //---------------------------------------------------------------------
     DDSCodec* DDSCodec::msInstance = 0;
@@ -193,42 +194,54 @@ namespace {
     { 
     }
     //---------------------------------------------------------------------
-    void DDSCodec::encodeToFile(const Any& input, const String& outFileName) const
+    DataStreamPtr DDSCodec::encode(const MemoryDataStreamPtr& input, const Codec::CodecDataPtr& pData) const
+    {        
+        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+            "DDS encoding not supported",
+            "DDSCodec::encode" ) ;
+    }
+    //---------------------------------------------------------------------
+    void DDSCodec::encodeToFile(const MemoryDataStreamPtr& input, const String& outFileName,
+                                const Codec::CodecDataPtr& pData) const
     {
-        Image* image = any_cast<Image*>(input);
+        // Unwrap codecDataPtr - data is cleaned by calling function
+        ImageData* imgData = static_cast<ImageData* >(pData.get());  
 
-        bool isCubeMap = image->hasFlag(IF_CUBEMAP);
+
+        // Check size for cube map faces
+        bool isCubeMap = (imgData->size == 
+            Image::calculateSize(imgData->num_mipmaps, 6, imgData->width, 
+            imgData->height, imgData->depth, imgData->format));
 
         // Establish texture attributes
-        bool isVolume = (image->getDepth() > 1);
-        bool isFloat32r = (image->getFormat() == PF_FLOAT32_R);
-        bool isFloat16 = (image->getFormat() == PF_FLOAT16_RGBA);
-        bool isFloat16r = (image->getFormat() == PF_FLOAT16_R);
-        bool isFloat32 = (image->getFormat() == PF_FLOAT32_RGBA);
+        bool isVolume = (imgData->depth > 1);       
+        bool isFloat32r = (imgData->format == PF_FLOAT32_R);
+        bool isFloat16 = (imgData->format == PF_FLOAT16_RGBA);
+        bool isFloat32 = (imgData->format == PF_FLOAT32_RGBA);
         bool notImplemented = false;
         String notImplementedString = "";
 
         // Check for all the 'not implemented' conditions
-        if ((isVolume == true)&&(image->getWidth() != image->getHeight()))
+        if ((isVolume == true)&&(imgData->width != imgData->height))
         {
             // Square textures only
             notImplemented = true;
-            notImplementedString += "non square textures";
+            notImplementedString += " non square textures";
         }
 
         uint32 size = 1;
-        while (size < image->getWidth())
+        while (size < imgData->width)
         {
             size <<= 1;
         }
-        if (size != image->getWidth())
+        if (size != imgData->width)
         {
             // Power two textures only
             notImplemented = true;
-            notImplementedString += "non power two textures";
+            notImplementedString += " non power two textures";
         }
 
-        switch(image->getFormat())
+        switch(imgData->format)
         {
         case PF_A8R8G8B8:
         case PF_X8R8G8B8:
@@ -237,14 +250,13 @@ namespace {
         case PF_X8B8G8R8:
         case PF_B8G8R8:
         case PF_FLOAT32_R:
-        case PF_FLOAT16_R:
         case PF_FLOAT16_RGBA:
         case PF_FLOAT32_RGBA:
             break;
         default:
             // No crazy FOURCC or 565 et al. file formats at this stage
             notImplemented = true;
-            notImplementedString = PixelUtil::getFormatName(image->getFormat());
+            notImplementedString = " unsupported pixel format";
             break;
         }       
 
@@ -254,7 +266,8 @@ namespace {
         if (notImplemented)
         {
             OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
-                        "DDS encoding for " + notImplementedString + " not supported");
+                "DDS encoding for" + notImplementedString + " not supported",
+                "DDSCodec::encodeToFile" ) ;
         }
         else
         {
@@ -276,7 +289,7 @@ namespace {
             bool flipRgbMasks = false;
 
             // Initalise the rgbBits flags
-            switch(image->getFormat())
+            switch(imgData->format)
             {
             case PF_A8B8G8R8:
                 flipRgbMasks = true;
@@ -298,9 +311,6 @@ namespace {
             case PF_FLOAT32_R:
                 ddsHeaderRgbBits = 32;
                 break;
-            case PF_FLOAT16_R:
-                ddsHeaderRgbBits = 16;
-                break;
             case PF_FLOAT16_RGBA:
                 ddsHeaderRgbBits = 16 * 4;
                 hasAlpha = true;
@@ -315,7 +325,7 @@ namespace {
             }
 
             // Initalise the SizeOrPitch flags (power two textures for now)
-            ddsHeaderSizeOrPitch = static_cast<uint32>(ddsHeaderRgbBits * image->getWidth());
+            ddsHeaderSizeOrPitch = static_cast<uint32>(ddsHeaderRgbBits * imgData->width);
 
             // Initalise the caps flags
             ddsHeaderCaps1 = (isVolume||isCubeMap) ? DDSCAPS_COMPLEX|DDSCAPS_TEXTURE : DDSCAPS_TEXTURE;
@@ -331,33 +341,30 @@ namespace {
                     DDSCAPS2_CUBEMAP_POSITIVEZ|DDSCAPS2_CUBEMAP_NEGATIVEZ;
             }
 
-            if( image->getNumMipmaps() > 0 )
+            if( imgData->num_mipmaps > 0 )
                 ddsHeaderCaps1 |= DDSCAPS_MIPMAP;
 
             // Populate the DDS header information
             DDSHeader ddsHeader;
             ddsHeader.size = DDS_HEADER_SIZE;
             ddsHeader.flags = ddsHeaderFlags;       
-            ddsHeader.width = image->getWidth();
-            ddsHeader.height = image->getHeight();
-            ddsHeader.depth = (uint32)(isVolume ? image->getDepth() : 0);
+            ddsHeader.width = (uint32)imgData->width;
+            ddsHeader.height = (uint32)imgData->height;
+            ddsHeader.depth = (uint32)(isVolume ? imgData->depth : 0);
             ddsHeader.depth = (uint32)(isCubeMap ? 6 : ddsHeader.depth);
-            ddsHeader.mipMapCount = image->getNumMipmaps() + 1;
+            ddsHeader.mipMapCount = imgData->num_mipmaps + 1;
             ddsHeader.sizeOrPitch = ddsHeaderSizeOrPitch;
-            for (unsigned int & reserved1 : ddsHeader.reserved1) // XXX nasty constant 11
+            for (uint32 reserved1=0; reserved1<11; reserved1++) // XXX nasty constant 11
             {
-                reserved1 = 0;
+                ddsHeader.reserved1[reserved1] = 0;
             }
             ddsHeader.reserved2 = 0;
 
             ddsHeader.pixelFormat.size = DDS_PIXELFORMAT_SIZE;
             ddsHeader.pixelFormat.flags = (hasAlpha) ? DDPF_RGB|DDPF_ALPHAPIXELS : DDPF_RGB;
-            ddsHeader.pixelFormat.flags = (isFloat32r || isFloat16r || isFloat16 || isFloat32) ? DDPF_FOURCC : ddsHeader.pixelFormat.flags;
+            ddsHeader.pixelFormat.flags = (isFloat32r || isFloat16 || isFloat32) ? DDPF_FOURCC : ddsHeader.pixelFormat.flags;
             if (isFloat32r) {
                 ddsHeader.pixelFormat.fourCC = D3DFMT_R32F;
-            }
-            else if (isFloat16r) {
-                ddsHeader.pixelFormat.fourCC = D3DFMT_R16F;
             }
             else if (isFloat16) {
                 ddsHeader.pixelFormat.fourCC = D3DFMT_A16B16G16R16F;
@@ -371,10 +378,10 @@ namespace {
             ddsHeader.pixelFormat.rgbBits = ddsHeaderRgbBits;
 
             ddsHeader.pixelFormat.alphaMask = (hasAlpha)   ? 0xFF000000 : 0x00000000;
-            ddsHeader.pixelFormat.alphaMask = (isFloat32r || isFloat16r) ? 0x00000000 : ddsHeader.pixelFormat.alphaMask;
-            ddsHeader.pixelFormat.redMask   = (isFloat32r || isFloat16r) ? 0xFFFFFFFF :0x00FF0000;
-            ddsHeader.pixelFormat.greenMask = (isFloat32r || isFloat16r) ? 0x00000000 :0x0000FF00;
-            ddsHeader.pixelFormat.blueMask  = (isFloat32r || isFloat16r) ? 0x00000000 :0x000000FF;
+            ddsHeader.pixelFormat.alphaMask = (isFloat32r) ? 0x00000000 : ddsHeader.pixelFormat.alphaMask;
+            ddsHeader.pixelFormat.redMask   = (isFloat32r) ? 0xFFFFFFFF :0x00FF0000;
+            ddsHeader.pixelFormat.greenMask = (isFloat32r) ? 0x00000000 :0x0000FF00;
+            ddsHeader.pixelFormat.blueMask  = (isFloat32r) ? 0x00000000 :0x000000FF;
 
             if( flipRgbMasks )
                 std::swap( ddsHeader.pixelFormat.redMask, ddsHeader.pixelFormat.blueMask );
@@ -389,13 +396,13 @@ namespace {
             flipEndian(&ddsHeader, 4, sizeof(DDSHeader) / 4);
 
             char *tmpData = 0;
-            char *dataPtr = (char*)image->getData();
+            char const *dataPtr = (char const *)input->getPtr();
 
-            if( image->getFormat() == PF_B8G8R8 )
+            if( imgData->format == PF_B8G8R8 )
             {
-                PixelBox src( image->getSize() / 3, 1, 1, PF_B8G8R8, image->getData() );
-                tmpData = new char[image->getSize()];
-                PixelBox dst( image->getSize() / 3, 1, 1, PF_R8G8B8, tmpData );
+                PixelBox src( imgData->size / 3, 1, 1, PF_B8G8R8, input->getPtr() );
+                tmpData = new char[imgData->size];
+                PixelBox dst( imgData->size / 3, 1, 1, PF_R8G8B8, tmpData );
 
                 PixelUtil::bulkPixelConversion( src, dst );
 
@@ -410,13 +417,13 @@ namespace {
                 of.write((const char *)&ddsMagic, sizeof(uint32));
                 of.write((const char *)&ddsHeader, DDS_HEADER_SIZE);
                 // XXX flipEndian on each pixel chunk written unless isFloat32r ?
-                of.write(dataPtr, image->getSize());
+                of.write(dataPtr, (uint32)imgData->size);
                 of.close();
             }
             catch(...)
             {
+                delete [] tmpData;
             }
-            delete [] tmpData;
         }
     }
     //---------------------------------------------------------------------
@@ -675,12 +682,12 @@ namespace {
         // Note - we assume all values have already been endian swapped
         
         // This is an explicit alpha block, 4 bits per pixel, LSB first
-        for (unsigned short row : block.alphaRow)
+        for (size_t row = 0; row < 4; ++row)
         {
             for (size_t x = 0; x < 4; ++x)
             {
                 // Shift and mask off to 4 bits
-                uint8 val = static_cast<uint8>(row >> (x * 4) & 0xF);
+                uint8 val = static_cast<uint8>(block.alphaRow[row] >> (x * 4) & 0xF);
                 // Convert to [0,1]
                 pCol->a = (Real)val / (Real)0xF;
                 pCol++;
@@ -735,9 +742,8 @@ namespace {
             pCol[i].a = derivedAlphas[dw & 0x7];
     }
     //---------------------------------------------------------------------
-    void DDSCodec::decode(const DataStreamPtr& stream, const Any& output) const
+    Codec::DecodeResult DDSCodec::decode(const DataStreamPtr& stream) const
     {
-        Image* image = any_cast<Image*>(output);
         // Read 4 character code
         uint32 fileType;
         stream->read(&fileType, sizeof(uint32));
@@ -768,29 +774,35 @@ namespace {
                 "DDS header size mismatch!", "DDSCodec::decode");
         }
 
-        uint32 imgDepth = 1; // (deal with volume later)
-        uint32 numFaces = 1; // assume one face until we know otherwise
-        uint32 num_mipmaps = 0;
-        PixelFormat format = PF_UNKNOWN;
+        ImageData* imgData = OGRE_NEW ImageData();
+        MemoryDataStreamPtr output;
+
+        imgData->depth = 1; // (deal with volume later)
+        imgData->width = header.width;
+        imgData->height = header.height;
+        size_t numFaces = 1; // assume one face until we know otherwise
 
         if (header.caps.caps1 & DDSCAPS_MIPMAP)
         {
-            num_mipmaps = static_cast<uint8>(header.mipMapCount - 1);
+            imgData->num_mipmaps = static_cast<uint8>(header.mipMapCount - 1);
         }
         else
         {
-            num_mipmaps = 0;
+            imgData->num_mipmaps = 0;
         }
+        imgData->flags = 0;
 
         bool decompressDXT = false;
         // Figure out basic image type
         if (header.caps.caps2 & DDSCAPS2_CUBEMAP)
         {
+            imgData->flags |= IF_CUBEMAP;
             numFaces = 6;
         }
         else if (header.caps.caps2 & DDSCAPS2_VOLUME)
         {
-            imgDepth = header.depth;
+            imgData->flags |= IF_3D_TEXTURE;
+            imgData->depth = header.depth;
         }
         // Pixel format
         PixelFormat sourceFormat = PF_UNKNOWN;
@@ -824,7 +836,9 @@ namespace {
         if (PixelUtil::isCompressed(sourceFormat))
         {
             if (Root::getSingleton().getRenderSystem() == NULL ||
-                !Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_TEXTURE_COMPRESSION_DXT))
+                !Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_TEXTURE_COMPRESSION_DXT)
+                || (!Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_AUTOMIPMAP_COMPRESSED)
+                && !imgData->num_mipmaps))
             {
                 // We'll need to decompress
                 decompressDXT = true;
@@ -848,11 +862,11 @@ namespace {
                     // colour_0 <= colour_1 means transparency in DXT1
                     if (block.colour_0 <= block.colour_1)
                     {
-                        format = PF_BYTE_RGBA;
+                        imgData->format = PF_BYTE_RGBA;
                     }
                     else
                     {
-                        format = PF_BYTE_RGB;
+                        imgData->format = PF_BYTE_RGB;
                     }
                     break;
                 case PF_DXT2:
@@ -860,7 +874,7 @@ namespace {
                 case PF_DXT4:
                 case PF_DXT5:
                     // full alpha present, formats vary only in encoding 
-                    format = PF_BYTE_RGBA;
+                    imgData->format = PF_BYTE_RGBA;
                     break;
                 default:
                     // all other cases need no special format handling
@@ -870,32 +884,39 @@ namespace {
             else
             {
                 // Use original format
-                format = sourceFormat;
+                imgData->format = sourceFormat;
+                // Keep DXT data compressed
+                imgData->flags |= IF_COMPRESSED;
             }
         }
         else // not compressed
         {
             // Don't test against DDPF_RGB since greyscale DDS doesn't set this
             // just derive any other kind of format
-            format = sourceFormat;
+            imgData->format = sourceFormat;
         }
 
         // Calculate total size from number of mipmaps, faces and size
-        image->create(format, header.width, header.height, imgDepth, numFaces, num_mipmaps);
+        imgData->size = Image::calculateSize(imgData->num_mipmaps, numFaces, 
+            imgData->width, imgData->height, imgData->depth, imgData->format);
+
+        // Bind output buffer
+        output.reset(OGRE_NEW MemoryDataStream(imgData->size));
+
 
         // Now deal with the data
-        void* destPtr = image->getData();
+        void* destPtr = output->getPtr();
 
         // all mips for a face, then each face
         for(size_t i = 0; i < numFaces; ++i)
         {
-            uint32 width = image->getWidth();
-            uint32 height = image->getHeight();
-            uint32 depth = image->getDepth();
+            uint32 width = imgData->width;
+            uint32 height = imgData->height;
+            uint32 depth = imgData->depth;
 
-            for(size_t mip = 0; mip <= num_mipmaps; ++mip)
+            for(size_t mip = 0; mip <= imgData->num_mipmaps; ++mip)
             {
-                size_t dstPitch = width * PixelUtil::getNumElemBytes(format);
+                size_t dstPitch = width * PixelUtil::getNumElemBytes(imgData->format);
                 
                 if (PixelUtil::isCompressed(sourceFormat))
                 {
@@ -907,7 +928,7 @@ namespace {
                         DXTExplicitAlphaBlock eAlpha;
                         // 4x4 block of decompressed colour
                         ColourValue tempColours[16];
-                        size_t destBpp = PixelUtil::getNumElemBytes(format);
+                        size_t destBpp = PixelUtil::getNumElemBytes(imgData->format);
 
                         // slices are done individually
                         for(size_t z = 0; z < depth; ++z)
@@ -958,7 +979,7 @@ namespace {
                                         for (size_t bx = 0; bx < sx; ++bx)
                                         {
                                             PixelUtil::packColour(tempColours[by*4+bx],
-                                                format, destPtr);
+                                                imgData->format, destPtr);
                                             destPtr = static_cast<void*>(
                                                 static_cast<uchar*>(destPtr) + destBpp);
                                         }
@@ -993,7 +1014,7 @@ namespace {
                     {
                         // load directly
                         // DDS format lies! sizeOrPitch is not always set for DXT!!
-                        size_t dxtSize = PixelUtil::getMemorySize(width, height, depth, format);
+                        size_t dxtSize = PixelUtil::getMemorySize(width, height, depth, imgData->format);
                         stream->read(destPtr, dxtSize);
                         destPtr = static_cast<void*>(static_cast<uchar*>(destPtr) + dxtSize);
                     }
@@ -1019,11 +1040,33 @@ namespace {
             }
 
         }
+
+        DecodeResult ret;
+        ret.first = output;
+        ret.second = CodecDataPtr(imgData);
+        return ret;
+        
+
+
     }
     //---------------------------------------------------------------------    
     String DDSCodec::getType() const 
     {
         return mType;
+    }
+    //---------------------------------------------------------------------    
+    void DDSCodec::flipEndian(void * pData, size_t size, size_t count)
+    {
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+		Bitwise::bswapChunks(pData, size, count);
+#endif
+    }
+    //---------------------------------------------------------------------    
+    void DDSCodec::flipEndian(void * pData, size_t size)
+    {
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+        Bitwise::bswapBuffer(pData, size);
+#endif
     }
     //---------------------------------------------------------------------
     String DDSCodec::magicNumberToFileExt(const char *magicNumberPtr, size_t maxbytes) const

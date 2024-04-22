@@ -40,7 +40,7 @@ namespace Ogre {
     /** \addtogroup Core
     *  @{
     */
-    /** \addtogroup Animation
+    /** \addtogroup General
     *  @{
     */
     //-----------------------------------------------------------------------
@@ -48,39 +48,38 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     /** Predefined controller value for getting the latest frame time.
     */
-    class _OgreExport FrameTimeControllerValue : public ControllerValue<float>, private FrameListener
+    class _OgreExport FrameTimeControllerValue : public ControllerValue<Real>, public FrameListener
     {
-    private:
+    protected:
         Real mFrameTime;
         Real mTimeFactor;
         Real mElapsedTime;
         Real mFrameDelay;
 
-        bool frameStarted(const FrameEvent &evt) override;
     public:
         /// @deprecated use create()
         FrameTimeControllerValue();
 
         static ControllerValueRealPtr create() { return std::make_shared<FrameTimeControllerValue>(); }
 
-        float getValue(void) const override { return mFrameTime; }
-        void setValue(float value) override { /* Do nothing - value is set from frame listener */ }
-        Real getTimeFactor(void) const { return mTimeFactor; }
-        /// @copydoc ControllerManager::setTimeFactor
+        bool frameEnded(const FrameEvent &evt);
+        bool frameStarted(const FrameEvent &evt);
+        Real getValue(void) const;
+        void setValue(Real value);
+        Real getTimeFactor(void) const;
         void setTimeFactor(Real tf);
-        Real getFrameDelay(void) const { return mFrameDelay; }
-        /// @copydoc ControllerManager::setFrameDelay
+        Real getFrameDelay(void) const;
         void setFrameDelay(Real fd);
-        Real getElapsedTime(void) const { return mElapsedTime; }
-        void setElapsedTime(Real elapsedTime) { mElapsedTime = elapsedTime; }
+        Real getElapsedTime(void) const;
+        void setElapsedTime(Real elapsedTime);
     };
 
     //-----------------------------------------------------------------------
     /** Predefined controller value for getting / setting the frame number of a texture layer
     */
-    class _OgreExport TextureFrameControllerValue : public ControllerValue<float>
+    class _OgreExport TextureFrameControllerValue : public ControllerValue<Real>
     {
-    private:
+    protected:
         TextureUnitState* mTextureLayer;
     public:
         /// @deprecated use create()
@@ -93,24 +92,24 @@ namespace Ogre {
 
         /** Gets the frame number as a parametric value in the range [0,1]
         */
-        float getValue(void) const override;
+        Real getValue(void) const;
         /** Sets the frame number as a parametric value in the range [0,1]; the actual frame number is (value * numFrames) % numFrames).
         */
-        void setValue(float value) override;
+        void setValue(Real value);
 
     };
     //-----------------------------------------------------------------------
     /** Predefined controller value for getting / setting a texture coordinate modifications (scales and translates).
-
+        @remarks
             Effects can be applied to the scale or the offset of the u or v coordinates, or both. If separate
             modifications are required to u and v then 2 instances are required to control both independently, or 4
             if you want separate u and v scales as well as separate u and v offsets.
         @par
             Because of the nature of this value, it can accept values outside the 0..1 parametric range.
     */
-    class _OgreExport TexCoordModifierControllerValue : public ControllerValue<float>
+    class _OgreExport TexCoordModifierControllerValue : public ControllerValue<Real>
     {
-    private:
+    protected:
         bool mTransU, mTransV;
         bool mScaleU, mScaleV;
         bool mRotate;
@@ -140,15 +139,15 @@ namespace Ogre {
             return std::make_shared<TexCoordModifierControllerValue>(t, translateU, translateV, scaleU, scaleV, rotate);
         }
 
-        float getValue(void) const override;
-        void setValue(float value) override;
+        Real getValue(void) const;
+        void setValue(Real value);
 
     };
 
     //-----------------------------------------------------------------------
     /** Predefined controller value for setting a single floating-
         point value in a constant parameter of a vertex or fragment program.
-
+    @remarks
         Any value is accepted, it is propagated into the 'x'
         component of the constant register identified by the index. If you
         need to use named parameters, retrieve the index from the param
@@ -158,16 +157,16 @@ namespace Ogre {
         supported, therefore do not use this controller value as a source,
         only as a target.
     */
-    class _OgreExport FloatGpuParameterControllerValue : public ControllerValue<float>
+    class _OgreExport FloatGpuParameterControllerValue : public ControllerValue<Real>
     {
-    private:
+    protected:
         /// The parameters to access
         GpuProgramParametersSharedPtr mParams;
         /// The index of the parameter to be read or set
         size_t mParamIndex;
     public:
         /// @deprecated use create()
-        FloatGpuParameterControllerValue(const GpuProgramParametersSharedPtr& params, size_t index);
+        FloatGpuParameterControllerValue(GpuProgramParametersSharedPtr params, size_t index);
 
         /** Constructor.
             @param
@@ -175,13 +174,13 @@ namespace Ogre {
             @param
                 index The index of the parameter to be set
         */
-        static ControllerValueRealPtr create(const GpuProgramParametersSharedPtr& params, size_t index)
+        static ControllerValueRealPtr create(GpuProgramParametersSharedPtr params, size_t index)
         {
             return std::make_shared<FloatGpuParameterControllerValue>(params, index);
         }
 
-        float getValue(void) const override;
-        void setValue(float value) override;
+        Real getValue(void) const;
+        void setValue(Real value);
 
     };
     //-----------------------------------------------------------------------
@@ -191,7 +190,7 @@ namespace Ogre {
     /** Predefined controller function which just passes through the original source
     directly to dest.
     */
-    class _OgreExport PassthroughControllerFunction : public ControllerFunction<float>
+    class _OgreExport PassthroughControllerFunction : public ControllerFunction<Real>
     {
     public:
         /// @deprecated use create()
@@ -203,14 +202,14 @@ namespace Ogre {
             return std::make_shared<PassthroughControllerFunction>(deltaInput);
         }
 
-        float calculate(float source) override;
+        Real calculate(Real source);
     };
 
     /** Predefined controller function for dealing with animation.
     */
-    class _OgreExport AnimationControllerFunction : public ControllerFunction<float>
+    class _OgreExport AnimationControllerFunction : public ControllerFunction<Real>
     {
-    private:
+    protected:
         Real mSeqTime;
         Real mTime;
     public:
@@ -228,7 +227,7 @@ namespace Ogre {
             return std::make_shared<AnimationControllerFunction>(sequenceTime, timeOffset);
         }
 
-        float calculate(float source) override;
+        Real calculate(Real source);
 
         /** Set the time value manually. */
         void setTime(Real timeVal);
@@ -239,9 +238,9 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     /** Predefined controller function which simply scales an input to an output value.
     */
-    class _OgreExport ScaleControllerFunction : public ControllerFunction<float>
+    class _OgreExport ScaleControllerFunction : public ControllerFunction<Real>
     {
-    private:
+    protected:
         Real mScale;
     public:
         /// @deprecated use create()
@@ -259,12 +258,12 @@ namespace Ogre {
             return std::make_shared<ScaleControllerFunction>(scalefactor, deltaInput);
         }
 
-        float calculate(float source) override;
+        Real calculate(Real source);
     };
 
     //-----------------------------------------------------------------------
     /** Predefined controller function based on a waveform.
-
+        @remarks
             A waveform function translates parametric input to parametric output based on a wave.
         @par
             Note that for simplicity of integration with the rest of the controller insfrastructure, the output of
@@ -275,9 +274,9 @@ namespace Ogre {
         @par
             Hence a wave output of -1 becomes 0, a wave output of 1 becomes 1, and a wave output of 0 becomes 0.5.
     */
-    class _OgreExport WaveformControllerFunction : public ControllerFunction<float>
+    class _OgreExport WaveformControllerFunction : public ControllerFunction<Real>
     {
-    private:
+    protected:
         WaveformType mWaveType;
         Real mBase;
         Real mFrequency;
@@ -309,13 +308,13 @@ namespace Ogre {
             return std::make_shared<WaveformControllerFunction>(wType, base, frequency, phase, amplitude, deltaInput, dutyCycle);
         }
 
-        float calculate(float source) override;
+        Real calculate(Real source);
     };
 
     //-----------------------------------------------------------------------
     /** Predefined controller function based on linear function interpolation.
     */
-    class _OgreExport LinearControllerFunction : public ControllerFunction<float> {
+    class _OgreExport LinearControllerFunction : public ControllerFunction<Real> {
         Real mFrequency;
         std::vector<Real> mKeys;
         std::vector<Real> mValues;
@@ -324,18 +323,14 @@ namespace Ogre {
         LinearControllerFunction(const std::vector<Real>& keys, const std::vector<Real>& values, Real frequency = 1, bool deltaInput = true);
 
         /** Constructor, requires keys and values of the function to interpolate
-
-            For simplicity and compatibility with the predefined ControllerValue classes the function domain must be [0,1].
-            However, you can use the frequency parameter to rescale the domain to a different range.
             @param
                 keys the x-values of the function sampling points. Value range is [0,1]. Must include at least the keys 0 and 1.
+            @remarks
+                for simplicity and compability with the predefined ControllerValue classes the function range is limited to [0,1].
+                However you can use the frequency parameter to rescale the input key values.
             @param
                 values the function values f(x) of the function. order must match keys
-            @param frequency the speed of the evaluation in cycles per second
-            @param
-                deltaInput If true, signifies that the input will be a delta value such that the function should
-                 add it to an internal counter before calculating the output.
-            @note
+            @remarks
                 there must be the same amount of keys and values
         */
         static ControllerFunctionRealPtr create(const std::vector<Real>& keys, const std::vector<Real>& values, Real frequency = 1, bool deltaInput = true)
@@ -343,7 +338,7 @@ namespace Ogre {
             return std::make_shared<LinearControllerFunction>(keys, values, frequency, deltaInput);
         }
 
-        float calculate(float source) override;
+        Real calculate(Real source);
     };
     //-----------------------------------------------------------------------
     /** @} */

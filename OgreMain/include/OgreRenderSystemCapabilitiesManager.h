@@ -59,12 +59,6 @@ namespace Ogre {
         */
         ~RenderSystemCapabilitiesManager();
 
-        /** loads a custom capabilites config file
-         *
-         * use with @ref Root::useCustomRenderSystemCapabilities
-         * @return the configured RenderSystemCapabilities
-         */
-        RenderSystemCapabilities* loadCapabilitiesConfig(const String& filename);
 
         /** @see ScriptLoader::parseScript
         */
@@ -86,7 +80,7 @@ namespace Ogre {
         /// @copydoc Singleton::getSingleton()
         static RenderSystemCapabilitiesManager* getSingletonPtr(void);
 
-    private:
+    protected:
 
         RenderSystemCapabilitiesSerializer* mSerializer;
 

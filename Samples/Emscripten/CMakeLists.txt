@@ -1,7 +1,7 @@
 set(MEDIA_DIR ${CMAKE_BINARY_DIR}/bin/media/)
 
 set(CMAKE_EXECUTABLE_SUFFIX ".html")
-set(CMAKE_EXE_LINKER_FLAGS "--preload-file ${MEDIA_DIR}/@. -s EXPORTED_FUNCTIONS=\"[ '_passAssetAsArrayBuffer', '_clearScene', '_main']\" -s USE_SDL=2 -s MAX_WEBGL_VERSION=2")
+set(CMAKE_EXE_LINKER_FLAGS "--preload-file ${MEDIA_DIR}/@. -s BINARYEN_TRAP_MODE=clamp -s EXPORTED_FUNCTIONS=\"['_passAssetAsArrayBuffer', '_clearScene', '_main']\" -s USE_SDL=2")
 
 add_definitions(-s USE_SDL=2)
 
@@ -25,9 +25,10 @@ file(COPY
     DESTINATION ${MEDIA_DIR})
 
 file(COPY
-    "${CMAKE_SOURCE_DIR}/Media/RTShaderLib"
-    DESTINATION "${MEDIA_DIR}/")
+    "${CMAKE_SOURCE_DIR}/Media/RTShaderLib/GLSL"
+    "${CMAKE_SOURCE_DIR}/Media/RTShaderLib/materials"
+    DESTINATION "${MEDIA_DIR}/RTShaderLib/")
 
 file(COPY
-    "${CMAKE_SOURCE_DIR}/Media/Main"
+    "${CMAKE_SOURCE_DIR}/Media/ShadowVolume"
     DESTINATION "${MEDIA_DIR}/")

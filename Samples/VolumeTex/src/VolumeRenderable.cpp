@@ -54,8 +54,17 @@ void VolumeRenderable::_notifyCurrentCamera( Camera* cam )
 
     // Fake orientation toward camera
     Vector3 zVec = getParentNode()->_getDerivedPosition() - cam->getDerivedPosition();
-    mFakeOrientation = Math::lookRotation(zVec.normalisedCopy(), cam->getDerivedOrientation().yAxis());
+    zVec.normalise();
+    Vector3 fixedAxis = cam->getDerivedOrientation() * Vector3::UNIT_Y ;
+    
+    Vector3 xVec = fixedAxis.crossProduct( zVec );
+    xVec.normalise();
 
+    Vector3 yVec = zVec.crossProduct( xVec );
+    yVec.normalise();
+
+    mFakeOrientation.FromAxes( xVec, yVec, zVec );
+    
     Matrix3 tempMat;
     getParentNode()->_getDerivedOrientation().UnitInverse().ToRotationMatrix(tempMat);
     
@@ -150,9 +159,12 @@ void VolumeRenderable::initialise()
     VertexBufferBinding* bind = vdata->vertexBufferBinding;
 
     size_t offset = 0;
-    offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
-    offset += decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL).getSize();
-    offset += decl->addElement(0, offset, VET_FLOAT3, VES_TEXTURE_COORDINATES).getSize();
+    decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
+    offset += VertexElement::getTypeSize(VET_FLOAT3);
+    decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL);
+    offset += VertexElement::getTypeSize(VET_FLOAT3);
+    decl->addElement(0, offset, VET_FLOAT3, VES_TEXTURE_COORDINATES);
+    offset += VertexElement::getTypeSize(VET_FLOAT3);
 
     HardwareVertexBufferSharedPtr vbuf = 
     HardwareBufferManager::getSingleton().createVertexBuffer(

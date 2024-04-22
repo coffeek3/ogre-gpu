@@ -45,10 +45,10 @@ public:
     O_IStream(MemoryDataStream& stream, const char file_name[]):
         IStream (file_name), _stream(stream) {}
 
-    bool    read (char c[], int n) override;
-    uint64_t   tellg () override;
-    void    seekg (uint64_t pos) override;
-    void    clear () override;
+    virtual bool    read (char c[], int n);
+    virtual Imf::Int64   tellg ();
+    virtual void    seekg (Imf::Int64 pos);
+    virtual void    clear ();
 
 private:
     MemoryDataStream& _stream;

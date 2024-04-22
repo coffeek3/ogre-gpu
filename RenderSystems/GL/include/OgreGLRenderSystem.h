@@ -33,7 +33,7 @@ THE SOFTWARE.
 #include "OgreRenderSystem.h"
 #include "OgreGLHardwareBufferManager.h"
 #include "OgreGLGpuProgramManager.h"
-#include "OgreVector.h"
+#include "OgreVector4.h"
 
 #include "OgreGLRenderSystemCommon.h"
 #include "OgreGLStateCacheManager.h"
@@ -57,6 +57,9 @@ namespace Ogre {
     class _OgreGLExport GLRenderSystem : public GLRenderSystemCommon
     {
     private:
+        /// Rendering loop control
+        bool mStopRendering;
+
         /// View matrix to set world against
         Matrix4 mViewMatrix;
         Matrix4 mWorldMatrix;
@@ -72,9 +75,6 @@ namespace Ogre {
         /// Holds texture type settings for every stage
         GLenum mTextureTypes[OGRE_MAX_TEXTURE_LAYERS];
 
-        /// Saved manual colour blends
-        ColourValue mManualBlendColours[OGRE_MAX_TEXTURE_LAYERS][2];
-
         /// Number of fixed-function texture units
         unsigned short mFixedFunctionTextureUnits;
 
@@ -85,10 +85,17 @@ namespace Ogre {
         GLint getTextureAddressingMode(TextureAddressingMode tam) const;
                 void initialiseContext(RenderWindow* primary);
 
+        /// Store last colour write state
+        bool mColourWrite[4];
         /// Store last stencil mask state
         uint32 mStencilWriteMask;
         /// Store last depth write state
         bool mDepthWrite;
+        /// Store last scissor enable state
+        bool mScissorsEnabled;
+
+        /// Store scissor box
+        int mScissorBox[4];
 
         GLint convertCompareFunction(CompareFunction func) const;
         GLint convertStencilOp(StencilOperation op, bool invert = false) const;
@@ -105,9 +112,13 @@ namespace Ogre {
 
         unsigned short mCurrentLights;
 
-        GLGpuProgramBase* mCurrentVertexProgram;
-        GLGpuProgramBase* mCurrentFragmentProgram;
-        GLGpuProgramBase* mCurrentGeometryProgram;
+        GLGpuProgram* mCurrentVertexProgram;
+        GLGpuProgram* mCurrentFragmentProgram;
+        GLGpuProgram* mCurrentGeometryProgram;
+
+        typedef std::list<GLContext*> GLContextList;
+        /// List of background thread contexts
+        GLContextList mBackgroundContextList;
 
         // statecaches are per context
         GLStateCacheManager* mStateCacheManager;
@@ -120,19 +131,16 @@ namespace Ogre {
         std::vector<GLuint> mRenderAttribsBound;
         std::vector<GLuint> mRenderInstanceAttribsBound;
 
-        /// is fixed pipeline enabled
-        bool mEnableFixedPipeline;
-
 #if OGRE_NO_QUAD_BUFFER_STEREO == 0
 		/// @copydoc RenderSystem::setDrawBuffer
 		virtual bool setDrawBuffer(ColourBufferType colourBuffer);
 #endif
 
     protected:
-        void setClipPlanesImpl(const PlaneList& clipPlanes) override;
+        void setClipPlanesImpl(const PlaneList& clipPlanes);
         void bindVertexElementToGpu(const VertexElement& elem,
                                     const HardwareVertexBufferSharedPtr& vertexBuffer,
-                                    const size_t vertexStart) override;
+                                    const size_t vertexStart);
 
         /** Initialises GL extensions, must be done AFTER the GL context has been
             established.
@@ -147,43 +155,48 @@ namespace Ogre {
         // Overridden RenderSystem functions
         // ----------------------------------
 
-        const GpuProgramParametersPtr& getFixedFunctionParams(TrackVertexColourType tracking, FogMode fog) override;
+        const GpuProgramParametersPtr& getFixedFunctionParams(TrackVertexColourType tracking, FogMode fog);
 
-        void applyFixedFunctionParams(const GpuProgramParametersPtr& params, uint16 variabilityMask) override;
+        void applyFixedFunctionParams(const GpuProgramParametersPtr& params, uint16 variabilityMask);
 
-        const String& getName(void) const override;
+        const String& getName(void) const;
 
         void _initialise() override;
 
-        void initConfigOptions() override;
+        virtual RenderSystemCapabilities* createRenderSystemCapabilities() const;
 
-        RenderSystemCapabilities* createRenderSystemCapabilities() const override;
+        void initialiseFromRenderSystemCapabilities(RenderSystemCapabilities* caps, RenderTarget* primary);
 
-        void initialiseFromRenderSystemCapabilities(RenderSystemCapabilities* caps, RenderTarget* primary) override;
+        void shutdown(void);
 
-        void shutdown(void) override;
+        void setShadingType(ShadeOptions so);
 
-        void setShadingType(ShadeOptions so) override;
-
-        void setLightingEnabled(bool enabled) override;
-
+        void setLightingEnabled(bool enabled);
+        
+        /// @copydoc RenderSystem::_createRenderWindow
         RenderWindow* _createRenderWindow(const String &name, unsigned int width, unsigned int height, 
-                                          bool fullScreen, const NameValuePairList *miscParams = 0) override;
+                                          bool fullScreen, const NameValuePairList *miscParams = 0);
 
-        DepthBuffer* _createDepthBufferFor( RenderTarget *renderTarget ) override;
+        /// @copydoc RenderSystem::_createRenderWindows
+        bool _createRenderWindows(const RenderWindowDescriptionList& renderWindowDescriptions, 
+                                  RenderWindowList& createdWindows);
 
-        MultiRenderTarget * createMultiRenderTarget(const String & name) override;
+        /// @copydoc RenderSystem::_createDepthBufferFor
+        DepthBuffer* _createDepthBufferFor( RenderTarget *renderTarget );
+        
+        /// @copydoc RenderSystem::createMultiRenderTarget
+        virtual MultiRenderTarget * createMultiRenderTarget(const String & name); 
         
 
-        void destroyRenderWindow(const String& name) override;
+        void destroyRenderWindow(const String& name);
 
-        void setNormaliseNormals(bool normalise) override;
+        void setNormaliseNormals(bool normalise);
 
         // -----------------------------
         // Low-level overridden members
         // -----------------------------
 
-        void _useLights(unsigned short limit) override;
+        void _useLights(unsigned short limit);
 
         void setWorldMatrix(const Matrix4 &m);
 
@@ -193,38 +206,50 @@ namespace Ogre {
 
         void _setSurfaceTracking(TrackVertexColourType tracking);
 
-        void _setPointParameters(bool attenuationEnabled, Real minSize, Real maxSize) override;
+        void _setPointParameters(bool attenuationEnabled, Real minSize, Real maxSize);
 
-        void _setLineWidth(float width) override;
+        void _setLineWidth(float width);
 
-        void _setPointSpritesEnabled(bool enabled) override;
+        void _setPointSpritesEnabled(bool enabled);
 
-        void _setTexture(size_t unit, bool enabled, const TexturePtr &tex) override;
+        void _setTexture(size_t unit, bool enabled, const TexturePtr &tex);
 
-        void _setSampler(size_t unit, Sampler& sampler) override;
+        void _setSampler(size_t unit, Sampler& sampler);
 
-        void _setTextureCoordSet(size_t stage, size_t index) override;
+        void _setTextureCoordSet(size_t stage, size_t index);
 
         void _setTextureCoordCalculation(size_t stage, TexCoordCalcMethod m, 
-            const Frustum* frustum = 0) override;
+            const Frustum* frustum = 0);
 
-        void _setTextureBlendMode(size_t stage, const LayerBlendModeEx& bm) override;
+        void _setTextureBlendMode(size_t stage, const LayerBlendModeEx& bm);
 
-        void _setTextureMatrix(size_t stage, const Matrix4& xform) override;
+        void _setTextureAddressingMode(size_t stage, const Sampler::UVWAddressingMode& uvw);
 
-        void _setAlphaRejectSettings(CompareFunction func, unsigned char value, bool alphaToCoverage) override;
+        void _setTextureMatrix(size_t stage, const Matrix4& xform);
 
-        void _setViewport(Viewport *vp) override;
+        void _setSeparateSceneBlending(SceneBlendFactor sourceFactor, SceneBlendFactor destFactor, SceneBlendFactor sourceFactorAlpha, SceneBlendFactor destFactorAlpha, SceneBlendOperation op, SceneBlendOperation alphaOp );
 
-        void _endFrame(void) override;
+        void _setAlphaRejectSettings(CompareFunction func, unsigned char value, bool alphaToCoverage);
 
-        void _setCullingMode(CullingMode mode) override;
+        void _setViewport(Viewport *vp);
 
-        void _setDepthBufferParams(bool depthTest = true, bool depthWrite = true, CompareFunction depthFunction = CMPF_LESS_EQUAL) override;
+        void _beginFrame(void);
 
-        void _setDepthBias(float constantBias, float slopeScaleBias) override;
+        void _endFrame(void);
 
-        void setColourBlendState(const ColourBlendState& state) override;
+        void _setCullingMode(CullingMode mode);
+
+        void _setDepthBufferParams(bool depthTest = true, bool depthWrite = true, CompareFunction depthFunction = CMPF_LESS_EQUAL);
+
+        void _setDepthBufferCheckEnabled(bool enabled = true);
+
+        void _setDepthBufferWriteEnabled(bool enabled = true);
+
+        void _setDepthBufferFunction(CompareFunction func = CMPF_LESS_EQUAL);
+
+        void _setDepthBias(float constantBias, float slopeScaleBias);
+
+        void _setColourBufferWriteEnabled(bool red, bool green, bool blue, bool alpha);
 
         void _setFog(FogMode mode);
 
@@ -232,36 +257,60 @@ namespace Ogre {
 
         void enableClipPlane (ushort index, bool enable);
 
-        void _setPolygonMode(PolygonMode level) override;
+        void _setPolygonMode(PolygonMode level);
 
-        void setStencilState(const StencilState& state) override;
+        void setStencilCheckEnabled(bool enabled);
+        /** See
+          RenderSystem.
+         */
+        void setStencilBufferParams(CompareFunction func = CMPF_ALWAYS_PASS, 
+            uint32 refValue = 0, uint32 compareMask = 0xFFFFFFFF, uint32 writeMask = 0xFFFFFFFF,
+            StencilOperation stencilFailOp = SOP_KEEP, 
+            StencilOperation depthFailOp = SOP_KEEP,
+            StencilOperation passOp = SOP_KEEP, 
+            bool twoSidedOperation = false,
+            bool readBackAsTexture = false);
 
-        void _render(const RenderOperation& op) override;
+        void _setTextureUnitFiltering(size_t unit, FilterType ftype, FilterOptions filter);
 
-        void bindGpuProgram(GpuProgram* prg) override;
+        void _render(const RenderOperation& op);
 
-        void unbindGpuProgram(GpuProgramType gptype) override;
+        void bindGpuProgram(GpuProgram* prg);
+
+        void unbindGpuProgram(GpuProgramType gptype);
 
         void bindGpuProgramParameters(GpuProgramType gptype, 
-                                      const GpuProgramParametersPtr& params, uint16 variabilityMask) override;
+                                      const GpuProgramParametersPtr& params, uint16 variabilityMask);
+        /** See
+            RenderSystem
+        */
+        void bindGpuProgramPassIterationParameters(GpuProgramType gptype);
 
-        void setScissorTest(bool enabled, const Rect& rect = Rect()) override ;
+        void setScissorTest(bool enabled, size_t left = 0, size_t top = 0, size_t right = 800, size_t bottom = 600) ;
         void clearFrameBuffer(unsigned int buffers, 
                               const ColourValue& colour = ColourValue::Black, 
-                              float depth = 1.0f, unsigned short stencil = 0) override;
-        HardwareOcclusionQuery* createHardwareOcclusionQuery(void) override;
+                              Real depth = 1.0f, unsigned short stencil = 0);
+        HardwareOcclusionQuery* createHardwareOcclusionQuery(void);
+        OGRE_MUTEX(mThreadInitMutex);
+        void registerThread();
+        void unregisterThread();
+        void preExtraThreadsStarted();
+        void postExtraThreadsStarted();
 
         // ----------------------------------
         // GLRenderSystem specific members
         // ----------------------------------
-        void _oneTimeContextInitialization() override;
+        /** One time initialization for the RenderState of a context. Things that
+            only need to be set once, like the LightingModel can be defined here.
+         */
+        void _oneTimeContextInitialization();
         /** Switch GL context, dealing with involved internal cached states too
         */
         void _switchContext(GLContext *context);
         /**
          * Set current render target to target, enabling its GL context if needed
          */
-        void _setRenderTarget(RenderTarget *target) override;
+        void _setRenderTarget(RenderTarget *target);
         /** Unregister a render target->context mapping. If the context of target 
             is the current context, change the context to the main context so it
             can be destroyed safely. 
@@ -269,21 +318,24 @@ namespace Ogre {
             @note This is automatically called by the destructor of 
             GLContext.
          */
-        void _unregisterContext(GLContext *context) override;
+        void _unregisterContext(GLContext *context);
 
         GLStateCacheManager * _getStateCacheManager() { return mStateCacheManager; }
+
+        /// @copydoc RenderSystem::getDisplayMonitorCount
+        unsigned int getDisplayMonitorCount() const;
         
         /// @copydoc RenderSystem::beginProfileEvent
-        void beginProfileEvent( const String &eventName ) override;
+        virtual void beginProfileEvent( const String &eventName );
 
         /// @copydoc RenderSystem::endProfileEvent
-        void endProfileEvent( void ) override;
+        virtual void endProfileEvent( void );
 
         /// @copydoc RenderSystem::markProfileEvent
-        void markProfileEvent( const String &eventName ) override;
+        virtual void markProfileEvent( const String &eventName );
 
         /** @copydoc RenderTarget::copyContentsToMemory */
-        void _copyContentsToMemory(Viewport* vp, const Box& src, const PixelBox &dst, RenderWindow::FrameBuffer buffer) override;
+        void _copyContentsToMemory(Viewport* vp, const Box& src, const PixelBox &dst, RenderWindow::FrameBuffer buffer);
     };
     /** @} */
     /** @} */

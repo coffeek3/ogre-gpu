@@ -520,16 +520,16 @@ namespace Ogre
         if(pWorldMap->empty())
             return true;
 
-        for(auto & i : *pWorldMap)
+        for(WorldMap::iterator i = pWorldMap->begin(); i != pWorldMap->end(); ++i)
         {
-            i.second->frameStart(evt.timeSinceLastFrame);
+            i->second->frameStart(evt.timeSinceLastFrame);
             // Notify of all active cameras
             // Previously we did this in cameraPreRenderScene, but that had the effect
             // of causing unnecessary unloading of pages if a camera was rendered
             // intermittently, so we assume that all cameras we're told to watch are 'active'
-            for (auto & c : *pCameraList)
+            for (CameraList::iterator c = pCameraList->begin(); c != pCameraList->end(); ++c)
             {
-                i.second->notifyCamera(c);
+                i->second->notifyCamera(*c);
             }
         }
 
@@ -541,8 +541,8 @@ namespace Ogre
         if(pWorldMap->empty())
             return true;
 
-        for(auto & i : *pWorldMap)
-            i.second->frameEnd(evt.timeSinceLastFrame);
+        for(WorldMap::iterator i = pWorldMap->begin(); i != pWorldMap->end(); ++i)
+            i->second->frameEnd(evt.timeSinceLastFrame);
 
         return true;
     }

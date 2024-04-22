@@ -29,33 +29,32 @@ THE SOFTWARE.
 #define __CgPlugin_H__
 
 #include "OgrePlugin.h"
-#include "OgreCgPrerequisites.h"
 
 namespace Ogre
 {
     class CgProgramFactory;
 
     /** Plugin instance for Cg Program Manager */
-    class _OgreCgPluginExport CgPlugin : public Plugin
+    class CgPlugin : public Plugin
     {
     public:
         CgPlugin();
 
 
         /// @copydoc Plugin::getName
-        const String& getName() const override;
+        const String& getName() const;
 
         /// @copydoc Plugin::install
-        void install() override;
+        void install();
 
         /// @copydoc Plugin::initialise
-        void initialise() override;
+        void initialise();
 
         /// @copydoc Plugin::shutdown
-        void shutdown() override;
+        void shutdown();
 
         /// @copydoc Plugin::uninstall
-        void uninstall() override;
+        void uninstall();
     protected:
         CgProgramFactory* mCgProgramFactory;
 

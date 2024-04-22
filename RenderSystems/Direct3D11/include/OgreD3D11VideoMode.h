@@ -51,6 +51,7 @@ namespace Ogre
         unsigned int getHeight() const;
         DXGI_FORMAT getFormat() const;
         DXGI_RATIONAL getRefreshRate() const;
+        unsigned int getColourDepth() const;
         DXGI_OUTPUT_DESC getDisplayMode() const;
         DXGI_MODE_DESC getModeDesc() const;
         void increaseRefreshRate(DXGI_RATIONAL rr); 

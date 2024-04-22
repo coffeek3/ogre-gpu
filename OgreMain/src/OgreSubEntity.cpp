@@ -34,7 +34,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     SubEntity::SubEntity (Entity* parent, SubMesh* subMeshBasis)
         : Renderable(), mParentEntity(parent),
-        mSubMesh(subMeshBasis), mCachedCamera(0)
+        mSubMesh(subMeshBasis), mMaterialLodIndex(0), mCachedCamera(0)
     {
         mVisible = true;
         mRenderQueueID = 0;
@@ -65,7 +65,11 @@ namespace Ogre {
 
         if( !material )
         {
-            logMaterialNotFound(name, groupName, "SubEntity of", mParentEntity->getName());
+            LogManager::getSingleton().logMessage("Can't assign material '" + name +
+                "' to SubEntity of '" + mParentEntity->getName() + "' because this "
+                "Material does not exist in group '"+groupName+"'. Have you forgotten to define it in a "
+                ".material script?", LML_CRITICAL);
+
             material = MaterialManager::getSingleton().getDefaultMaterial();
         }
 
@@ -78,8 +82,10 @@ namespace Ogre {
         
         if (!mMaterialPtr)
         {
-            LogManager::getSingleton().logError("Can't assign nullptr material "
-                "to SubEntity of '" + mParentEntity->getName() + "'. Falling back to default");
+            LogManager::getSingleton().logMessage("Can't assign material "  
+                " to SubEntity of '" + mParentEntity->getName() + "' because this "
+                "Material does not exist. Have you forgotten to define it in a "
+                ".material script?", LML_CRITICAL);
             
             mMaterialPtr = MaterialManager::getSingleton().getDefaultMaterial();
         }
@@ -89,6 +95,11 @@ namespace Ogre {
 
         // tell parent to reconsider material vertex processing options
         mParentEntity->reevaluateVertexProcessing();
+    }
+    //-----------------------------------------------------------------------
+    Technique* SubEntity::getTechnique(void) const
+    {
+        return mMaterialPtr->getBestTechnique(mMaterialLodIndex, this);
     }
     //-----------------------------------------------------------------------
     void SubEntity::getRenderOperation(RenderOperation& op)
@@ -177,29 +188,22 @@ namespace Ogre {
                 mSubMesh->parent->sharedBlendIndexToBoneIndexMap : mSubMesh->blendIndexToBoneIndexMap;
             assert(indexMap.size() <= mParentEntity->mNumBoneMatrices);
 
-            if (MeshManager::getBonesUseObjectSpace())
-            {
-                *xform++ = mParentEntity->_getParentNodeFullTransform();
-            }
-
             if (mParentEntity->_isSkeletonAnimated())
             {
                 // Bones, use cached matrices built when Entity::_updateRenderQueue was called
-                auto boneMatrices = MeshManager::getBonesUseObjectSpace() ? mParentEntity->mBoneMatrices
-                                                                          : mParentEntity->mBoneWorldMatrices;
-                assert(boneMatrices);
+                assert(mParentEntity->mBoneWorldMatrices);
 
-                for (auto idx : indexMap)
+                Mesh::IndexMap::const_iterator it, itend;
+                itend = indexMap.end();
+                for (it = indexMap.begin(); it != itend; ++it, ++xform)
                 {
-                    *xform++ = boneMatrices[idx];
+                    *xform = mParentEntity->mBoneWorldMatrices[*it];
                 }
             }
             else
             {
-                auto& value = MeshManager::getBonesUseObjectSpace() ? Affine3::IDENTITY
-                                                                    : mParentEntity->_getParentNodeFullTransform();
                 // All animations disabled, use parent entity world transform only
-                std::fill_n(xform, indexMap.size(), value);
+                std::fill_n(xform, indexMap.size(), mParentEntity->_getParentNodeFullTransform());
             }
         }
     }
@@ -219,7 +223,7 @@ namespace Ogre {
                 mSubMesh->parent->sharedBlendIndexToBoneIndexMap : mSubMesh->blendIndexToBoneIndexMap;
             assert(indexMap.size() <= mParentEntity->mNumBoneMatrices);
 
-            return uint16(indexMap.size()) + uint16(MeshManager::getBonesUseObjectSpace());
+            return static_cast<unsigned short>(indexMap.size());
         }
     }
     //-----------------------------------------------------------------------
@@ -236,16 +240,15 @@ namespace Ogre {
         Real dist;
         if (!mSubMesh->extremityPoints.empty())
         {
-            bool euclidean = cam->getSortMode() == SM_DISTANCE;
-            Vector3 zAxis = cam->getDerivedDirection();
             const Vector3 &cp = cam->getDerivedPosition();
             const Affine3 &l2w = mParentEntity->_getParentNodeFullTransform();
             dist = std::numeric_limits<Real>::infinity();
-            for (const Vector3& v : mSubMesh->extremityPoints)
+            for (std::vector<Vector3>::const_iterator i = mSubMesh->extremityPoints.begin();
+                 i != mSubMesh->extremityPoints.end (); ++i)
             {
-                Vector3 diff = l2w * v - cp;
-                Real d = euclidean ? diff.squaredLength() : Math::Sqr(zAxis.dotProduct(diff));
-
+                Vector3 v = l2w * (*i);
+                Real d = (v - cp).squaredLength();
+                
                 dist = std::min(d, dist);
             }
         }
@@ -286,7 +289,7 @@ namespace Ogre {
                 // Clone without copying data, don't remove any blending info
                 // (since if we skeletally animate too, we need it)
                 mSoftwareVertexAnimVertexData.reset(mSubMesh->vertexData->clone(false));
-                mTempVertexAnimInfo.extractFrom(mSoftwareVertexAnimVertexData.get());
+                mParentEntity->extractTempBufferInfo(mSoftwareVertexAnimVertexData.get(), &mTempVertexAnimInfo);
 
                 // Also clone for hardware usage, don't remove blend info since we'll
                 // need it if we also hardware skeletally animate
@@ -299,8 +302,10 @@ namespace Ogre {
                 // Prepare temp vertex data if needed
                 // Clone without copying data, remove blending info
                 // (since blend is performed in software)
-                mSkelAnimVertexData.reset(mSubMesh->vertexData->_cloneRemovingBlendData());
-                mTempSkelAnimInfo.extractFrom(mSkelAnimVertexData.get());
+                mSkelAnimVertexData.reset(
+                    mParentEntity->cloneVertexDataRemoveBlendInfo(mSubMesh->vertexData));
+                mParentEntity->extractTempBufferInfo(mSkelAnimVertexData.get(), &mTempSkelAnimInfo);
+
             }
         }
     }
@@ -326,6 +331,16 @@ namespace Ogre {
     {
         assert (mHardwareVertexAnimVertexData && "Not vertex animated or has no dedicated geometry!");
         return mHardwareVertexAnimVertexData.get();
+    }
+    //-----------------------------------------------------------------------
+    TempBlendedBufferInfo* SubEntity::_getSkelAnimTempBufferInfo(void) 
+    {
+        return &mTempSkelAnimInfo;
+    }
+    //-----------------------------------------------------------------------
+    TempBlendedBufferInfo* SubEntity::_getVertexAnimTempBufferInfo(void) 
+    {
+        return &mTempVertexAnimInfo;
     }
     //-----------------------------------------------------------------------
     void SubEntity::_updateCustomGpuParameter(

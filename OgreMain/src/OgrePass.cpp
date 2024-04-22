@@ -25,8 +25,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
-#include <memory>
-
 #include "OgreStableHeaders.h"
 
 #include "OgreGpuProgramUsage.h"
@@ -35,12 +33,12 @@ THE SOFTWARE.
 namespace Ogre {
 
     /** Default pass hash function.
-
+    @remarks
         Tries to minimise the number of texture changes.
     */
     struct MinTextureStateChangeHashFunc : public Pass::HashFunc
     {
-        uint32 operator()(const Pass* p) const override
+        uint32 operator()(const Pass* p) const
         {
             OGRE_LOCK_MUTEX(p->mTexUnitChangeMutex);
             uint32 hash = 0;
@@ -58,12 +56,12 @@ namespace Ogre {
     };
     MinTextureStateChangeHashFunc sMinTextureStateChangeHashFunc;
     /** Alternate pass hash function.
-
+    @remarks
         Tries to minimise the number of GPU program changes.
     */
     struct MinGpuProgramChangeHashFunc : public Pass::HashFunc
     {
-        uint32 operator()(const Pass* p) const override
+        uint32 operator()(const Pass* p) const
         {
             OGRE_LOCK_MUTEX(p->mGpuProgramChangeMutex);
             uint32 hash = 0;
@@ -121,6 +119,7 @@ namespace Ogre {
     Pass::Pass(Technique* parent, unsigned short index)
         : mParent(parent)
         , mHash(0)
+        , mIndex(index)
         , mAmbient(ColourValue::White)
         , mDiffuse(ColourValue::White)
         , mSpecular(ColourValue::Black)
@@ -136,6 +135,7 @@ namespace Ogre {
         , mLightingEnabled(true)
         , mIteratePerLight(false)
         , mRunOnlyForOneLightType(false)
+        , mNormaliseNormals(false)
         , mPolygonModeOverrideable(true)
         , mFogOverride(false)
         , mQueuedForDeletion(false)
@@ -145,32 +145,31 @@ namespace Ogre {
         , mPointAttenuationEnabled(false)
         , mContentTypeLookupBuilt(false)
         , mAlphaRejectVal(0)
+        , mDepthFunc(CMPF_LESS_EQUAL)
         , mDepthBiasConstant(0.0f)
         , mDepthBiasSlopeScale(0.0f)
         , mDepthBiasPerIteration(0.0f)
-        , mDepthFunc(CMPF_LESS_EQUAL)
         , mAlphaRejectFunc(CMPF_ALWAYS_PASS)
         , mCullMode(CULL_CLOCKWISE)
         , mManualCullMode(MANUAL_CULL_BACK)
         , mMaxSimultaneousLights(OGRE_MAX_SIMULTANEOUS_LIGHTS)
         , mStartLight(0)
         , mLightsPerIteration(1)
-        , mIndex(index)
+        , mOnlyLightType(Light::LT_POINT)
         , mLightMask(0xFFFFFFFF)
+        , mShadeOptions(SO_GOURAUD)
+        , mPolygonMode(PM_SOLID)
+        , mFogMode(FOG_NONE)
         , mFogColour(ColourValue::White)
         , mFogStart(0.0)
         , mFogEnd(1.0)
         , mFogDensity(0.001)
-        , mLineWidth(1.0f)
         , mPassIterationCount(1)
+        , mLineWidth(1.0f)
         , mPointMinSize(0.0f)
         , mPointMaxSize(0.0f)
         , mPointAttenution(1.0f, 1.0f, 0.0f, 0.0f)
-        , mShadeOptions(SO_GOURAUD)
-        , mPolygonMode(PM_SOLID)
         , mIlluminationStage(IS_UNKNOWN)
-        , mOnlyLightType(Light::LT_POINT)
-        , mFogMode(FOG_NONE)
     {
         // init the hash inline
         _recalculateHash();
@@ -178,7 +177,7 @@ namespace Ogre {
 
     //-----------------------------------------------------------------------------
     Pass::Pass(Technique *parent, unsigned short index, const Pass& oth)
-        : mParent(parent), mQueuedForDeletion(false), mIndex(index), mPassIterationCount(1)
+        : mParent(parent), mIndex(index), mQueuedForDeletion(false), mPassIterationCount(1)
     {
         *this = oth;
         mParent = parent;
@@ -231,6 +230,7 @@ namespace Ogre {
         mIteratePerLight = oth.mIteratePerLight;
         mLightsPerIteration = oth.mLightsPerIteration;
         mRunOnlyForOneLightType = oth.mRunOnlyForOneLightType;
+        mNormaliseNormals = oth.mNormaliseNormals;
         mOnlyLightType = oth.mOnlyLightType;
         mShadeOptions = oth.mShadeOptions;
         mPolygonMode = oth.mPolygonMode;
@@ -253,22 +253,50 @@ namespace Ogre {
         {
             auto& programUsage = mProgramUsage[i];
             auto& othUsage = oth.mProgramUsage[i];
-            programUsage = othUsage ? std::make_unique<GpuProgramUsage>(*othUsage, this) : nullptr;
+            othUsage ? programUsage.reset(new GpuProgramUsage(*othUsage, this)) : programUsage.reset();
         }
+
+        mShadowCasterVertexProgramUsage.reset();
+        if (oth.mShadowCasterVertexProgramUsage)
+        {
+            mShadowCasterVertexProgramUsage.reset(new GpuProgramUsage(*(oth.mShadowCasterVertexProgramUsage), this));
+        }
+
+        mShadowCasterFragmentProgramUsage.reset();
+        if (oth.mShadowCasterFragmentProgramUsage)
+        {
+            mShadowCasterFragmentProgramUsage.reset(new GpuProgramUsage(*(oth.mShadowCasterFragmentProgramUsage), this));
+        }
+
+        mShadowReceiverVertexProgramUsage.reset();
+        if (oth.mShadowReceiverVertexProgramUsage)
+        {
+            mShadowReceiverVertexProgramUsage.reset(new GpuProgramUsage(*(oth.mShadowReceiverVertexProgramUsage), this));
+        }
+
+        mShadowReceiverFragmentProgramUsage.reset();
+        if (oth.mShadowReceiverFragmentProgramUsage)
+        {
+            mShadowReceiverFragmentProgramUsage.reset(new GpuProgramUsage(*(oth.mShadowReceiverFragmentProgramUsage), this));
+        }
+
+        TextureUnitStates::const_iterator i, iend;
 
         // Clear texture units but doesn't notify need recompilation in the case
         // we are cloning, The parent material will take care of this.
-        for (auto *t : mTextureUnitStates)
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            OGRE_DELETE t;
+            OGRE_DELETE *i;
         }
 
         mTextureUnitStates.clear();
 
         // Copy texture units
-        for (auto *s : oth.mTextureUnitStates)
+        iend = oth.mTextureUnitStates.end();
+        for (i = oth.mTextureUnitStates.begin(); i != iend; ++i)
         {
-            TextureUnitState* t = OGRE_NEW TextureUnitState(this, *s);
+            TextureUnitState* t = OGRE_NEW TextureUnitState(this, *(*i));
             mTextureUnitStates.push_back(t);
         }
 
@@ -282,14 +310,39 @@ namespace Ogre {
         size_t memSize = 0;
 
         // Tally up TU states
-        for (auto *t : mTextureUnitStates)
+        TextureUnitStates::const_iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            memSize += t->calculateSize();
+            memSize += (*i)->calculateSize();
         }
         for(const auto& u : mProgramUsage)
             memSize += u ? u->calculateSize() : 0;
 
+        if(mShadowCasterVertexProgramUsage)
+            memSize += mShadowCasterVertexProgramUsage->calculateSize();
+        if(mShadowCasterFragmentProgramUsage)
+            memSize += mShadowCasterFragmentProgramUsage->calculateSize();
+        if(mShadowReceiverVertexProgramUsage)
+            memSize += mShadowReceiverVertexProgramUsage->calculateSize();
+        if(mShadowReceiverFragmentProgramUsage)
+            memSize += mShadowReceiverFragmentProgramUsage->calculateSize();
         return memSize;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setName(const String& name)
+    {
+        mName = name;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setPointSpritesEnabled(bool enabled)
+    {
+        mPointSpritesEnabled = enabled;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::getPointSpritesEnabled(void) const
+    {
+        return mPointSpritesEnabled;
     }
     //-----------------------------------------------------------------------
     void Pass::setPointAttenuation(bool enabled, float constant, float linear, float quadratic)
@@ -298,6 +351,11 @@ namespace Ogre {
         mPointAttenution[1] = enabled ? constant : 1.0f;
         mPointAttenution[2] = enabled ? linear : 0.0f;
         mPointAttenution[3] = enabled ? quadratic : 0.0f;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::isPointAttenuationEnabled(void) const
+    {
+        return mPointAttenuationEnabled;
     }
     //-----------------------------------------------------------------------
     void Pass::setPointMinSize(Real min)
@@ -328,12 +386,22 @@ namespace Ogre {
 
     }
     //-----------------------------------------------------------------------
+    void Pass::setAmbient(const ColourValue& ambient)
+    {
+        mAmbient = ambient;
+    }
+    //-----------------------------------------------------------------------
     void Pass::setDiffuse(float red, float green, float blue, float alpha)
     {
         mDiffuse.r = red;
         mDiffuse.g = green;
         mDiffuse.b = blue;
         mDiffuse.a = alpha;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setDiffuse(const ColourValue& diffuse)
+    {
+        mDiffuse = diffuse;
     }
     //-----------------------------------------------------------------------
     void Pass::setSpecular(float red, float green, float blue, float alpha)
@@ -344,11 +412,62 @@ namespace Ogre {
         mSpecular.a = alpha;
     }
     //-----------------------------------------------------------------------
+    void Pass::setSpecular(const ColourValue& specular)
+    {
+        mSpecular = specular;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShininess(Real val)
+    {
+        mShininess = val;
+    }
+    //-----------------------------------------------------------------------
     void Pass::setSelfIllumination(float red, float green, float blue)
     {
         mEmissive.r = red;
         mEmissive.g = green;
         mEmissive.b = blue;
+
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setSelfIllumination(const ColourValue& selfIllum)
+    {
+        mEmissive = selfIllum;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setVertexColourTracking(TrackVertexColourType tracking)
+    {
+        mTracking = tracking;
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& Pass::getAmbient(void) const
+    {
+        return mAmbient;
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& Pass::getDiffuse(void) const
+    {
+        return mDiffuse;
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& Pass::getSpecular(void) const
+    {
+        return mSpecular;
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& Pass::getSelfIllumination(void) const
+    {
+        return mEmissive;
+    }
+    //-----------------------------------------------------------------------
+    Real Pass::getShininess(void) const
+    {
+        return mShininess;
+    }
+    //-----------------------------------------------------------------------
+    TrackVertexColourType Pass::getVertexColourTracking(void) const
+    {
+        return mTracking;
     }
     //-----------------------------------------------------------------------
     TextureUnitState* Pass::createTextureUnitState(void)
@@ -372,45 +491,71 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Pass::addTextureUnitState(TextureUnitState* state)
     {
-        OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
+            OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
 
-        OgreAssert(state , "TextureUnitState is NULL");
-
-        // only attach TUS to pass if TUS does not belong to another pass
-        OgreAssert(!state->getParent() || (state->getParent() == this), "TextureUnitState already attached to another pass");
-
-        mTextureUnitStates.push_back(state);
-        // Notify state
-        state->_notifyParent(this);
-        // if texture unit state name is empty then give it a default name based on its index
-        if (state->getName().empty())
+        assert(state && "state is 0 in Pass::addTextureUnitState()");
+        if (state)
         {
-            // its the last entry in the container so its index is size - 1
-            size_t idx = mTextureUnitStates.size() - 1;
+            // only attach TUS to pass if TUS does not belong to another pass
+            if ((state->getParent() == 0) || (state->getParent() == this))
+            {
+                mTextureUnitStates.push_back(state);
+                // Notify state
+                state->_notifyParent(this);
+                // if texture unit state name is empty then give it a default name based on its index
+                if (state->getName().empty())
+                {
+                    // its the last entry in the container so its index is size - 1
+                    size_t idx = mTextureUnitStates.size() - 1;
+                    
+                    // allow 8 digit hex number. there should never be that many texture units.
+                    // This sprintf replaced a call to StringConverter::toString for performance reasons
+                    state->setName( StringUtil::format("%lx", static_cast<long>(idx)));
+                    
+                    /** since the name was never set and a default one has been made, clear the alias name
+                     so that when the texture unit name is set by the user, the alias name will be set to
+                     that name
+                    */
+                    state->setTextureNameAlias(BLANKSTRING);
+                }
+                // Needs recompilation
+                mParent->_notifyNeedsRecompile();
+                _dirtyHash();
+            }
+            else
+            {
+                OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "TextureUnitState already attached to another pass",
+                    "Pass:addTextureUnitState");
 
-            // allow 8 digit hex number. there should never be that many texture units.
-            // This sprintf replaced a call to StringConverter::toString for performance reasons
-            state->setName( StringUtil::format("%lx", static_cast<long>(idx)));
+            }
+            mContentTypeLookupBuilt = false;
         }
-        _notifyNeedsRecompile();
-        _dirtyHash();
-
-        mContentTypeLookupBuilt = false;
+    }
+    //-----------------------------------------------------------------------
+    TextureUnitState* Pass::getTextureUnitState(unsigned short index) const
+    {
+            OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
+        assert (index < mTextureUnitStates.size() && "Index out of bounds");
+        return mTextureUnitStates[index];
     }
     //-----------------------------------------------------------------------------
     TextureUnitState* Pass::getTextureUnitState(const String& name) const
     {
-        OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
+            OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
+        TextureUnitStates::const_iterator i    = mTextureUnitStates.begin();
+        TextureUnitStates::const_iterator iend = mTextureUnitStates.end();
         TextureUnitState* foundTUS = 0;
 
         // iterate through TUS Container to find a match
-        for (auto *t : mTextureUnitStates)
+        while (i != iend)
         {
-            if (t->getName() == name)
+            if ( (*i)->getName() == name )
             {
-                foundTUS = t;
+                foundTUS = (*i);
                 break;
             }
+
+            ++i;
         }
 
         return foundTUS;
@@ -423,10 +568,18 @@ namespace Ogre {
         assert(state && "state is 0 in Pass::getTextureUnitStateIndex()");
 
         // only find index for state attached to this pass
-        OgreAssert(state->getParent() == this, "TextureUnitState is not attached to this pass");
-        auto i = std::find(mTextureUnitStates.begin(), mTextureUnitStates.end(), state);
-        assert(i != mTextureUnitStates.end() && "state is supposed to attached to this pass");
-        return static_cast<unsigned short>(std::distance(mTextureUnitStates.begin(), i));
+        if (state->getParent() == this)
+        {
+            TextureUnitStates::const_iterator i =
+                std::find(mTextureUnitStates.begin(), mTextureUnitStates.end(), state);
+            assert(i != mTextureUnitStates.end() && "state is supposed to attached to this pass");
+            return static_cast<unsigned short>(std::distance(mTextureUnitStates.begin(), i));
+        }
+        else
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "TextureUnitState is not attached to this pass",
+                "Pass:getTextureUnitStateIndex");
+        }
     }
 
     //-----------------------------------------------------------------------
@@ -450,7 +603,11 @@ namespace Ogre {
         TextureUnitStates::iterator i = mTextureUnitStates.begin() + index;
         OGRE_DELETE *i;
         mTextureUnitStates.erase(i);
-        _notifyNeedsRecompile();
+        if (!mQueuedForDeletion)
+        {
+            // Needs recompilation
+            mParent->_notifyNeedsRecompile();
+        }
         _dirtyHash();
         mContentTypeLookupBuilt = false;
     }
@@ -465,12 +622,16 @@ namespace Ogre {
             OGRE_DELETE *i;
         }
         mTextureUnitStates.clear();
-        _notifyNeedsRecompile();
+        if (!mQueuedForDeletion)
+        {
+            // Needs recompilation
+            mParent->_notifyNeedsRecompile();
+        }
         _dirtyHash();
         mContentTypeLookupBuilt = false;
     }
     //-----------------------------------------------------------------------
-    static void _getBlendFlags(SceneBlendType type, SceneBlendFactor& source, SceneBlendFactor& dest)
+    void Pass::_getBlendFlags(SceneBlendType type, SceneBlendFactor& source, SceneBlendFactor& dest)
     {
         switch ( type )
         {
@@ -490,12 +651,16 @@ namespace Ogre {
             source = SBF_ONE;
             dest = SBF_ONE;
             return;
-        default:
         case SBT_REPLACE:
             source = SBF_ONE;
             dest = SBF_ZERO;
             return;
         }
+
+        // Default to SBT_REPLACE
+
+        source = SBF_ONE;
+        dest = SBF_ZERO;
     }
     //-----------------------------------------------------------------------
     void Pass::setSceneBlending(SceneBlendType sbt)
@@ -545,6 +710,31 @@ namespace Ogre {
         mBlendState.destFactorAlpha = destFactorAlpha;
     }
     //-----------------------------------------------------------------------
+    SceneBlendFactor Pass::getSourceBlendFactor(void) const
+    {
+        return mBlendState.sourceFactor;
+    }
+    //-----------------------------------------------------------------------
+    SceneBlendFactor Pass::getDestBlendFactor(void) const
+    {
+        return mBlendState.destFactor;
+    }
+    //-----------------------------------------------------------------------
+    SceneBlendFactor Pass::getSourceBlendFactorAlpha(void) const
+    {
+        return mBlendState.sourceFactorAlpha ;
+    }
+    //-----------------------------------------------------------------------
+    SceneBlendFactor Pass::getDestBlendFactorAlpha(void) const
+    {
+        return mBlendState.destFactorAlpha;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::hasSeparateSceneBlending() const
+    {
+        return true;
+    }
+    //-----------------------------------------------------------------------
     void Pass::setSceneBlendingOperation(SceneBlendOperation op)
     {
         mBlendState.operation = op;
@@ -555,6 +745,21 @@ namespace Ogre {
     {
         mBlendState.operation = op;
         mBlendState.alphaOperation = alphaOp;
+    }
+    //-----------------------------------------------------------------------
+    SceneBlendOperation Pass::getSceneBlendingOperation() const
+    {
+        return mBlendState.operation;
+    }
+    //-----------------------------------------------------------------------
+    SceneBlendOperation Pass::getSceneBlendingOperationAlpha() const
+    {
+        return mBlendState.alphaOperation;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::hasSeparateSceneBlendingOperations() const
+    {
+        return true;
     }
     //-----------------------------------------------------------------------
     bool Pass::isTransparent(void) const
@@ -574,11 +779,76 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
+    void Pass::setDepthCheckEnabled(bool enabled)
+    {
+        mDepthCheck = enabled;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::getDepthCheckEnabled(void) const
+    {
+        return mDepthCheck;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setDepthWriteEnabled(bool enabled)
+    {
+        mDepthWrite = enabled;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::getDepthWriteEnabled(void) const
+    {
+        return mDepthWrite;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setDepthFunction( CompareFunction func)
+    {
+        mDepthFunc = func;
+    }
+    //-----------------------------------------------------------------------
+    CompareFunction Pass::getDepthFunction(void) const
+    {
+        return mDepthFunc;
+    }
+    //-----------------------------------------------------------------------
     void Pass::setAlphaRejectSettings(CompareFunction func, unsigned char value, bool alphaToCoverage)
     {
         mAlphaRejectFunc = func;
         mAlphaRejectVal = value;
         mAlphaToCoverageEnabled = alphaToCoverage;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setAlphaRejectFunction(CompareFunction func)
+    {
+        mAlphaRejectFunc = func;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setAlphaRejectValue(unsigned char val)
+    {
+        mAlphaRejectVal = val;
+    }
+    //---------------------------------------------------------------------
+    void Pass::setAlphaToCoverageEnabled(bool enabled)
+    {
+        mAlphaToCoverageEnabled = enabled;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setTransparentSortingEnabled(bool enabled)
+    {
+        mTransparentSorting = enabled;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::getTransparentSortingEnabled(void) const
+    {
+        return mTransparentSorting;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setTransparentSortingForced(bool enabled)
+    {
+        mTransparentSortingForced = enabled;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::getTransparentSortingForced(void) const
+    {
+        return mTransparentSortingForced;
     }
     //-----------------------------------------------------------------------
     void Pass::setColourWriteEnabled(bool enabled)
@@ -612,12 +882,92 @@ namespace Ogre {
         alpha = mBlendState.writeA;
     }
     //-----------------------------------------------------------------------
+    void Pass::setCullingMode( CullingMode mode)
+    {
+        mCullMode = mode;
+    }
+    //-----------------------------------------------------------------------
+    CullingMode Pass::getCullingMode(void) const
+    {
+        return mCullMode;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setLightingEnabled(bool enabled)
+    {
+        mLightingEnabled = enabled;
+    }
+    //-----------------------------------------------------------------------
+    bool Pass::getLightingEnabled(void) const
+    {
+        return mLightingEnabled;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setMaxSimultaneousLights(unsigned short maxLights)
+    {
+        mMaxSimultaneousLights = maxLights;
+    }
+    //-----------------------------------------------------------------------
+    unsigned short Pass::getMaxSimultaneousLights(void) const
+    {
+        return mMaxSimultaneousLights;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setStartLight(unsigned short startLight)
+    {
+        mStartLight = startLight;
+    }
+    //-----------------------------------------------------------------------
+    unsigned short Pass::getStartLight(void) const
+    {
+        return mStartLight;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setLightMask(uint32 mask)
+    {
+        mLightMask = mask;
+    }
+    //-----------------------------------------------------------------------
+    uint32 Pass::getLightMask() const
+    {
+        return mLightMask;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setLightCountPerIteration(unsigned short c)
+    {
+        mLightsPerIteration = c;
+    }
+    //-----------------------------------------------------------------------
+    unsigned short Pass::getLightCountPerIteration(void) const
+    {
+        return mLightsPerIteration;
+    }
+    //-----------------------------------------------------------------------
     void Pass::setIteratePerLight(bool enabled,
             bool onlyForOneLightType, Light::LightTypes lightType)
     {
         mIteratePerLight = enabled;
         mRunOnlyForOneLightType = onlyForOneLightType;
         mOnlyLightType = lightType;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadingMode(ShadeOptions mode)
+    {
+        mShadeOptions = mode;
+    }
+    //-----------------------------------------------------------------------
+    ShadeOptions Pass::getShadingMode(void) const
+    {
+        return mShadeOptions;
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setPolygonMode(PolygonMode mode)
+    {
+        mPolygonMode = mode;
+    }
+    //-----------------------------------------------------------------------
+    PolygonMode Pass::getPolygonMode(void) const
+    {
+        return mPolygonMode;
     }
     //-----------------------------------------------------------------------
     void Pass::setManualCullingMode(ManualCullingMode mode)
@@ -630,7 +980,7 @@ namespace Ogre {
         return mManualCullMode;
     }
     //-----------------------------------------------------------------------
-    void Pass::setFog(bool overrideScene, FogMode mode, const ColourValue& colour, float density, float start, float end)
+    void Pass::setFog(bool overrideScene, FogMode mode, const ColourValue& colour, Real density, Real start, Real end)
     {
         mFogOverride = overrideScene;
         if (overrideScene)
@@ -643,17 +993,70 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
+    bool Pass::getFogOverride(void) const
+    {
+        return mFogOverride;
+    }
+    //-----------------------------------------------------------------------
+    FogMode Pass::getFogMode(void) const
+    {
+        return mFogMode;
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& Pass::getFogColour(void) const
+    {
+        return mFogColour;
+    }
+    //-----------------------------------------------------------------------
+    Real Pass::getFogStart(void) const
+    {
+        return mFogStart;
+    }
+    //-----------------------------------------------------------------------
+    Real Pass::getFogEnd(void) const
+    {
+        return mFogEnd;
+    }
+    //-----------------------------------------------------------------------
+    Real Pass::getFogDensity(void) const
+    {
+        return mFogDensity;
+    }
+    //-----------------------------------------------------------------------
     void Pass::setDepthBias(float constantBias, float slopeScaleBias)
     {
        mDepthBiasConstant = constantBias;
        mDepthBiasSlopeScale = slopeScaleBias;
     }
     //-----------------------------------------------------------------------
+    float Pass::getDepthBiasConstant(void) const
+    {
+        return mDepthBiasConstant;
+    }
+    //-----------------------------------------------------------------------
+    float Pass::getDepthBiasSlopeScale(void) const
+    {
+        return mDepthBiasSlopeScale;
+    }
+    //---------------------------------------------------------------------
+    void Pass::setIterationDepthBias(float biasPerIteration)
+    {
+        mDepthBiasPerIteration = biasPerIteration;
+    }
+    //---------------------------------------------------------------------
+    float Pass::getIterationDepthBias() const
+    {
+        return mDepthBiasPerIteration;
+    }
+    //-----------------------------------------------------------------------
     Pass* Pass::_split(unsigned short numUnits)
     {
-        OgreAssert(
-            !isProgrammable(),
-            "Programmable passes cannot be automatically split, define a fallback technique instead");
+        if (isProgrammable())
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Programmable passes cannot be "
+                "automatically split, define a fallback technique instead.",
+                "Pass:_split");
+        }
 
         if (mTextureUnitStates.size() > numUnits)
         {
@@ -703,10 +1106,13 @@ namespace Ogre {
     {
         // We assume the Technique only calls this when the material is being
         // prepared
+
         // prepare each TextureUnitState
-        for (auto *t : mTextureUnitStates)
+        TextureUnitStates::iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            t->_prepare();
+            (*i)->_prepare();
         }
 
     }
@@ -714,9 +1120,11 @@ namespace Ogre {
     void Pass::_unprepare(void)
     {
         // unprepare each TextureUnitState
-        for (auto *t : mTextureUnitStates)
+        TextureUnitStates::iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            t->_unprepare();
+            (*i)->_unprepare();
         }
 
     }
@@ -725,15 +1133,40 @@ namespace Ogre {
     {
         // We assume the Technique only calls this when the material is being
         // loaded
+
         // Load each TextureUnitState
-        for (auto *t : mTextureUnitStates)
+        TextureUnitStates::iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            t->_load();
+            (*i)->_load();
         }
 
         // Load programs
         for (const auto& u : mProgramUsage)
             if(u) u->_load();
+
+        if (mShadowCasterVertexProgramUsage)
+        {
+            // Load vertex program
+            mShadowCasterVertexProgramUsage->_load();
+        }
+        if (mShadowCasterFragmentProgramUsage)
+        {
+            // Load fragment program
+            mShadowCasterFragmentProgramUsage->_load();
+        }
+        if (mShadowReceiverVertexProgramUsage)
+        {
+            // Load vertex program
+            mShadowReceiverVertexProgramUsage->_load();
+        }
+
+        if (mShadowReceiverFragmentProgramUsage)
+        {
+            // Load Fragment program
+            mShadowReceiverFragmentProgramUsage->_load();
+        }
 
         if (mHashDirtyQueued)
         {
@@ -745,9 +1178,11 @@ namespace Ogre {
     void Pass::_unload(void)
     {
         // Unload each TextureUnitState
-        for (auto *t : mTextureUnitStates)
+        TextureUnitStates::iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            t->_unload();
+            (*i)->_unload();
         }
 
         // TODO Unload programs
@@ -790,12 +1225,12 @@ namespace Ogre {
         {
             if (!programUsage)
             {
-                programUsage = std::make_unique<GpuProgramUsage>(type, this);
+                programUsage.reset(new GpuProgramUsage(type, this));
             }
             programUsage->setProgram(program, resetParams);
         }
         // Needs recompilation
-        _notifyNeedsRecompile();
+        mParent->_notifyNeedsRecompile();
 
         if( Pass::getHashFunction() == Pass::getBuiltinHashFunction( Pass::MIN_GPU_PROGRAM_CHANGE ) )
         {
@@ -871,7 +1306,8 @@ namespace Ogre {
         const auto& programUsage = getProgramUsage(type);
         if (!programUsage)
         {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "This pass has no " + to_string(type) + " program");
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have this program type assigned!");
         }
         return programUsage->getParameters();
     }
@@ -900,6 +1336,11 @@ namespace Ogre {
         return mProgramUsage[programType]->getProgram();
 	}
     //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getVertexProgram(void) const
+    {
+        return getGpuProgram(GPT_VERTEX_PROGRAM);
+    }
+    //-----------------------------------------------------------------------
     const String& Pass::getGpuProgramName(GpuProgramType type) const
     {
         OGRE_LOCK_MUTEX(mGpuProgramChangeMutex);
@@ -916,9 +1357,19 @@ namespace Ogre {
         return getGpuProgramParameters(GPT_FRAGMENT_PROGRAM);
     }
     //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getFragmentProgram(void) const
+    {
+        return getGpuProgram(GPT_FRAGMENT_PROGRAM);
+    }
+    //-----------------------------------------------------------------------
     GpuProgramParametersSharedPtr Pass::getGeometryProgramParameters(void) const
     {
         return getGpuProgramParameters(GPT_GEOMETRY_PROGRAM);
+    }
+    //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getGeometryProgram(void) const
+    {
+        return getGpuProgram(GPT_GEOMETRY_PROGRAM);
     }
     //-----------------------------------------------------------------------
     GpuProgramParametersSharedPtr Pass::getTessellationHullProgramParameters(void) const
@@ -926,14 +1377,29 @@ namespace Ogre {
         return getGpuProgramParameters(GPT_HULL_PROGRAM);
     }
     //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getTessellationHullProgram(void) const
+    {
+        return getGpuProgram(GPT_HULL_PROGRAM);
+    }
+    //-----------------------------------------------------------------------
     GpuProgramParametersSharedPtr Pass::getTessellationDomainProgramParameters(void) const
     {
         return getGpuProgramParameters(GPT_DOMAIN_PROGRAM);
     }
     //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getTessellationDomainProgram(void) const
+    {
+        return getGpuProgram(GPT_DOMAIN_PROGRAM);
+    }
+    //-----------------------------------------------------------------------
     GpuProgramParametersSharedPtr Pass::getComputeProgramParameters(void) const
     {
         return getGpuProgramParameters(GPT_COMPUTE_PROGRAM);
+    }
+    //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getComputeProgram(void) const
+    {
+        return getGpuProgram(GPT_COMPUTE_PROGRAM);
     }
     //-----------------------------------------------------------------------
     bool Pass::isLoaded(void) const
@@ -956,13 +1422,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Pass::_dirtyHash(void)
     {
-        if (mQueuedForDeletion)
-            return;
-
         Material* mat = mParent->getParent();
         if (mat->isLoading() || mat->isLoaded())
         {
-            OGRE_LOCK_MUTEX(msDirtyHashListMutex);
+                    OGRE_LOCK_MUTEX(msDirtyHashListMutex);
             // Mark this hash as for follow up
             msDirtyHashList.insert(this);
             mHashDirtyQueued = false;
@@ -981,25 +1444,29 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Pass::_notifyNeedsRecompile(void)
     {
-        if (!mQueuedForDeletion)
-            mParent->_notifyNeedsRecompile();
+        mParent->_notifyNeedsRecompile();
     }
     //-----------------------------------------------------------------------
     void Pass::setTextureFiltering(TextureFilterOptions filterType)
     {
         OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
-        for (auto *t : mTextureUnitStates)
+
+        TextureUnitStates::iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            t->setTextureFiltering(filterType);
+            (*i)->setTextureFiltering(filterType);
         }
     }
     // --------------------------------------------------------------------
     void Pass::setTextureAnisotropy(unsigned int maxAniso)
     {
         OGRE_LOCK_MUTEX(mTexUnitChangeMutex);
-        for (auto *t : mTextureUnitStates)
+        TextureUnitStates::iterator i, iend;
+        iend = mTextureUnitStates.end();
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
         {
-            t->setTextureAnisotropy(maxAniso);
+            (*i)->setTextureAnisotropy(maxAniso);
         }
     }
     //-----------------------------------------------------------------------
@@ -1019,22 +1486,27 @@ namespace Ogre {
     void Pass::processPendingPassUpdates(void)
     {
         {
-            OGRE_LOCK_MUTEX(msPassGraveyardMutex);
+                    OGRE_LOCK_MUTEX(msPassGraveyardMutex);
             // Delete items in the graveyard
-            for (auto& i : msPassGraveyard)
+            PassSet::iterator i, iend;
+            iend = msPassGraveyard.end();
+            for (i = msPassGraveyard.begin(); i != iend; ++i)
             {
-                OGRE_DELETE i;
+                OGRE_DELETE *i;
             }
             msPassGraveyard.clear();
         }
         PassSet tempDirtyHashList;
         {
-            OGRE_LOCK_MUTEX(msDirtyHashListMutex);
+                    OGRE_LOCK_MUTEX(msDirtyHashListMutex);
             // The dirty ones will have been removed from the groups above using the old hash now
             tempDirtyHashList.swap(msDirtyHashList);
         }
-        for (auto *p : tempDirtyHashList)
+        PassSet::iterator i, iend;
+        iend = tempDirtyHashList.end();
+        for (i = tempDirtyHashList.begin(); i != iend; ++i)
         {
+            Pass* p = *i;
             p->_recalculateHash();
         }
     }
@@ -1046,6 +1518,11 @@ namespace Ogre {
         removeAllTextureUnitStates();
         for (auto& u : mProgramUsage)
             u.reset();
+
+        mShadowCasterVertexProgramUsage.reset();
+        mShadowCasterFragmentProgramUsage.reset();
+        mShadowReceiverVertexProgramUsage.reset();
+        mShadowReceiverFragmentProgramUsage.reset();
 
         // remove from dirty list, if there
         {
@@ -1071,9 +1548,249 @@ namespace Ogre {
              mSpecular == ColourValue::Black));
     }
     //-----------------------------------------------------------------------
+    void Pass::setShadowCasterVertexProgram(const String& name)
+    {
+        // Turn off vertex program if name blank
+        if (name.empty())
+        {
+            mShadowCasterVertexProgramUsage.reset();
+        }
+        else
+        {
+            if (!mShadowCasterVertexProgramUsage)
+            {
+                mShadowCasterVertexProgramUsage.reset(new GpuProgramUsage(GPT_VERTEX_PROGRAM, this));
+            }
+            mShadowCasterVertexProgramUsage->setProgramName(name);
+        }
+        // Needs recompilation
+        mParent->_notifyNeedsRecompile();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowCasterVertexProgramParameters(GpuProgramParametersSharedPtr params)
+    {
+        if (!mShadowCasterVertexProgramUsage)
+        {
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have a shadow caster vertex program assigned!",
+                "Pass::setShadowCasterVertexProgramParameters");
+        }
+        mShadowCasterVertexProgramUsage->setParameters(params);
+    }
+    //-----------------------------------------------------------------------
+    const String& Pass::getShadowCasterVertexProgramName(void) const
+    {
+        if (!mShadowCasterVertexProgramUsage)
+            return BLANKSTRING;
+        else
+            return mShadowCasterVertexProgramUsage->getProgramName();
+    }
+    //-----------------------------------------------------------------------
+    GpuProgramParametersSharedPtr Pass::getShadowCasterVertexProgramParameters(void) const
+    {
+        if (!mShadowCasterVertexProgramUsage)
+        {
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have a shadow caster vertex program assigned!",
+                "Pass::getShadowCasterVertexProgramParameters");
+        }
+        return mShadowCasterVertexProgramUsage->getParameters();
+    }
+    //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getShadowCasterVertexProgram(void) const
+    {
+        return mShadowCasterVertexProgramUsage->getProgram();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowCasterFragmentProgram(const String& name)
+    {
+        // Turn off fragment program if name blank
+        if (name.empty())
+        {
+            mShadowCasterFragmentProgramUsage.reset();
+        }
+        else
+        {
+            if (!mShadowCasterFragmentProgramUsage)
+            {
+                mShadowCasterFragmentProgramUsage.reset(new GpuProgramUsage(GPT_FRAGMENT_PROGRAM, this));
+            }
+            mShadowCasterFragmentProgramUsage->setProgramName(name);
+        }
+        // Needs recompilation
+        mParent->_notifyNeedsRecompile();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowCasterFragmentProgramParameters(GpuProgramParametersSharedPtr params)
+    {
+        if (!mShadowCasterFragmentProgramUsage &&
+            !Root::getSingletonPtr()->getRenderSystem()->getCapabilities()->hasCapability(
+                RSC_FIXED_FUNCTION))
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "This pass does not have a shadow caster fragment program assigned!",
+                        "Pass::setShadowCasterFragmentProgramParameters");
+        }
+        mShadowCasterFragmentProgramUsage->setParameters(params);
+    }
+    //-----------------------------------------------------------------------
+    const String& Pass::getShadowCasterFragmentProgramName(void) const
+    {
+        if (!mShadowCasterFragmentProgramUsage)
+            return BLANKSTRING;
+        else
+            return mShadowCasterFragmentProgramUsage->getProgramName();
+    }
+    //-----------------------------------------------------------------------
+    GpuProgramParametersSharedPtr Pass::getShadowCasterFragmentProgramParameters(void) const
+    {
+
+        if (!mShadowCasterFragmentProgramUsage &&
+            !Root::getSingletonPtr()->getRenderSystem()->getCapabilities()->hasCapability(
+                RSC_FIXED_FUNCTION))
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "This pass does not have a shadow caster fragment program assigned!",
+                        "Pass::getShadowCasterFragmentProgramParameters");
+        }
+
+        return mShadowCasterFragmentProgramUsage->getParameters();
+    }
+    //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getShadowCasterFragmentProgram(void) const
+    {
+        return mShadowCasterFragmentProgramUsage->getProgram();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowReceiverVertexProgram(const String& name)
+    {
+        // Turn off vertex program if name blank
+        if (name.empty())
+        {
+            mShadowReceiverVertexProgramUsage.reset();
+        }
+        else
+        {
+            if (!mShadowReceiverVertexProgramUsage)
+            {
+                mShadowReceiverVertexProgramUsage.reset(new GpuProgramUsage(GPT_VERTEX_PROGRAM, this));
+            }
+            mShadowReceiverVertexProgramUsage->setProgramName(name);
+        }
+        // Needs recompilation
+        mParent->_notifyNeedsRecompile();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowReceiverVertexProgramParameters(GpuProgramParametersSharedPtr params)
+    {
+        if (!mShadowReceiverVertexProgramUsage)
+        {
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have a shadow receiver vertex program assigned!",
+                "Pass::setShadowReceiverVertexProgramParameters");
+        }
+        mShadowReceiverVertexProgramUsage->setParameters(params);
+    }
+    //-----------------------------------------------------------------------
+    const String& Pass::getShadowReceiverVertexProgramName(void) const
+    {
+        if (!mShadowReceiverVertexProgramUsage)
+            return BLANKSTRING;
+        else
+            return mShadowReceiverVertexProgramUsage->getProgramName();
+    }
+    //-----------------------------------------------------------------------
+    GpuProgramParametersSharedPtr Pass::getShadowReceiverVertexProgramParameters(void) const
+    {
+        if (!mShadowReceiverVertexProgramUsage)
+        {
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have a shadow receiver vertex program assigned!",
+                "Pass::getShadowReceiverVertexProgramParameters");
+        }
+        return mShadowReceiverVertexProgramUsage->getParameters();
+    }
+    //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getShadowReceiverVertexProgram(void) const
+    {
+        return mShadowReceiverVertexProgramUsage->getProgram();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowReceiverFragmentProgram(const String& name)
+    {
+        // Turn off Fragment program if name blank
+        if (name.empty())
+        {
+            mShadowReceiverFragmentProgramUsage.reset();
+        }
+        else
+        {
+            if (!mShadowReceiverFragmentProgramUsage)
+            {
+                mShadowReceiverFragmentProgramUsage.reset(new GpuProgramUsage(GPT_FRAGMENT_PROGRAM, this));
+            }
+            mShadowReceiverFragmentProgramUsage->setProgramName(name);
+        }
+        // Needs recompilation
+        mParent->_notifyNeedsRecompile();
+    }
+    //-----------------------------------------------------------------------
+    void Pass::setShadowReceiverFragmentProgramParameters(GpuProgramParametersSharedPtr params)
+    {
+        if (!mShadowReceiverFragmentProgramUsage)
+        {
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have a shadow receiver fragment program assigned!",
+                "Pass::setShadowReceiverFragmentProgramParameters");
+        }
+        mShadowReceiverFragmentProgramUsage->setParameters(params);
+    }
+    //-----------------------------------------------------------------------
+    const String& Pass::getShadowReceiverFragmentProgramName(void) const
+    {
+        if (!mShadowReceiverFragmentProgramUsage)
+            return BLANKSTRING;
+        else
+            return mShadowReceiverFragmentProgramUsage->getProgramName();
+    }
+    //-----------------------------------------------------------------------
+    GpuProgramParametersSharedPtr Pass::getShadowReceiverFragmentProgramParameters(void) const
+    {
+        if (!mShadowReceiverFragmentProgramUsage)
+        {
+            OGRE_EXCEPT (Exception::ERR_INVALIDPARAMS,
+                "This pass does not have a shadow receiver fragment program assigned!",
+                "Pass::getShadowReceiverFragmentProgramParameters");
+        }
+        return mShadowReceiverFragmentProgramUsage->getParameters();
+    }
+    //-----------------------------------------------------------------------
+    const GpuProgramPtr& Pass::getShadowReceiverFragmentProgram(void) const
+    {
+        return mShadowReceiverFragmentProgramUsage->getProgram();
+    }
+    //-----------------------------------------------------------------------
     const String& Pass::getResourceGroup(void) const
     {
         return mParent->getResourceGroup();
+    }
+
+    //-----------------------------------------------------------------------
+    bool Pass::applyTextureAliases(const AliasTextureNamePairList& aliasList, const bool apply) const
+    {
+        // iterate through each texture unit state and apply the texture alias if it applies
+        TextureUnitStates::const_iterator i, iend;
+        iend = mTextureUnitStates.end();
+        bool testResult = false;
+
+        for (i = mTextureUnitStates.begin(); i != iend; ++i)
+        {
+            if ((*i)->applyTextureAliases(aliasList, apply))
+                testResult = true;
+        }
+
+        return testResult;
+
     }
     //-----------------------------------------------------------------------
     unsigned short Pass::_getTextureUnitWithContentTypeIndex(

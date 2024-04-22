@@ -31,9 +31,9 @@
 #include "OgreGLSupportPrerequisites.h"
 #include "OgreString.h"
 #include "OgreGpuProgramParams.h"
-#include "OgreGLSLProgramCommon.h"
 
 namespace Ogre {
+    class GLSLProgramCommon;
     class GLSLShaderCommon;
 
     /** Ogre assumes that there are separate programs to deal with but
@@ -51,29 +51,26 @@ namespace Ogre {
     class GLSLProgramManagerCommon
     {
     protected:
-        typedef std::map<String, GpuConstantType> StringToEnumMap;
+        typedef std::map<String, uint32> StringToEnumMap;
         StringToEnumMap mTypeEnumMap;
+
+        /**  Convert GL uniform size and type to OGRE constant types
+             and associate uniform definitions together. */
+        virtual void convertGLUniformtoOgreType(uint32 gltype,
+                                        GpuConstantDefinition& defToUpdate) = 0;
 
         /** Parse an individual uniform from a GLSL source file and
             store it in a GpuNamedConstant. */
-        void parseGLSLUniform(String line, GpuNamedConstants& defs, const String& filename);
-
-        /// checks whether the param with the given name should be added to the uniforms list
-        static bool validateParam(String paramName, uint32 numActiveArrayElements,
-                                  const GpuConstantDefinitionMap* (&constantDefs)[6], GLUniformReference& refToUpdate);
+        void parseGLSLUniform(
+            String line, GpuNamedConstants& defs,
+            const String& filename, const GpuSharedParametersPtr& sharedParams);
 
         typedef std::map<uint32, GLSLProgramCommon*> ProgramMap;
         typedef ProgramMap::iterator ProgramIterator;
 
         /// container holding previously created program objects
         ProgramMap mPrograms;
-
-        /// Active shader objects defining the active program object.
-        GLShaderList mActiveShader;
-        /// active objects defining the active rendering gpu state
-        GLSLProgramCommon* mActiveProgram;
     public:
-        GLSLProgramManagerCommon();
         virtual ~GLSLProgramManagerCommon();
 
         /** Populate a list of uniforms based on GLSL source and store
@@ -89,11 +86,6 @@ namespace Ogre {
 
         /// Destroy all programs which referencing this shader
         void destroyAllByShader(GLSLShaderCommon* shader);
-
-        /** Set the shader for the next rendering state.
-            The active program object will be cleared.
-        */
-        void setActiveShader(GpuProgramType type, GLSLShaderCommon* shader);
     };
 
 }

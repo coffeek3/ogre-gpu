@@ -1,13 +1,16 @@
-# Build instructions
+# Build instructions for Mono on Ubuntu
 
-1. copy the contents of `lib/cli/ogre-sharp-x.y.z/` to the `bin/` directory
-2. copy `example.cs` to the `bin/` directory
-3. compile the sample as
+1. inside `build/csharp/`
     ```
-    C:/Windows/Microsoft.NET/Framework64/x.y.z/csc.exe example.cs -r:Ogre.dll
+    mcs -target:library -out:Ogre.dll *.cs
     ```
-    On Linux, you can the `mcs` mono compiler instead.
-4. Run the sample by double clicking `example.exe` or on linux, running:
+2. copy `Ogre.dll` and `libOgre.so` to current directory
+3. compile the sample
+    ```
+    mcs example.cs -r:Ogre.dll
+    ```
+4. copy `build/bin/resources.cfg` to current directory
+5. to start the sample run
     ```
     mono example.exe
     ```

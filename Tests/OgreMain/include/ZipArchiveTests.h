@@ -38,8 +38,8 @@ class ZipArchiveTests : public ::testing::Test
 protected:
     Ogre::Archive* arch;
 public:
-    void SetUp() override;
-    void TearDown() override;
+    void SetUp();
+    void TearDown();
 };
 
 #endif

@@ -41,16 +41,16 @@ namespace Ogre {
     *  @{
     */
     /** Allows the rendering of a wireframe bounding box.
-
+        @remarks
             This class builds a wireframe renderable from a given aabb. A pointer to this class can be
             added to a render queue to display the bounding box of an object.
     */
     class _OgreExport WireBoundingBox : public SimpleRenderable
     {
-    private:
+    protected:
         /** Override this method to prevent parent transforms (rotation,translation,scale)
         */
-        void getWorldTransforms( Matrix4* xform ) const override;
+        void getWorldTransforms( Matrix4* xform ) const;
         
         /** Builds the wireframe line list.
         */
@@ -72,9 +72,9 @@ namespace Ogre {
         */
         void setupBoundingBox(const AxisAlignedBox& aabb);
 
-        Real getSquaredViewDepth(const Camera* cam) const override;
+        Real getSquaredViewDepth(const Camera* cam) const;
 
-        Real getBoundingRadius(void) const override { return mRadius; }
+        Real getBoundingRadius(void) const { return mRadius; }
 
     };
     /** @} */

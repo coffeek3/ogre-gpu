@@ -33,7 +33,7 @@ THE SOFTWARE.
 #include "OgreRoot.h"
 #include "OgreGLHardwarePixelBuffer.h"
 #include "OgreGLFBORenderTexture.h"
-#include "OgreGLDepthBufferCommon.h"
+#include "OgreGLDepthBuffer.h"
 #include "OgreGLRenderSystemCommon.h"
 
 namespace Ogre {
@@ -45,7 +45,7 @@ namespace Ogre {
         // Generate framebuffer object
         glGenFramebuffersEXT(1, &mFB);
         // check multisampling
-        if (GLAD_GL_EXT_framebuffer_blit && GLAD_GL_EXT_framebuffer_multisample)
+        if (GLEW_EXT_framebuffer_blit && GLEW_EXT_framebuffer_multisample)
         {
             // check samples supported
             GLint maxSamples;
@@ -107,6 +107,8 @@ namespace Ogre {
         // Bind simple buffer to add colour attachments
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, mFB);
 
+        bool isDepth = PixelUtil::isDepth(getFormat());
+
         // Bind all attachment points to frame buffer
         for(unsigned int x=0; x<maxSupportedMRTs; ++x)
         {
@@ -122,8 +124,13 @@ namespace Ogre {
                     ss << ".";
                     OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, ss.str(), "GLFrameBufferObject::initialise");
                 }
+                if (!rsc->hasCapability(RSC_MRT_DIFFERENT_BIT_DEPTHS) && mColour[x].buffer->getGLFormat() != format)
+                {
+                    StringStream ss;
+                    ss << "Attachment " << x << " has incompatible format.";
+                    OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, ss.str(), "GLFrameBufferObject::initialise");
+                }
 
-                bool isDepth = PixelUtil::isDepth(mColour[x].buffer->getFormat());
                 mColour[x].buffer->bindToFramebuffer(
                     isDepth ? GL_DEPTH_ATTACHMENT_EXT : (GL_COLOR_ATTACHMENT0_EXT + x), mColour[x].zoffset);
             }
@@ -136,7 +143,7 @@ namespace Ogre {
         }
 
         // Now deal with depth / stencil
-        if (mMultisampleFB && !PixelUtil::isDepth(getFormat()))
+        if (mMultisampleFB)
         {
             // Bind multisample buffer
             glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, mMultisampleFB);
@@ -166,11 +173,9 @@ namespace Ogre {
             // Fill attached colour buffers
             if(mColour[x].buffer)
             {
-                bool isDepth = PixelUtil::isDepth(mColour[x].buffer->getFormat());
-                bufs[x] = isDepth ? GL_NONE : (GL_COLOR_ATTACHMENT0_EXT + x);
+                bufs[x] = isDepth ? GL_DEPTH_ATTACHMENT_EXT : (GL_COLOR_ATTACHMENT0_EXT + x);
                 // Keep highest used buffer + 1
-                if(!isDepth)
-                    n = x+1;
+                n = x+1;
             }
             else
             {
@@ -178,12 +183,26 @@ namespace Ogre {
             }
         }
 
-        if(glDrawBuffers)
-            // Drawbuffer extension supported, use it
-            glDrawBuffers(n, bufs);
+        if(!isDepth)
+        {
+            if(glDrawBuffers)
+                // Drawbuffer extension supported, use it
+                glDrawBuffers(n, bufs);
+            else
+                // In this case, the capabilities will not show more than 1 simultaneaous render target.
+                glDrawBuffer(bufs[0]);
+        }
+
+        if (mMultisampleFB)
+        {
+            // we need a read buffer because we'll be blitting to mFB
+            glReadBuffer(bufs[0]);
+        }
         else
-            // In this case, the capabilities will not show more than 1 simultaneaous render target.
-            glDrawBuffer(bufs[0]);
+        {
+            // No read buffer, by default, if we want to read anyway we must not forget to set this.
+            glReadBuffer(GL_NONE);
+        }
         
         // Check status
         GLuint status;
@@ -237,7 +256,7 @@ namespace Ogre {
 
     void GLFrameBufferObject::attachDepthBuffer( DepthBuffer *depthBuffer )
     {
-        auto glDepthBuffer = static_cast<GLDepthBufferCommon*>(depthBuffer);
+        GLDepthBuffer *glDepthBuffer = static_cast<GLDepthBuffer*>(depthBuffer);
 
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, mMultisampleFB ? mMultisampleFB : mFB );
 

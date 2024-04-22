@@ -78,10 +78,10 @@ namespace Ogre
     DynLibManager::~DynLibManager()
     {
         // Unload & delete resources in turn
-        for(auto & it : mLibList)
+        for( DynLibList::iterator it = mLibList.begin(); it != mLibList.end(); ++it )
         {
-            it.second->unload();
-            OGRE_DELETE it.second;
+            it->second->unload();
+            OGRE_DELETE it->second;
         }
 
         // Empty the list

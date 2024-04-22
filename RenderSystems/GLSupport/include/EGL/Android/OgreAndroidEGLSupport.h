@@ -38,12 +38,14 @@ namespace Ogre {
         AndroidEGLSupport();
         virtual ~AndroidEGLSupport();
 
-        ConfigOptionMap getConfigOptions() override;
+        ConfigOptionMap getConfigOptions();
+
+        virtual void switchMode(uint& width, uint& height, short& frequency);
         
-        RenderWindow* newWindow(const String& name,
+        virtual RenderWindow* newWindow(const String& name,
                                         unsigned int width, unsigned int height,
                                         bool fullScreen,
-                                        const NameValuePairList *miscParams = 0) override;
+                                        const NameValuePairList *miscParams = 0);
     };
 }
 

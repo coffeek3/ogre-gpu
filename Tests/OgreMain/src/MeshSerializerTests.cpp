@@ -47,7 +47,6 @@ THE SOFTWARE.
 #include "OgreSkeleton.h"
 #include "OgreKeyFrame.h"
 
-#include <fstream>
 
 //#define I_HAVE_LOT_OF_FREE_TIME
 
@@ -275,16 +274,16 @@ TEST_F(MeshSerializerTests,Mesh_Version_1_2)
 }
 #endif /* ifdef I_HAVE_LOT_OF_FREE_TIME */
 //--------------------------------------------------------------------------
-#ifdef OGRE_TEST_XMLSERIALIZER
 TEST_F(MeshSerializerTests,Mesh_XML)
 {
+#ifdef OGRE_TEST_XMLSERIALIZER
     XMLMeshSerializer serializerXML;
     serializerXML.exportMesh(mOrigMesh.get(), mMeshFullPath + ".xml");
     mMesh = MeshManager::getSingleton().create(mMesh->getName() + ".test.mesh", mMesh->getGroup());
     serializerXML.importMesh(mMeshFullPath + ".xml", VET_COLOUR_ABGR, mMesh.get());
     assertMeshClone(mOrigMesh.get(), mMesh.get());
-}
 #endif
+}
 
 namespace Ogre
 {
@@ -385,6 +384,7 @@ void MeshSerializerTests::assertMeshClone(Mesh* a, Mesh* b, MeshVersion version 
         EXPECT_TRUE(aSubmesh->useSharedVertices == bSubmesh->useSharedVertices);
         EXPECT_TRUE(aSubmesh->getVertexAnimationIncludesNormals() == bSubmesh->getVertexAnimationIncludesNormals());
         EXPECT_TRUE(aSubmesh->getVertexAnimationType() == bSubmesh->getVertexAnimationType());
+        EXPECT_TRUE(aSubmesh->getTextureAliasCount() == bSubmesh->getTextureAliasCount());
         EXPECT_TRUE(isContainerClone(aSubmesh->blendIndexToBoneIndexMap, bSubmesh->blendIndexToBoneIndexMap));
         // TODO: Compare getBoneAssignments and getTextureAliases
         for (int n = 0; n < numLods; n++) {
@@ -431,7 +431,7 @@ void MeshSerializerTests::assertMeshClone(Mesh* a, Mesh* b, MeshVersion version 
             EXPECT_EQ(bList.at(it->first)->getAnimationType(), it->second->getAnimationType());
             ASSERT_EQ(bList.at(it->first)->getNumKeyFrames(), it->second->getNumKeyFrames());
 
-            for (size_t j = 0; j < it->second->getNumKeyFrames(); j++)
+            for (int j = 0; j < it->second->getNumKeyFrames(); j++)
             {
                 VertexPoseKeyFrame* aKeyFrame = it->second->getVertexPoseKeyFrame(j);
                 VertexPoseKeyFrame* bKeyFrame = bList.at(it->first)->getVertexPoseKeyFrame(j);
@@ -620,7 +620,7 @@ void MeshSerializerTests::getResourceFullPath(const ResourcePtr& resource, Strin
     it = locPtr->begin();
     itEnd = locPtr->end();
     for (; it != itEnd; it++) {
-        if (StringUtil::startsWith(name, it->filename)) {
+        if (stricmp(name.c_str(), it->filename.c_str()) == 0) {
             info = &*it;
             break;
         }

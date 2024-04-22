@@ -28,7 +28,7 @@
 #include <android/native_window_jni.h>
 
 // adapt to OGRE
-#include "OgreVector.h"
+#include "OgreVector2.h"
 #include <android/log.h>
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "Ogre", __VA_ARGS__))
 #define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "Ogre", __VA_ARGS__))
@@ -94,7 +94,7 @@ public:
     virtual ~TapDetector()
     {
     }
-    GESTURE_STATE Detect( const AInputEvent* motion_event ) override;
+    virtual GESTURE_STATE Detect( const AInputEvent* motion_event );
 };
 
 /******************************************************************
@@ -117,8 +117,8 @@ public:
     virtual ~DoubletapDetector()
     {
     }
-    GESTURE_STATE Detect( const AInputEvent* motion_event ) override;
-    void SetConfiguration( AConfiguration* config ) override;
+    virtual GESTURE_STATE Detect( const AInputEvent* motion_event );
+    virtual void SetConfiguration( AConfiguration* config );
 };
 
 /******************************************************************
@@ -142,7 +142,7 @@ public:
     virtual ~PinchDetector()
     {
     }
-    GESTURE_STATE Detect( const AInputEvent* event ) override;
+    virtual GESTURE_STATE Detect( const AInputEvent* event );
     bool GetPointers( Vec2& v1, Vec2& v2 );
 };
 
@@ -164,7 +164,7 @@ public:
     virtual ~DragDetector()
     {
     }
-    GESTURE_STATE Detect( const AInputEvent* event ) override;
+    virtual GESTURE_STATE Detect( const AInputEvent* event );
     bool GetPointer( Vec2& v );
 };
 

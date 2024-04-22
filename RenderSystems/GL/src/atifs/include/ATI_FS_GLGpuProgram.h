@@ -45,16 +45,24 @@ namespace Ogre {
 
 
         /// Execute the binding functions for this program
-        void bindProgram(void) override;
+        void bindProgram(void);
         /// Execute the unbinding functions for this program
-        void unbindProgram(void) override;
+        void unbindProgram(void);
         /// Execute the param binding functions for this program
-        void bindProgramParameters(GpuProgramParametersSharedPtr params, uint16 mask) override;
+        void bindProgramParameters(GpuProgramParametersSharedPtr params, uint16 mask);
+        /** Execute the pass iteration param binding functions for this program.
+            Only binds those parameters used for multipass rendering
+        */
+        void bindProgramPassIterationParameters(GpuProgramParametersSharedPtr params);
+
+        /// Get the assigned GL program id
+        GLuint getProgramID(void) const
+        { return mProgramID; }
 
     protected:
         /// @copydoc Resource::unload
-        void unloadImpl(void) override;
-        void loadFromSource(void) override;
+        void unloadImpl(void);
+        void loadFromSource(void);
         GLenum mProgramType;
 
     }; // class ATI_FS_GLGpuProgram

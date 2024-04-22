@@ -29,11 +29,24 @@ THE SOFTWARE.
 #define __GLSLESProgram_H__
 
 #include "OgreGLES2Prerequisites.h"
-#include "OgreHighLevelGpuProgramManager.h"
 #include "OgreGLSLShaderCommon.h"
 #include "OgreGLES2ManagedResource.h"
 
 namespace Ogre {
+    /** Specialisation of HighLevelGpuProgram to provide support for OpenGL 
+        Shader Language (GLSL ES) for OpenGL ES 2.0.
+    @remarks
+        GLSL ES has no target assembler or entry point specification like DirectX 9 HLSL.
+        Vertex and Fragment shaders only have one entry point called "main".  
+        When a shader is compiled, microcode is generated but can not be accessed by
+        the application.
+        GLSL ES also does not provide assembler low level output after compiling.  The GL ES Render
+        system assumes that the Gpu program is a GL Gpu program so GLSLESProgram will create a 
+        GLSLESGpuProgram that is subclassed from GLES2GpuProgram for the low level implementation.
+        The GLES2Program class will create a shader object and compile the source but will
+        not create a program object.  It's up to GLES2GpuProgram class to request a program object
+        to link the shader object to.
+    */
     class _OgreGLES2Export GLSLESProgram : public GLSLShaderCommon MANAGED_RESOURCE
     {
     public:
@@ -51,8 +64,13 @@ namespace Ogre {
             const String& group, bool isManual, ManualResourceLoader* loader);
         ~GLSLESProgram();
 
-        void attachToProgramObject( const GLuint programObject ) override;
-        void detachFromProgramObject( const GLuint programObject ) override;
+        /// GL Shader Handle
+        GLuint getGLShaderHandle() const { return mGLShaderHandle; }
+        void attachToProgramObject( const GLuint programObject );
+        void detachFromProgramObject( const GLuint programObject );
+        GLuint getGLProgramHandle() const { return mGLProgramHandle; }
+
+        GLuint createGLProgramHandle();
 
 #if !OGRE_NO_GLES2_GLSL_OPTIMISER
         /// Sets if the GLSL optimiser is enabled.
@@ -72,23 +90,45 @@ namespace Ogre {
 #endif
 
         /// Overridden from GpuProgram
-        const String& getLanguage(void) const override;
+        const String& getLanguage(void) const;
         /// Overridden from GpuProgram
-        GpuProgramParametersSharedPtr createParameters(void) override;
+        GpuProgramParametersSharedPtr createParameters(void);
 
-        bool linkSeparable() override;
+        /// compile source into shader object
+        bool compile( bool checkErrors = false);
+
+        /// Since GLSL has no assembly, use this shader for binding.
+        GpuProgram* _getBindingDelegate(void) { return this; }
+
+        /// Execute the binding functions for this program
+        void bindProgram(void);
+        /// Execute the unbinding functions for this program
+        void unbindProgram(void);
+        /// Execute the param binding functions for this program
+        void bindProgramParameters(GpuProgramParametersSharedPtr params, uint16 mask);
+        /// Execute the shared param binding functions for this program
+        void bindProgramSharedParameters(GpuProgramParametersSharedPtr params, uint16 mask);
+        /// Execute the pass iteration param binding functions for this program
+        void bindProgramPassIterationParameters(GpuProgramParametersSharedPtr params);
+
+        size_t calculateSize(void) const;
 
     protected:
 #if !OGRE_NO_GLES2_GLSL_OPTIMISER
         static CmdOptimisation msCmdOptimisation;
 #endif
 
-        void loadFromSource() override;
+        /** Internal method for creating a dummy low-level program for this
+        high-level program. GLSL ES does not give access to the low level implementation of the
+        shader so this method creates an object sub-classed from GLES2GpuProgram just to be
+        compatible with GLES2RenderSystem.
+        */
+        void createLowLevelImpl(void);
         /// Internal unload implementation, must be implemented by subclasses
-        void unloadHighLevelImpl(void) override;
+        void unloadHighLevelImpl(void);
 
         /// Populate the passed parameters with name->index map, must be overridden
-        void buildConstantDefinitions() override;
+        void buildConstantDefinitions() const;
         /** check the compile result for an error with default precision - and recompile if needed.
             some glsl compilers return an error default precision is set to types other then
             int or float, this function test a failed compile result for the error,
@@ -97,11 +137,14 @@ namespace Ogre {
         void checkAndFixInvalidDefaultPrecisionError( String &message );
         
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
-        void notifyOnContextLost() override;
-        void notifyOnContextReset() override;
+        virtual void notifyOnContextLost();
+        virtual void notifyOnContextReset();
 #endif
         
     private:
+        /// GL handle for shader object
+        GLuint mGLShaderHandle;
+        GLuint mGLProgramHandle;
 #if !OGRE_NO_GLES2_GLSL_OPTIMISER
         /// Flag indicating if shader has been successfully optimised
         bool mIsOptimised;
@@ -109,18 +152,6 @@ namespace Ogre {
         /// The optmised source of the program (may be blank until the shader is optmisied)
         String mOptimisedSource;
 #endif
-    };
-
-    /** Factory class for GLSL ES programs. */
-    class GLSLESProgramFactory : public HighLevelGpuProgramFactory
-    {
-    public:
-        /// Get the name of the language this factory creates programs for
-        const String& getLanguage(void) const override;
-        /// Create an instance of GLSLESProgram
-        GpuProgram* create(ResourceManager* creator,
-            const String& name, ResourceHandle handle,
-            const String& group, bool isManual, ManualResourceLoader* loader) override;
     };
 }
 

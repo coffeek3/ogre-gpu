@@ -42,7 +42,7 @@ namespace Ogre {
     *  @{
     */
     /** Handles the management of skeleton resources.
-
+        @remarks
             This class deals with the runtime management of
             skeleton data; like other resource managers it handles
             the creation of resources (in this case skeleton data),
@@ -63,18 +63,18 @@ namespace Ogre {
 
         /// Get a resource by name
         /// @see ResourceManager::getResourceByName
-        SkeletonPtr getByName(const String& name, const String& groupName OGRE_RESOURCE_GROUP_INIT) const;
+        SkeletonPtr getByName(const String& name, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
         /// @copydoc Singleton::getSingleton()
         static SkeletonManager& getSingleton(void);
         /// @copydoc Singleton::getSingleton()
         static SkeletonManager* getSingletonPtr(void);
-    private:
+    protected:
 
         /// @copydoc ResourceManager::createImpl
         Resource* createImpl(const String& name, ResourceHandle handle, 
             const String& group, bool isManual, ManualResourceLoader* loader, 
-            const NameValuePairList* createParams) override;
+            const NameValuePairList* createParams);
 
     };
 

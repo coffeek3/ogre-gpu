@@ -79,31 +79,34 @@ void Operand::setMaskToParamType()
 }
 
 //-----------------------------------------------------------------------------
-static void writeMask(std::ostream& os, int mask)
+String Operand::getMaskAsString(int mask)
 {
-    if (mask != Operand::OPM_ALL)
+    String retVal = "";
+
+    if (mask != OPM_ALL)
     {
-        os << '.';
-        if (mask & Operand::OPM_X)
+        if (mask & OPM_X)
         {
-            os << 'x';
+            retVal += "x";
         }
 
-        if (mask & Operand::OPM_Y)
+        if (mask & OPM_Y)
         {
-            os << 'y';
+            retVal += "y";
         }
 
-        if (mask & Operand::OPM_Z)
+        if (mask & OPM_Z)
         {
-            os << 'z';
+            retVal += "z";
         }
 
-        if (mask & Operand::OPM_W)
+        if (mask & OPM_W)
         {
-            os << 'w';
+            retVal += "w";
         }
     }
+
+    return retVal;
 }
 
 //-----------------------------------------------------------------------------
@@ -125,10 +128,50 @@ int Operand::getFloatCount(int mask)
 }
 
 //-----------------------------------------------------------------------------
-void Operand::write(std::ostream& os) const
+GpuConstantType Operand::getGpuConstantType(int mask)
 {
-    os << mParameter->toString();
-    writeMask(os, mMask);
+    int floatCount = getFloatCount(mask);
+    GpuConstantType type;
+
+    switch (floatCount)
+    {
+
+    case 1:
+        type = GCT_FLOAT1;
+        break;
+
+    case 2:
+        type = GCT_FLOAT2;
+        break;
+
+    case 3:
+        type = GCT_FLOAT3;
+        break;
+
+    case 4:
+        type = GCT_FLOAT4;
+        break;
+
+    default:
+        type = GCT_UNKNOWN;
+        break;
+    }
+
+    return type;
+}
+
+//-----------------------------------------------------------------------------
+String Operand::toString() const
+{
+    String retVal = mParameter->toString();
+    if (mMask == OPM_ALL)
+    {
+        return retVal;
+    }
+
+    retVal += "." + getMaskAsString(mMask);
+
+    return retVal;
 }
 
 //-----------------------------------------------------------------------------
@@ -181,16 +224,14 @@ static String parameterNullMsg(const String& name, size_t pos)
 
 void FunctionAtom::pushOperand(ParameterPtr parameter, Operand::OpSemantic opSemantic, Operand::OpMask opMask, int indirectionLevel)
 {
-    if (!parameter)
-        OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, parameterNullMsg(mFunctionName, mOperands.size()));
+    OgreAssert(parameter, parameterNullMsg(mFunctionName, mOperands.size()).c_str());
     mOperands.push_back(Operand(parameter, opSemantic, opMask, indirectionLevel));
 }
 
 void FunctionAtom::setOperands(const OperandVector& ops)
 {
     for (size_t i = 0; i < ops.size(); i++)
-        if(!ops[i].getParameter())
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, parameterNullMsg(mFunctionName, i));
+        OgreAssert(ops[i].getParameter(), parameterNullMsg(mFunctionName, i).c_str());
 
     mOperands = ops;
 }
@@ -202,7 +243,7 @@ void FunctionAtom::writeOperands(std::ostream& os, OperandVector::const_iterator
     ushort curIndLevel = 0;
     for (OperandVector::const_iterator it = begin; it != end; )
     {
-        it->write(os);
+        os << it->toString();
         ++it;
 
         ushort opIndLevel = 0;
@@ -340,28 +381,20 @@ bool FunctionInvocation::FunctionInvocationCompare::operator ()(FunctionInvocati
     if (lhs.getReturnType() != rhs.getReturnType())
         return false;
 
-    // filter indirect operands
-    std::vector<const Operand*> lhsOps;
-    std::vector<const Operand*> rhsOps;
-    for(const Operand& op : lhs.mOperands)
-        if(op.getIndirectionLevel() == 0) lhsOps.push_back(&op);
-    for(const Operand& op : rhs.mOperands)
-        if(op.getIndirectionLevel() == 0) rhsOps.push_back(&op);
-
-    // Check the number of direct operands
-    if (lhsOps.size() != rhsOps.size())
+    // Check the number of operands
+    if (lhs.mOperands.size() != rhs.mOperands.size())
         return false;
 
     // Now that we've gotten past the two quick tests, iterate over operands
     // Check the semantic and type.  The operands must be in the same order as well.
-    auto itLHSOps = lhsOps.begin();
-    auto itRHSOps = rhsOps.begin();
-    for ( ; ((itLHSOps != lhsOps.end()) && (itRHSOps != rhsOps.end())); ++itLHSOps, ++itRHSOps)
+    OperandVector::const_iterator itLHSOps = lhs.mOperands.begin();
+    OperandVector::const_iterator itRHSOps = rhs.mOperands.begin();
+    for ( ; ((itLHSOps != lhs.mOperands.end()) && (itRHSOps != rhs.mOperands.end())); ++itLHSOps, ++itRHSOps)
     {
-        if ((*itLHSOps)->getSemantic() != (*itRHSOps)->getSemantic())
+        if (itLHSOps->getSemantic() != itRHSOps->getSemantic())
             return false;
 
-        if (getSwizzledSize(**itLHSOps) != getSwizzledSize(**itRHSOps))
+        if (getSwizzledSize(*itLHSOps) != getSwizzledSize(*itRHSOps))
             return false;
     }
 
@@ -404,7 +437,9 @@ void SampleTextureAtom::writeSourceCode(std::ostream& os, const String& targetLa
     writeOperands(os, outOp, mOperands.end());
     os << "\t=\t";
 
-    os << "texture";
+    bool is_glsl = targetLanguage[0] == 'g';
+
+    os << (is_glsl ? "texture" : "tex");
     const auto& sampler = mOperands.front().getParameter();
     switch(sampler->getType())
     {
@@ -419,7 +454,7 @@ void SampleTextureAtom::writeSourceCode(std::ostream& os, const String& targetLa
         os << "3D";
         break;
     case GCT_SAMPLERCUBE:
-        os << "Cube";
+        os << (is_glsl ? "Cube" : "CUBE");
         break;
     default:
         OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "unknown sampler");
@@ -457,19 +492,6 @@ void BinaryOpAtom::writeSourceCode(std::ostream& os, const String& targetLanguag
     os << mOp;
     writeOperands(os, secondOp, outOp);
     os << ";";
-}
-
-void BuiltinFunctionAtom::writeSourceCode(std::ostream& os, const String& targetLanguage) const
-{
-    // find the output operand
-    OperandVector::const_iterator outOp = mOperands.begin();
-    while(outOp->getSemantic() != Operand::OPS_OUT)
-        outOp++;
-
-    writeOperands(os, outOp, mOperands.end());
-    os << "\t=\t" << mFunctionName << "(";
-    writeOperands(os, mOperands.begin(), outOp);
-    os << ");";
 }
 
 }

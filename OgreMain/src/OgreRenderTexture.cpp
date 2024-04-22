@@ -41,6 +41,8 @@ namespace Ogre
         mPriority = OGRE_REND_TO_TEX_RT_GROUP;
         mWidth = mBuffer->getWidth();
         mHeight = mBuffer->getHeight();
+        mColourDepth = static_cast<unsigned int>(
+            Ogre::PixelUtil::getNumElemBits(mBuffer->getFormat()));
 
         if(PixelUtil::isDepth(mBuffer->getFormat()))
             mDepthBufferPoolId = DepthBuffer::POOL_NO_DEPTH;
@@ -53,7 +55,12 @@ namespace Ogre
     void RenderTexture::copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer)
     {
         if (buffer == FB_AUTO) buffer = FB_FRONT;
-        OgreAssert(buffer == FB_FRONT, "Invalid buffer");
+        if (buffer != FB_FRONT)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "Invalid buffer.",
+                        "RenderTexture::copyContentsToMemory" );
+        }
 
         mBuffer->blitToMemory(src, dst);
     }
@@ -70,20 +77,6 @@ namespace Ogre
         /// Width and height is unknown with no targets attached
         mWidth = mHeight = 0;
     }
-    void MultiRenderTarget::bindSurface(size_t attachment, RenderTexture* target)
-    {
-        if(PixelUtil::isDepth(target->suggestPixelFormat()))
-            setDepthBufferPool(DepthBuffer::POOL_NO_DEPTH); // unbinds any previously bound depth render buffer
-
-        for (size_t i = mBoundSurfaces.size(); i <= attachment; ++i)
-        {
-            mBoundSurfaces.push_back(0);
-        }
-        mBoundSurfaces[attachment] = target;
-
-        bindSurfaceImpl(attachment, target);
-    }
-
     //-----------------------------------------------------------------------------
     void MultiRenderTarget::copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer)
     {

@@ -81,19 +81,27 @@ namespace Ogre {
     //---------------------------------------------------------------------
     void EdgeListBuilder::addVertexData(const VertexData* vertexData)
     {
-        OgreAssert(vertexData->vertexStart == 0,
-                   "The base vertex index of the vertex data must be zero for build edge list");
+        if (vertexData->vertexStart != 0)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                "The base vertex index of the vertex data must be zero for build edge list.",
+                "EdgeListBuilder::addVertexData");
+        }
+
         mVertexDataList.push_back(vertexData);
     }
     //---------------------------------------------------------------------
     void EdgeListBuilder::addIndexData(const IndexData* indexData, 
         size_t vertexSet, RenderOperation::OperationType opType)
     {
-        OgreAssert(opType == RenderOperation::OT_TRIANGLE_LIST ||
-                   opType == RenderOperation::OT_TRIANGLE_FAN ||
-                   opType == RenderOperation::OT_TRIANGLE_STRIP,
-                   "Unsupported RenderOperation");
-        OgreAssert(indexData->indexCount, "Index data must not be empty");
+        if (opType != RenderOperation::OT_TRIANGLE_LIST &&
+            opType != RenderOperation::OT_TRIANGLE_FAN &&
+            opType != RenderOperation::OT_TRIANGLE_STRIP)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                "Only triangle list, fan and strip are supported to build edge list.",
+                "EdgeListBuilder::addIndexData");
+        }
 
         Geometry geometry;
         geometry.indexData = indexData;
@@ -174,9 +182,11 @@ namespace Ogre {
         }
 
         // Build triangles and edge list
-        for (auto& g : mGeometryList)
+        GeometryList::const_iterator i, iend;
+        iend = mGeometryList.end();
+        for (i = mGeometryList.begin(); i != iend; ++i)
         {
-            buildTrianglesEdges(g);
+            buildTrianglesEdges(*i);
         }
 
         // Allocate memory for light facing calculate

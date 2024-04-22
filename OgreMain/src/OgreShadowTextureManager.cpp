@@ -71,18 +71,20 @@ namespace Ogre
         clear();
     }
     //---------------------------------------------------------------------
-    void ShadowTextureManager::getShadowTextures(ShadowTextureConfigList& configList,
+    void ShadowTextureManager::getShadowTextures(const ShadowTextureConfigList& configList, 
         ShadowTextureList& listToPopulate)
     {
         listToPopulate.clear();
 
         std::set<Texture*> usedTextures;
 
-        for (ShadowTextureConfig& config : configList)
+        for (ShadowTextureConfigList::const_iterator c = configList.begin(); c != configList.end(); ++c)
         {
+            const ShadowTextureConfig& config = *c;
             bool found = false;
-            for (auto & tex : mTextureList)
+            for (ShadowTextureList::iterator t = mTextureList.begin(); t != mTextureList.end(); ++t)
             {
+                const TexturePtr& tex = *t;
                 // Skip if already used this one
                 if (usedTextures.find(tex.get()) != usedTextures.end())
                     continue;
@@ -109,9 +111,6 @@ namespace Ogre
                     TU_RENDERTARGET, NULL, false, config.fsaa);
                 // Ensure texture loaded
                 shadowTex->load();
-
-                // update with actual format, if the requested format is not supported
-                config.format = shadowTex->getFormat();
                 listToPopulate.push_back(shadowTex);
                 usedTextures.insert(shadowTex.get());
                 mTextureList.push_back(shadowTex);
@@ -122,8 +121,10 @@ namespace Ogre
     //---------------------------------------------------------------------
     TexturePtr ShadowTextureManager::getNullShadowTexture(PixelFormat format)
     {
-        for (auto & tex : mNullTextureList)
+        for (ShadowTextureList::iterator t = mNullTextureList.begin(); t != mNullTextureList.end(); ++t)
         {
+            const TexturePtr& tex = *t;
+
             if (format == tex->getFormat())
             {
                 // Ok, a match
@@ -142,9 +143,6 @@ namespace Ogre
         mNullTextureList.push_back(shadowTex);
 
         // lock & populate the texture based on format
-        if(PixelUtil::isDepth(format))
-            return shadowTex;
-
         HardwareBufferLockGuard shadowTexLock(shadowTex->getBuffer(), HardwareBuffer::HBL_DISCARD);
         const PixelBox& box = shadowTex->getBuffer()->getCurrentLock();
 
@@ -192,9 +190,9 @@ namespace Ogre
     //---------------------------------------------------------------------
     void ShadowTextureManager::clear()
     {
-        for (auto & i : mTextureList)
+        for (ShadowTextureList::iterator i = mTextureList.begin(); i != mTextureList.end(); ++i)
         {
-            TextureManager::getSingleton().remove(i->getHandle());
+            TextureManager::getSingleton().remove((*i)->getHandle());
         }
         mTextureList.clear();
 

@@ -43,9 +43,9 @@ class _OgreLodExport LodCollapseCostQuadric :
     public LodCollapseCost
 {
 public:
-    void initCollapseCosts(LodData* data) override;
-    void updateVertexCollapseCost(LodData* data, LodData::Vertex* vertex) override;
-    Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge) override;
+    virtual void initCollapseCosts(LodData* data);
+    virtual void updateVertexCollapseCost(LodData* data, LodData::Vertex* vertex);
+    virtual Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge);
 protected:
 
     struct TriangleQuadricPlane {

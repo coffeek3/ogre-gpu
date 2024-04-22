@@ -36,19 +36,19 @@ namespace Ogre
 //! [font_translator]
 struct FontTranslator : public ScriptTranslator
 {
-    void translate(ScriptCompiler* compiler, const AbstractNodePtr& node) override;
+    void translate(ScriptCompiler* compiler, const AbstractNodePtr& node);
     void parseAttribute(ScriptCompiler* compiler, FontPtr& pFont, PropertyAbstractNode* prop);
 };
 //! [font_translator]
 
 struct ElementTranslator : public ScriptTranslator
 {
-    void translate(ScriptCompiler* compiler, const AbstractNodePtr& node) override;
+    void translate(ScriptCompiler* compiler, const AbstractNodePtr& node);
 };
 
 struct OverlayTranslator : public ScriptTranslator
 {
-    void translate(ScriptCompiler* compiler, const AbstractNodePtr& node) override;
+    void translate(ScriptCompiler* compiler, const AbstractNodePtr& node);
 };
 
 class OverlayTranslatorManager : public ScriptTranslatorManager
@@ -65,7 +65,7 @@ class OverlayTranslatorManager : public ScriptTranslatorManager
 public:
     OverlayTranslatorManager();
     ~OverlayTranslatorManager();
-    ScriptTranslator* getTranslator(const AbstractNodePtr& node) override;
+    ScriptTranslator* getTranslator(const AbstractNodePtr& node);
 };
 }
 

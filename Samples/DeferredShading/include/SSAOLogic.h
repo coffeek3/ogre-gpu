@@ -21,7 +21,7 @@ class SSAOLogic : public ListenerFactoryLogic
 {
 protected:
     /** @copydoc ListenerFactoryLogic::createListener */
-    Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance) override;
+    virtual Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance);
 };
 
 #endif

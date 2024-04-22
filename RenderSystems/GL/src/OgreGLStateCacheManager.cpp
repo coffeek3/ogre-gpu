@@ -41,11 +41,11 @@ namespace Ogre {
     {
         glBlendEquation(GL_FUNC_ADD);
 
-        if(GLAD_GL_VERSION_2_0)
+        if(GLEW_VERSION_2_0)
         {
             glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
         }
-        else if(GLAD_GL_EXT_blend_equation_separate)
+        else if(GLEW_EXT_blend_equation_separate)
         {
             glBlendEquationSeparateEXT(GL_FUNC_ADD, GL_FUNC_ADD);
         }
@@ -114,6 +114,11 @@ namespace Ogre {
         mTexUnitsMap.clear();
         mTextureCoordGen.clear();
 
+        mViewport[0] = 0.0f;
+        mViewport[1] = 0.0f;
+        mViewport[2] = 0.0f;
+        mViewport[3] = 0.0f;
+
         mAmbient[0] = 0.2f;
         mAmbient[1] = 0.2f;
         mAmbient[2] = 0.2f;
@@ -147,11 +152,11 @@ namespace Ogre {
         mPointAttenuation[2] = 0.0f;
     }
 
-    void GLStateCacheManager::bindGLBuffer(GLenum target, GLuint buffer)
+    void GLStateCacheManager::bindGLBuffer(GLenum target, GLuint buffer, bool force)
     {
 #ifdef OGRE_ENABLE_STATE_CACHE
         auto ret = mActiveBufferMap.emplace(target, buffer);
-        if(ret.first->second != buffer) // Update the cached value if needed
+        if(ret.first->second != buffer || force) // Update the cached value if needed
         {
             ret.first->second = buffer;
             ret.second = true;
@@ -224,7 +229,7 @@ namespace Ogre {
         TexUnitsMap::iterator it = mTexUnitsMap.find(mLastBoundTexID);
         if (it == mTexUnitsMap.end())
         {
-            TexParameteriMap unit;
+            TextureUnitParams unit;
             mTexUnitsMap[mLastBoundTexID] = unit;
             
             // Update the iterator
@@ -232,7 +237,7 @@ namespace Ogre {
         }
         
         // Get a local copy of the parameter map and search for this parameter
-        TexParameteriMap &myMap = (*it).second;
+        TexParameteriMap &myMap = (*it).second.mTexParameteriMap;
 
         auto ret = myMap.emplace(pname, param);
         TexParameteriMap::iterator i = ret.first;
@@ -264,6 +269,8 @@ namespace Ogre {
         if (mActiveTextureUnit == unit)
             return true;
 #endif
+        if (unit >= Root::getSingleton().getRenderSystem()->getCapabilities()->getNumTextureUnits())
+            return false;
 
         glActiveTexture(GL_TEXTURE0 + unit);
         mActiveTextureUnit = unit;
@@ -397,14 +404,20 @@ namespace Ogre {
         }
     }
 
-    void GLStateCacheManager::setViewport(const Rect& r)
+    void GLStateCacheManager::setViewport(GLint x, GLint y, GLsizei width, GLsizei height)
     {
 #ifdef OGRE_ENABLE_STATE_CACHE
-        if(mViewport != r)
+        if((mViewport[0] != x) ||
+           (mViewport[1] != y) ||
+           (mViewport[2] != width) ||
+           (mViewport[3] != height))
 #endif
         {
-            mViewport = r;
-            glViewport(r.left, r.top, r.width(), r.height());
+            mViewport[0] = x;
+            mViewport[1] = y;
+            mViewport[2] = width;
+            mViewport[3] = height;
+            glViewport(x, y, width, height);
         }
     }
 
@@ -429,11 +442,11 @@ namespace Ogre {
             mBlendEquationRGB = eqRGB;
             mBlendEquationAlpha = eqAlpha;
 
-            if(GLAD_GL_VERSION_2_0)
+            if(GLEW_VERSION_2_0)
             {
                 glBlendEquationSeparate(eqRGB, eqAlpha);
             }
-            else if(GLAD_GL_EXT_blend_equation_separate)
+            else if(GLEW_EXT_blend_equation_separate)
             {
                 glBlendEquationSeparateEXT(eqRGB, eqAlpha);
             }
@@ -584,7 +597,9 @@ namespace Ogre {
 #endif
         {
             mPointSizeMin = minSize;
-            glPointParameterf(GL_POINT_SIZE_MIN, mPointSizeMin);
+            const Ogre::RenderSystemCapabilities* caps = dynamic_cast<GLRenderSystem*>(Root::getSingleton().getRenderSystem())->getCapabilities();
+            if (caps->hasCapability(RSC_POINT_EXTENDED_PARAMETERS))
+                glPointParameterf(GL_POINT_SIZE_MIN, mPointSizeMin);
         }
 
         if(maxSize > -1)
@@ -593,7 +608,9 @@ namespace Ogre {
 #endif
         {
             mPointSizeMax = maxSize;
-            glPointParameterf(GL_POINT_SIZE_MAX, mPointSizeMax);
+            const Ogre::RenderSystemCapabilities* caps = dynamic_cast<GLRenderSystem*>(Root::getSingleton().getRenderSystem())->getCapabilities();
+            if (caps->hasCapability(RSC_POINT_EXTENDED_PARAMETERS))
+                glPointParameterf(GL_POINT_SIZE_MAX, mPointSizeMax);
         }
 
         if(attenuation)
@@ -604,7 +621,9 @@ namespace Ogre {
             mPointAttenuation[0] = attenuation[0];
             mPointAttenuation[1] = attenuation[1];
             mPointAttenuation[2] = attenuation[2];
-            glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, &mPointAttenuation[0]);
+            const Ogre::RenderSystemCapabilities* caps = dynamic_cast<GLRenderSystem*>(Root::getSingleton().getRenderSystem())->getCapabilities();
+            if (caps->hasCapability(RSC_POINT_EXTENDED_PARAMETERS))
+                glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, &mPointAttenuation[0]);
         }
     }
 

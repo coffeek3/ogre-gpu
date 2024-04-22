@@ -44,7 +44,7 @@ namespace Ogre {
         GLES2FrameBufferObject(GLES2FBOManager *manager, uint fsaa);
         ~GLES2FrameBufferObject();
         
-        bool bind(bool recreateIfNeeded) override;
+        bool bind(bool recreateIfNeeded);
         
         /** Swap buffers - only useful when using multisample buffers.
         */
@@ -72,7 +72,7 @@ namespace Ogre {
         GLES2FBOManager *mManager;
         GLSurfaceDesc mMultisampleColourBuffer;
 
-        void initialise() override;
+        void initialise();
     };
 
 }

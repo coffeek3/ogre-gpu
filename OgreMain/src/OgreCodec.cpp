@@ -35,33 +35,16 @@ namespace Ogre {
     Codec::~Codec() {
     }
 
-    DataStreamPtr Codec::encode(const Any& input) const
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, getType() + " - encoding to memory not supported");
-        return DataStreamPtr();
-    }
-
-    void Codec::encodeToFile(const Any& input, const String& outFileName) const
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, getType() + " - encoding to file not supported");
-    }
-
     StringVector Codec::getExtensions(void)
     {
         StringVector result;
         result.reserve(msMapCodecs.size());
-        for (auto& c : msMapCodecs)
+        CodecList::const_iterator i;
+        for (i = msMapCodecs.begin(); i != msMapCodecs.end(); ++i)
         {
-            result.push_back(c.first);
+            result.push_back(i->first);
         }
         return result;
-    }
-
-    void Codec::registerCodec(Codec* pCodec)
-    {
-        auto ret = msMapCodecs.emplace(pCodec->getType(), pCodec);
-        if (!ret.second)
-            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, pCodec->getType() + " already has a registered codec");
     }
 
     Codec* Codec::getCodec(const String& extension)
@@ -77,31 +60,37 @@ namespace Ogre {
             else
                 formats_str = "Supported formats are: " + StringConverter::toString(getExtensions()) + ".";
 
-            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
-                        "Can not find codec for '" + extension + "' format.\n" + formats_str);
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, 
+                "Can not find codec for '" + extension + "' image format.\n" + 
+                formats_str,
+                "Codec::getCodec");
         }
 
         return i->second;
+
     }
 
     Codec* Codec::getCodec(char *magicNumberPtr, size_t maxbytes)
     {
-        for (auto& c : msMapCodecs)
+        for (CodecList::const_iterator i = msMapCodecs. begin(); 
+            i != msMapCodecs.end(); ++i)
         {
-            String ext = c.second->magicNumberToFileExt(magicNumberPtr, maxbytes);
+            String ext = i->second->magicNumberToFileExt(magicNumberPtr, maxbytes);
             if (!ext.empty())
             {
                 // check codec type matches
                 // if we have a single codec class that can handle many types, 
                 // and register many instances of it against different types, we
                 // can end up matching the wrong one here, so grab the right one
-                if (ext == c.second->getType())
-                    return c.second;
+                if (ext == i->second->getType())
+                    return i->second;
                 else
                     return getCodec(ext);
             }
         }
 
         return 0;
+
     }
+
 }

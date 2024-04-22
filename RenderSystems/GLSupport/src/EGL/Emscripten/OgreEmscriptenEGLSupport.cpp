@@ -46,10 +46,21 @@ namespace Ogre {
     {        
         mNativeDisplay = EGL_DEFAULT_DISPLAY;
         mGLDisplay = getGLDisplay();
+        
+        mCurrentMode.width = 800;
+        mCurrentMode.height = 600;
+        mCurrentMode.refreshRate = 0;
+        mOriginalMode = mCurrentMode;
+        mVideoModes.push_back(mCurrentMode);
     }
 
     EmscriptenEGLSupport::~EmscriptenEGLSupport()
     {        
+    }
+    
+    void EmscriptenEGLSupport::switchMode( uint& width, uint& height, short& frequency )
+    {
+        //TODO
     }
     
     RenderWindow* EmscriptenEGLSupport::newWindow( const String &name, unsigned int width, unsigned int height, bool fullScreen, const NameValuePairList *miscParams)

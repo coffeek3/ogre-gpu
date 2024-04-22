@@ -36,31 +36,9 @@ THE SOFTWARE.
 namespace Ogre {
     //---------------------------------------------------------------------
     String PanelOverlayElement::msTypeName = "Panel";
-    /** Command object for specifying tiling (see ParamCommand).*/
-    class _OgrePrivate CmdTiling : public ParamCommand
-    {
-    public:
-        String doGet(const void* target) const override;
-        void doSet(void* target, const String& val) override;
-    };
-    /** Command object for specifying transparency (see ParamCommand).*/
-    class _OgrePrivate CmdTransparent : public ParamCommand
-    {
-    public:
-        String doGet(const void* target) const override;
-        void doSet(void* target, const String& val) override;
-    };
-    /** Command object for specifying UV coordinates (see ParamCommand).*/
-    class _OgrePrivate CmdUVCoords : public ParamCommand
-    {
-    public:
-        String doGet(const void* target) const override;
-        void doSet(void* target, const String& val) override;
-    };
-    // Command objects
-    static CmdTiling msCmdTiling;
-    static CmdTransparent msCmdTransparent;
-    static CmdUVCoords msCmdUVCoords;
+    PanelOverlayElement::CmdTiling PanelOverlayElement::msCmdTiling;
+    PanelOverlayElement::CmdTransparent PanelOverlayElement::msCmdTransparent;
+    PanelOverlayElement::CmdUVCoords PanelOverlayElement::msCmdUVCoords;
     //---------------------------------------------------------------------
     // vertex buffer bindings, set at compile time (we could look these up but no point)
     #define POSITION_BINDING 0
@@ -118,7 +96,7 @@ namespace Ogre {
             // No indexes & issue as a strip
             mRenderOp.useIndexes = false;
             mRenderOp.operationType = RenderOperation::OT_TRIANGLE_STRIP;
-            mRenderOp.useGlobalInstancing = false;
+            mRenderOp.useGlobalInstancingVertexBufferIsAvailable = false;
 
             mInitialised = true;
 
@@ -241,10 +219,11 @@ namespace Ogre {
             }
 
             // Also add children
-            for (const auto& p : getChildren())
+            ChildIterator it = getChildIterator();
+            while (it.hasMoreElements())
             {
                 // Give children Z-order 1 higher than this
-                p.second->_updateRenderQueue(queue);
+                it.getNext()->_updateRenderQueue(queue);
             }
         }
     }
@@ -322,9 +301,11 @@ namespace Ogre {
                 size_t offset = VertexElement::getTypeSize(VET_FLOAT2) * mNumTexCoordsInBuffer;
                 for (size_t i = mNumTexCoordsInBuffer; i < numLayers; ++i)
                 {
-                    offset += decl->addElement(TEXCOORD_BINDING, offset, VET_FLOAT2,
-                                               VES_TEXTURE_COORDINATES, ushort(i))
-                                  .getSize();
+                    decl->addElement(TEXCOORD_BINDING,
+                        offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 
+                        static_cast<unsigned short>(i));
+                    offset += VertexElement::getTypeSize(VET_FLOAT2);
+
                 }
             }
 
@@ -413,7 +394,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     // Command objects
     //-----------------------------------------------------------------------
-    String CmdTiling::doGet(const void* target) const
+    String PanelOverlayElement::CmdTiling::doGet(const void* target) const
     {
         // NB only returns 1st layer tiling
         String ret = "0 " + StringConverter::toString(
@@ -422,7 +403,7 @@ namespace Ogre {
             static_cast<const PanelOverlayElement*>(target)->getTileY() );
         return ret;
     }
-    void CmdTiling::doSet(void* target, const String& val)
+    void PanelOverlayElement::CmdTiling::doSet(void* target, const String& val)
     {
         // 3 params: <layer> <x_tile> <y_tile>
         // Param count is validated higher up
@@ -434,18 +415,18 @@ namespace Ogre {
         static_cast<PanelOverlayElement*>(target)->setTiling(x_tile, y_tile, layer);
     }
     //-----------------------------------------------------------------------
-    String CmdTransparent::doGet(const void* target) const
+    String PanelOverlayElement::CmdTransparent::doGet(const void* target) const
     {
         return StringConverter::toString(
             static_cast<const PanelOverlayElement*>(target)->isTransparent() );
     }
-    void CmdTransparent::doSet(void* target, const String& val)
+    void PanelOverlayElement::CmdTransparent::doSet(void* target, const String& val)
     {
         static_cast<PanelOverlayElement*>(target)->setTransparent(
             StringConverter::parseBool(val));
     }
     //-----------------------------------------------------------------------
-    String CmdUVCoords::doGet(const void* target) const
+    String PanelOverlayElement::CmdUVCoords::doGet(const void* target) const
     {
         Real u1, v1, u2, v2;
 
@@ -456,7 +437,7 @@ namespace Ogre {
 
         return ret;
     }
-    void CmdUVCoords::doSet(void* target, const String& val)
+    void PanelOverlayElement::CmdUVCoords::doSet(void* target, const String& val)
     {
         std::vector<String> vec = StringUtil::split(val);
 

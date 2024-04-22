@@ -35,14 +35,14 @@
 
 #include "OgreInput.h"
 
+/** \addtogroup Optional
+*  @{
+*/
+/** \addtogroup Bites
+*  @{
+*/
 namespace OgreBites
 {
-    /** \addtogroup Optional
-    *  @{
-    */
-    /** \addtogroup Bites
-    *  @{
-    */
     enum CameraStyle   /// enumerator values for different styles of camera movement
     {
         CS_FREELOOK,
@@ -81,7 +81,7 @@ namespace OgreBites
         /**
         Sets the spatial offset from the target. Only applies for orbit style.
         */
-        void setYawPitchDist(const Ogre::Radian& yaw, const Ogre::Radian& pitch, Ogre::Real dist);
+        void setYawPitchDist(Ogre::Radian yaw, Ogre::Radian pitch, Ogre::Real dist);
 
         /**
         Sets the camera's top speed. Only applies for free-look style.
@@ -111,36 +111,36 @@ namespace OgreBites
         */
         void manualStop();
 
-        void frameRendered(const Ogre::FrameEvent& evt) override;
+        void frameRendered(const Ogre::FrameEvent& evt);
 
         /**
         Processes key presses for free-look style movement.
         */
-        bool keyPressed(const KeyboardEvent& evt) override;
+        bool keyPressed(const KeyboardEvent& evt);
 
         /**
         Processes key releases for free-look style movement.
         */
-        bool keyReleased(const KeyboardEvent& evt) override;
+        bool keyReleased(const KeyboardEvent& evt);
 
         /**
         Processes mouse movement differently for each style.
         */
-        bool mouseMoved(const MouseMotionEvent& evt) override;
+        bool mouseMoved(const MouseMotionEvent& evt);
 
-        bool mouseWheelRolled(const MouseWheelEvent& evt) override;
+        bool mouseWheelRolled(const MouseWheelEvent& evt);
 
         /**
         Processes mouse presses. Only applies for orbit style.
         Left button is for orbiting, and right button is for zooming.
         */
-        bool mousePressed(const MouseButtonEvent& evt) override;
+        bool mousePressed(const MouseButtonEvent& evt);
 
         /**
         Processes mouse releases. Only applies for orbit style.
         Left button is for orbiting, and right button is for zooming.
         */
-        bool mouseReleased(const MouseButtonEvent& evt) override;
+        bool mouseReleased(const MouseButtonEvent& evt);
 
         /**
          * fix the yaw axis to be Vector3::UNIT_Y of the parent node (tabletop mode)
@@ -172,7 +172,7 @@ namespace OgreBites
         bool mFastMove;
         Ogre::Vector3 mOffset;
     };
-    /** @} */
-    /** @} */
 }
+/** @} */
+/** @} */
 #endif

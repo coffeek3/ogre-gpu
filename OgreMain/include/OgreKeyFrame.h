@@ -30,7 +30,7 @@ THE SOFTWARE.
 #define __KeyFrame_H__
 
 #include "OgrePrerequisites.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 #include "OgreQuaternion.h"
 #include "OgreAny.h"
 #include "OgreHardwareVertexBuffer.h"
@@ -46,7 +46,7 @@ namespace Ogre
     *  @{
     */
     /** A key frame in an animation sequence defined by an AnimationTrack.
-
+    @remarks
         This class can be used as a basis for all kinds of key frames. 
         The unifying principle is that multiple KeyFrames define an 
         animation sequence, with the exact state of the animation being an 
@@ -84,17 +84,17 @@ namespace Ogre
         ~NumericKeyFrame() {}
 
         /** Get the value at this keyframe. */
-        const Any& getValue(void) const { return mValue; }
+        virtual const AnyNumeric& getValue(void) const;
         /** Set the value at this keyframe.
-
+        @remarks
             All keyframe values must have a consistent type. 
         */
-        void setValue(const Any& val) { mValue = val; }
+        virtual void setValue(const AnyNumeric& val);
 
         /** Clone a keyframe (internal use only) */
-        KeyFrame* _clone(AnimationTrack* newParent) const override;
-    private:
-        Any mValue;
+        KeyFrame* _clone(AnimationTrack* newParent) const;
+    protected:
+        AnyNumeric mValue;
     };
 
 
@@ -106,7 +106,7 @@ namespace Ogre
         TransformKeyFrame(const AnimationTrack* parent, Real time);
         ~TransformKeyFrame() {}
         /** Sets the translation associated with this keyframe. 
-
+        @remarks    
         The translation factor affects how much the keyframe translates (moves) it's animable
         object at it's time index.
         @param trans The vector to translate by
@@ -136,8 +136,8 @@ namespace Ogre
         virtual const Quaternion& getRotation(void) const;
 
         /** Clone a keyframe (internal use only) */
-        KeyFrame* _clone(AnimationTrack* newParent) const override;
-    private:
+        KeyFrame* _clone(AnimationTrack* newParent) const;
+    protected:
         Vector3 mTranslate;
         Vector3 mScale;
         Quaternion mRotate;
@@ -157,7 +157,7 @@ namespace Ogre
         VertexMorphKeyFrame(const AnimationTrack* parent, Real time);
         ~VertexMorphKeyFrame() {}
         /** Sets the vertex buffer containing the source positions for this keyframe. 
-
+        @remarks    
             We assume that positions are the first 3 float elements in this buffer,
             although we don't necessarily assume they're the only ones in there.
         @param buf Vertex buffer link; will not be modified so can be shared
@@ -168,9 +168,10 @@ namespace Ogre
         /** Gets the vertex buffer containing positions for this keyframe. */
         const HardwareVertexBufferSharedPtr& getVertexBuffer(void) const;
 
-        KeyFrame* _clone(AnimationTrack* newParent) const override;
+        /** Clone a keyframe (internal use only) */
+        KeyFrame* _clone(AnimationTrack* newParent) const;      
 
-    private:
+    protected:
         HardwareVertexBufferSharedPtr mBuffer;
 
     };
@@ -187,13 +188,13 @@ namespace Ogre
         ~VertexPoseKeyFrame() {}
 
         /** Reference to a pose at a given influence level 
-
+        @remarks
             Each keyframe can refer to many poses each at a given influence level.
         **/
         struct PoseRef
         {
             /** The linked pose index.
-
+            @remarks
                 The Mesh contains all poses for all vertex data in one list, both 
                 for the shared vertex data and the dedicated vertex data on submeshes.
                 The 'target' on the parent track must match the 'target' on the 
@@ -203,20 +204,20 @@ namespace Ogre
             /** Influence level of the linked pose. 
                 1.0 for full influence (full offset), 0.0 for no influence.
             */
-            float influence;
+            Real influence;
 
-            PoseRef(ushort p, float i) : poseIndex(p), influence(i) {}
+            PoseRef(ushort p, Real i) : poseIndex(p), influence(i) {}
         };
         typedef std::vector<PoseRef> PoseRefList;
 
         /** Add a new pose reference. 
         @see PoseRef
         */
-        void addPoseReference(ushort poseIndex, float influence);
+        void addPoseReference(ushort poseIndex, Real influence);
         /** Update the influence of a pose reference. 
         @see PoseRef
         */
-        void updatePoseReference(ushort poseIndex, float influence);
+        void updatePoseReference(ushort poseIndex, Real influence);
         /** Remove reference to a given pose. 
         @param poseIndex The pose index (not the index of the reference)
         */
@@ -240,11 +241,11 @@ namespace Ogre
         OGRE_DEPRECATED ConstPoseRefIterator getPoseReferenceIterator(void) const;
 
         /** Clone a keyframe (internal use only) */
-        KeyFrame* _clone(AnimationTrack* newParent) const override;
+        KeyFrame* _clone(AnimationTrack* newParent) const;
         
         void _applyBaseKeyFrame(const VertexPoseKeyFrame* base);
         
-    private:
+    protected:
         PoseRefList mPoseRefs;
 
     };

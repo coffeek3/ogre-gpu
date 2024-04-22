@@ -32,7 +32,6 @@ THE SOFTWARE.
 #include "OgreTerrainPrerequisites.h"
 #include "OgreCommon.h"
 #include "OgreDataStream.h"
-#include "OgreImage.h"
 
 namespace Ogre
 {
@@ -49,7 +48,7 @@ namespace Ogre
     /** Class exposing an interface to a blend map for a given layer. 
     Each layer after the first layer in a terrain has a blend map which 
     expresses how it is alpha blended with the layers beneath. Internally, this
-    blend map is packed into one channel of an RGBA texture in
+    blend map is packed into one channel of an RGB or RGBA texture in
     order to use the smallest number of samplers, but this class allows
     a caller to manipulate the data more easily without worrying about
     this packing. Also, the values you use to interact with the blend map are
@@ -60,6 +59,7 @@ namespace Ogre
     */
     class _OgreTerrainExport TerrainLayerBlendMap : public TerrainAlloc
     {
+    protected:
         Terrain* mParent;
         uint8 mLayerIdx;
         uint8 mChannel; // RGBA
@@ -67,7 +67,7 @@ namespace Ogre
         Box mDirtyBox;
         bool mDirty;
         HardwarePixelBuffer* mBuffer;
-        Image mData;
+        float* mData;
 
         void download();
         void upload();
@@ -119,16 +119,16 @@ namespace Ogre
         @param x,y Coordinates of the point of data to get, in image space (top down)
         @return The blend data
         */
-        float getBlendValue(uint32 x, uint32 y);
+        float getBlendValue(size_t x, size_t y);
 
         /** Set a single value of blend information (0 = transparent, 255 = solid)
         @param x,y Coordinates of the point of data to get, in image space (top down)
         @param val The blend value to set (0..1)
         */
-        void setBlendValue(uint32 x, uint32 y, float val);
+        void setBlendValue(size_t x, size_t y, float val);
 
         /** Get a pointer to the whole blend data. 
-
+        @remarks
             This method allows you to get a raw pointer to all the blend data, to 
             update it as you like. However, you must then call dirtyRect manually 
             if you want those changes to be recognised. 

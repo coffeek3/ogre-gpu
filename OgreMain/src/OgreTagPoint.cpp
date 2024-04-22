@@ -35,10 +35,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     TagPoint::TagPoint(unsigned short handle, Skeleton* creator)
         : Bone(handle, creator)
-        , mInheritParentEntityOrientation(true)
-        , mInheritParentEntityScale(true)
         , mParentEntity(0)
         , mChildObject(0)
+        , mInheritParentEntityOrientation(true)
+        , mInheritParentEntityScale(true)
     {
     }
     //-----------------------------------------------------------------------------
@@ -158,6 +158,11 @@ namespace Ogre {
         {
             mChildObject->_notifyMoved();
         }
+    }
+    //-----------------------------------------------------------------------------
+    const LightList& TagPoint::getLights(void) const
+    {
+        return mParentEntity->queryLights();
     }
 
 }

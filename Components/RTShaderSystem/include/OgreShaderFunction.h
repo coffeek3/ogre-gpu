@@ -48,7 +48,6 @@ class _OgreRTSSExport FunctionStageRef
 public:
     /** call a library function
      * @param name the function name
-     * @param inout function argument
      */
     void callFunction(const char* name, const InOut& inout) const;
 
@@ -90,33 +89,35 @@ public:
     /// dst = arg0 OP arg1;
     void binaryOp(char op, const std::vector<Operand>& params) const;
 
-    /// shorthand for "dst = BUILTIN(args);"
-    void callBuiltin(const char* name, const std::vector<Operand>& params) const;
-    /// @overload
-    void callBuiltin(const char* name, const In& arg, const Out& ret) const { callBuiltin(name, {arg, ret}); }
-    /// @overload
-    void callBuiltin(const char* name, const In& arg0, const In& arg1, const Out& ret) const
-    {
-        callBuiltin(name, {arg0, arg1, ret});
-    }
-    /// @overload
-    void callBuiltin(const char* name, const In& arg0, const In& arg1, const In& arg2, const Out& ret) const
-    {
-        callBuiltin(name, {arg0, arg1, arg2, ret});
-    }
 private:
-    uint32 mStage;
+    size_t mStage;
     Function* mParent;
-    FunctionStageRef(uint32 stage, Function* parent) : mStage(stage), mParent(parent) {}
+    FunctionStageRef(size_t stage, Function* parent) : mStage(stage), mParent(parent) {}
 };
 
 /** A class that represents a shader based program function.
 */
 class _OgreRTSSExport Function : public RTShaderSystemAlloc
 {
-    friend class ProgramManager;
+    friend ProgramManager;
 // Interface.
 public:
+    enum FunctionType
+    {
+        // internal function (default)
+        FFT_INTERNAL,
+        // Vertex program main
+        FFT_VS_MAIN,
+        // Pixel shader main
+        FFT_PS_MAIN
+    };
+
+    /** Get the name of this function */
+    const String& getName() const { return mName; }
+
+    /** Get the description of this function */
+    const String& getDescription() const { return mDescription; }
+
     /// @deprecated
     ParameterPtr resolveInputParameter(Parameter::Semantic semantic, int index,  const Parameter::Content content, GpuConstantType type);
 
@@ -140,7 +141,6 @@ public:
     /**
      * get input parameter by content
      * @param content
-     * @param type The type of the desired parameter.
      * @return parameter or NULL if not found
      */
     ParameterPtr getInputParameter(Parameter::Content content, GpuConstantType type = GCT_UNKNOWN)
@@ -164,7 +164,6 @@ public:
     /**
      * get output parameter by content
      * @param content
-     * @param type The type of the desired parameter.
      * @return parameter or NULL if not found
      */
     ParameterPtr getOutputParameter(Parameter::Content content, GpuConstantType type = GCT_UNKNOWN)
@@ -172,27 +171,31 @@ public:
         return _getParameterByContent(mOutputParameters, content, type);
     }
 
-    /** Resolve local parameter of this function
+    /// @deprecated local parameters do not have index or sematic. use resolveLocalParameter(const String&, GpuConstantType)
+    ParameterPtr resolveLocalParameter(Parameter::Semantic semantic, int index, const String& name, GpuConstantType type);
 
-    local parameters do not have index or semantic.
+    /** Resolve local parameter of this function    
     @param name The name of the parameter.
-    @param type The type of the desired parameter.
-    @param arraySize If > 0, the parameter will be an array of the given size.
-    @return parameter instance in case of that resolve operation succeeded.
+    @param type The type of the desired parameter.  
+    Return parameter instance in case of that resolve operation succeeded.
     */
-    ParameterPtr resolveLocalParameter(GpuConstantType type, const String& name, size_t arraySize = 0);
+    ParameterPtr resolveLocalParameter(const String& name, GpuConstantType type)
+    {
+        return resolveLocalParameter(Parameter::SPS_UNKNOWN, 0, name, type);
+    }
+
+    /// @deprecated local parameters do not have index or sematic. use resolveLocalParameter(const String&, GpuConstantType)
+    ParameterPtr resolveLocalParameter(Parameter::Semantic semantic, int index, const Parameter::Content content, GpuConstantType type);
 
     /** Resolve local parameter of this function
-
-    local parameters do not have index or semantic.
     @param content The content of the parameter.
     @param type The type of the desired parameter.
-    @return parameter instance in case of that resolve operation succeeded.
+    Return parameter instance in case of that resolve operation succeeded.
     */
-    ParameterPtr resolveLocalParameter(Parameter::Content content, GpuConstantType type = GCT_UNKNOWN);
-
-
-    ParameterPtr resolveLocalStructParameter(const String& type, const String& name);
+    ParameterPtr resolveLocalParameter(Parameter::Content content, GpuConstantType type = GCT_UNKNOWN)
+    {
+        return resolveLocalParameter(Parameter::SPS_UNKNOWN, 0,content, type);
+    }
 
     /**
      * get local parameter by content
@@ -224,7 +227,7 @@ public:
     void addAtomInstance(FunctionAtom* atomInstance);
 
     /// get a @ref FFPShaderStage of this function
-    FunctionStageRef getStage(uint32 s)
+    FunctionStageRef getStage(size_t s)
     {
         return FunctionStageRef(s, this);
     }
@@ -255,13 +258,23 @@ public:
     /** Delete all output parameters from this function. */
     void deleteAllOutputParameters();
 
-    explicit Function(GpuProgramType type = GPT_VERTEX_PROGRAM);
+    /** get function type. */
+    FunctionType getFunctionType() const;
 
-private:
+
+protected:
 
     static ParameterPtr _getParameterByName(const ShaderParameterList& parameterList, const String& name);
     static ParameterPtr _getParameterBySemantic(const ShaderParameterList& parameterList, const Parameter::Semantic semantic, int index);
     static ParameterPtr _getParameterByContent(const ShaderParameterList& parameterList, const Parameter::Content content, GpuConstantType type);
+
+
+    /** Class constructor.
+    @param name The name of this function.
+    @param desc The description of this function.
+    @remarks This class is allocated via an instance of Program class. 
+    */
+    Function(const String& name, const String& desc, const FunctionType functionType);
 
     /** Class destructor */
     ~Function();
@@ -272,6 +285,11 @@ private:
     /** Delete parameter from a given list */
     void deleteParameter(ShaderParameterList& parameterList, ParameterPtr parameter);
 
+protected:
+    // Function name.
+    String mName;
+    // Function description.
+    String mDescription;
     // Input parameters.
     ShaderParameterList mInputParameters;
     // Output parameters.
@@ -281,9 +299,10 @@ private:
     // Atom instances composing this function.
     std::map<size_t, FunctionAtomInstanceList> mAtomInstances;
     FunctionAtomInstanceList mSortedAtomInstances;
-
-    GpuProgramType mType;
-
+    // Function type
+    FunctionType mFunctionType;
+    
+private:
     friend class Program;
 };
 

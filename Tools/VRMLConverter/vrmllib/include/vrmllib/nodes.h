@@ -14,7 +14,7 @@ namespace vrmllib {
 
 #define VRMLLIB_NODE_CLASS2_ND(name, base) \
     protected: \
-    void parse_attribute(const std::string &, std::istream &, file &) override;\
+    void parse_attribute(const std::string &, std::istream &, file &);\
     private: \
     typedef base base_type;
 

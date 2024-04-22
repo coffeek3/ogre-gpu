@@ -45,28 +45,38 @@ namespace Ogre {
     class _OgreGLES2Export GLSLESLinkProgram : public GLSLESProgramCommon
     {
     protected:
+        virtual void extractLayoutQualifiers(void) {}
+
         /// Compiles and links the vertex and fragment programs
-        void compileAndLink(void) override;
+        virtual void compileAndLink(void);
 
         void buildGLUniformReferences(void);
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
-        void notifyOnContextLost() override;
+        virtual void notifyOnContextLost();
 #endif
         
     public:
         /// Constructor should only be used by GLSLESLinkProgramManager
-        explicit GLSLESLinkProgram(const GLShaderList& shaders);
+        GLSLESLinkProgram(GLSLESProgram* vertexProgram, GLSLESProgram* fragmentProgram);
         virtual ~GLSLESLinkProgram(void);
 
         /** Makes a program object active by making sure it is linked and then putting it in use.
         */
-        void activate(void) override;
+        void activate(void);
 
         /** Updates program object uniforms using data from GpuProgramParameters.
         normally called by GLSLESGpuProgram::bindParameters() just before rendering occurs.
         */
-        void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) override;
+        virtual void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object uniform blocks using data from GpuProgramParameters.
+         normally called by GLSLGpuProgram::bindParameters() just before rendering occurs.
+         */
+        virtual void updateUniformBlocks(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object uniforms using data from pass iteration GpuProgramParameters.
+        normally called by GLSLESGpuProgram::bindMultiPassParameters() just before multi pass rendering occurs.
+        */
+        virtual void updatePassIterationUniforms(GpuProgramParametersSharedPtr params);
     };
 
 }

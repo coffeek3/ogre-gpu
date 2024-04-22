@@ -68,7 +68,7 @@ public:
     @param size number of elements in the parameter.    
     @return parameter instance in case of that resolve operation succeeded.  
     */
-    UniformParameterPtr resolveAutoParameterReal(GpuProgramParameters::AutoConstantType autoType, GpuConstantType type, float data, size_t size = 0);
+    UniformParameterPtr resolveAutoParameterReal(GpuProgramParameters::AutoConstantType autoType, GpuConstantType type, Real data, size_t size = 0);
 
     /** Resolve uniform auto constant parameter with associated int data of this program.
     @param autoType The auto type of the desired parameter.
@@ -77,7 +77,7 @@ public:
     @param size number of elements in the parameter.
     @return parameter instance in case of that resolve operation succeeded.  
     */
-    UniformParameterPtr resolveAutoParameterInt(GpuProgramParameters::AutoConstantType autoType, GpuConstantType type, uint32 data, size_t size = 0);
+    UniformParameterPtr resolveAutoParameterInt(GpuProgramParameters::AutoConstantType autoType, GpuConstantType type, size_t data, size_t size = 0);
 
     /** Resolve uniform parameter of this program.
     @param type The type of the desired parameter.
@@ -90,18 +90,12 @@ public:
     */
     UniformParameterPtr resolveParameter(GpuConstantType type, int index, uint16 variability, const String& suggestedName, size_t size = 0);
     
-    /// @overload
-    UniformParameterPtr resolveParameter(GpuConstantType type, const String& name, int index = -1)
-    {
-        return resolveParameter(type, index, GPV_GLOBAL, name);
-    }
-
     /** Resolve uniform auto constant parameter
     @param autoType The auto type of the desired parameter
     @param data The data to associate with the auto parameter. 
     @return parameter instance in case of that resolve operation succeeded.  
     */
-    UniformParameterPtr resolveParameter(GpuProgramParameters::AutoConstantType autoType, uint32 data = 0);
+    UniformParameterPtr resolveParameter(GpuProgramParameters::AutoConstantType autoType, size_t data = 0);
 
     /** Get parameter by a given name.  
     @param name The name of the parameter to search for.
@@ -126,10 +120,29 @@ public:
     */
     const UniformParameterList& getParameters() const { return mParameters; };
 
-    /// @deprecated use getMain()
-    Function* getEntryPointFunction()                    { return mEntryPointFunction; }
+    /** Create new function in this program. Return the newly created function instance.
+    @param name The name of the function to create.
+    @param desc The description of the function.
+    @param functionType
+    */
+    Function* createFunction(const String& name, const String& desc, const Function::FunctionType functionType);
 
-    Function* getMain() { return mEntryPointFunction; }
+    /** Get a function by a given name. Return NULL if no matching function found.
+    @param name The name of the function to search for.
+    */
+    Function* getFunctionByName(const String& name);
+
+    /** Get the function list of this program.
+    */
+    const ShaderFunctionList& getFunctions() const { return mFunctions; };
+
+    /** Set the entry point function.
+    @param function The function that will use as entry point of this program.
+    */
+    void setEntryPointFunction(Function* function) { mEntryPointFunction = function; }
+
+    /** Get the entry point function of this program.*/
+    Function* getEntryPointFunction()                    { return mEntryPointFunction; }
 
     /** Add dependency for this program. Basically a filename that will be included in this
     program and provide predefined shader functions code.
@@ -145,21 +158,20 @@ public:
     @param index The index of the dependecy.
     */
     const String& getDependency(unsigned int index) const;
+    
 
-    /// @copydoc GpuProgram::setSkeletalAnimationIncluded
+    /** Sets whether a vertex program includes the required instructions
+        to perform skeletal animation. 
+    */
     void setSkeletalAnimationIncluded(bool value) { mSkeletalAnimation = value; }
  
-    /// @copydoc GpuProgram::isSkeletalAnimationIncluded
+    /** Returns whether a vertex program includes the required instructions
+        to perform skeletal animation. 
+    */
     bool getSkeletalAnimationIncluded() const { return mSkeletalAnimation; }
 
-    /// @copydoc GpuProgram::setInstancingIncluded
-    void setInstancingIncluded(bool included) { mInstancing = included; }
-
-    /// @copydoc GpuProgram::isInstancingIncluded
-    bool getInstancingIncluded(void) const { return mInstancing; }
-
     /** Tells Ogre whether auto-bound matrices should be sent in column or row-major order.
-
+    @remarks
         This method has the same effect as column_major_matrices option used when declaring manually written hlsl program.
         You want to use this method only when you use float3x4 type in a shader, e.g. for bone matrices.
         In mentioned case you should call this method with false as parameter.
@@ -184,7 +196,7 @@ public:
     /** Class destructor */
     ~Program();
 // Protected methods.
-private:
+protected:
 
     /** Class constructor.
     @param type The type of this program.
@@ -194,16 +206,22 @@ private:
     /** Destroy all parameters of this program. */
     void destroyParameters();
 
+    /** Destroy all functions of this program. */
+    void destroyFunctions();
+
     /** Add parameter to this program. */
     void addParameter(UniformParameterPtr parameter);
         
     /** Remove parameter from this program. */
     void removeParameter(UniformParameterPtr parameter);
-
+// Attributes.
+protected:
     // Program type. (Vertex, Fragment, Geometry).
     GpuProgramType mType;
     // Program uniform parameters.  
     UniformParameterList mParameters;
+    // Function list.
+    ShaderFunctionList mFunctions;
     // Entry point function for this program.   
     Function* mEntryPointFunction;
     // Program dependencies.
@@ -214,7 +232,7 @@ private:
     bool mSkeletalAnimation;
     // Whether to pass matrices as column-major.
     bool mColumnMajorMatrices;
-    bool mInstancing;
+private:
     friend class TargetRenderState;
 };
 

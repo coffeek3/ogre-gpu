@@ -109,16 +109,16 @@ namespace Ogre
         // Name
         ser.write(&mName);
         // Sections
-        for (auto & s : mSections)
+        for (SectionMap::iterator i = mSections.begin(); i != mSections.end(); ++i)
         {
-            PagedWorldSection* sec = s.second;
+            PagedWorldSection* sec = i->second;
             // declaration
             ser.writeChunkBegin(CHUNK_SECTIONDECLARATION_ID);
             ser.write(&sec->getType());
             ser.write(&sec->getName());
             ser.writeChunkEnd(CHUNK_SECTIONDECLARATION_ID);
             // data
-            s.second->save(ser);
+            i->second->save(ser);
         }
 
         ser.writeChunkEnd(CHUNK_ID);
@@ -203,8 +203,8 @@ namespace Ogre
     //---------------------------------------------------------------------
     void PagedWorld::destroyAllSections()
     {
-        for (auto & s : mSections)
-            OGRE_DELETE s.second;
+        for (SectionMap::iterator i = mSections.begin(); i != mSections.end(); ++i)
+            OGRE_DELETE i->second;
         mSections.clear();
     }
     //---------------------------------------------------------------------
@@ -286,25 +286,25 @@ namespace Ogre
     //---------------------------------------------------------------------
     void PagedWorld::frameStart(Real t)
     {
-        for (auto & s : mSections)
+        for (SectionMap::iterator i = mSections.begin(); i != mSections.end(); ++i)
         {
-            s.second->frameStart(t);
+            i->second->frameStart(t);
         }
     }
     //---------------------------------------------------------------------
     void PagedWorld::frameEnd(Real t)
     {
-        for (auto & s : mSections)
+        for (SectionMap::iterator i = mSections.begin(); i != mSections.end(); ++i)
         {
-            s.second->frameEnd(t);
+            i->second->frameEnd(t);
         }
     }
     //---------------------------------------------------------------------
     void PagedWorld::notifyCamera(Camera* cam)
     {
-        for (auto & s : mSections)
+        for (SectionMap::iterator i = mSections.begin(); i != mSections.end(); ++i)
         {
-            s.second->notifyCamera(cam);
+            i->second->notifyCamera(cam);
         }
     }
     //---------------------------------------------------------------------

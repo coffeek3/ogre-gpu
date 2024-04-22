@@ -31,16 +31,18 @@ package org.ogre.example;
 import org.ogre.*;
 
 import android.app.Activity;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceHolder.Callback;
 import android.view.SurfaceView;
 import android.content.res.AssetManager;
 
-public class BasicSample extends Activity {
+public class BasicSample extends Activity implements SensorEventListener {
 	protected Handler handler = null;
 	protected SurfaceView surfaceView = null;
 	protected Surface lastSurface = null;
@@ -51,7 +53,6 @@ public class BasicSample extends Activity {
 	private AssetManager assetMgr = null;
 	
 	ApplicationContext ogreApp = null;
-	CameraMan camman = null;
 	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -125,9 +126,6 @@ public class BasicSample extends Activity {
                                     camnode.attachObject(cam);
                                     camnode.setPosition(0, 0, 15);
                                     
-									camman = new CameraMan(camnode);
-									ogreApp.addInputListener(camman);
-
                                     Entity ent = scnMgr.createEntity("Sinbad.mesh");
                                     SceneNode node = scnMgr.getRootSceneNode().createChildSceneNode();
                                     node.attachObject(ent);
@@ -191,32 +189,13 @@ public class BasicSample extends Activity {
 
 	boolean wndCreate = false;
 
-	private int previousX = -1;
-	private int previousY = -1;
+	public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
-	@Override
-	public boolean onTouchEvent(MotionEvent e) {
-		if(ogreApp == null)
-			return true;
+	}
 
-		if(e.getAction() == MotionEvent.ACTION_MOVE)
-		{
-			// Convert to Ogre Event types, so we can use C++ Listeners like CameraMan
-			// you could also just modify camnode here yourself
-			MouseMotionEvent mme = new MouseMotionEvent();
-			mme.setXrel((int) e.getX() - previousX);
-			mme.setYrel((int) e.getY() - previousY);
-			mme.setType(EventType.MOUSEMOTION.swigValue());
-
-			Event ogreEvt = new Event();
-			ogreEvt.setMotion(mme);
-			ogreApp._fireInputEvent(ogreEvt, 0);
+	public void onSensorChanged(SensorEvent event) {
+		if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
 		}
-
-		previousX = (int)e.getX();
-		previousY = (int)e.getY();
-
-		return true;
 	}
 
 	static {

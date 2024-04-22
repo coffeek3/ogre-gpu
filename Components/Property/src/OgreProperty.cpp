@@ -67,9 +67,9 @@ namespace Ogre
     //---------------------------------------------------------------------
     PropertySet::~PropertySet()
     {
-        for (auto& p : mPropertyMap)
+        for (PropertyMap::iterator i = mPropertyMap.begin(); i != mPropertyMap.end(); ++i)
         {
-            OGRE_DELETE p.second;
+            OGRE_DELETE i->second;
         }
         mPropertyMap.clear();
     }
@@ -78,7 +78,7 @@ namespace Ogre
     {
         std::pair<PropertyMap::iterator, bool> retPair = mPropertyMap.emplace(prop->getName(), prop);
         if (!retPair.second)
-            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Duplicate property entry!",
+            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Duplicate property entry!", 
                 "PropertySet::addProperty");
     }
     //---------------------------------------------------------------------
@@ -94,7 +94,7 @@ namespace Ogre
         if (i != mPropertyMap.end())
             return i->second;
         else
-            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Property not found!",
+            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Property not found!", 
                 "PropertySet::getProperty");
     }
     //---------------------------------------------------------------------
@@ -106,65 +106,65 @@ namespace Ogre
     PropertyValueMap PropertySet::getValueMap() const
     {
         PropertyValueMap ret;
-        for (const auto& p : mPropertyMap)
+        for (PropertyMap::const_iterator i = mPropertyMap.begin(); i != mPropertyMap.end(); ++i)
         {
             PropertyValue val;
-            val.propType = p.second->getType();
+            val.propType = i->second->getType();
             switch(val.propType)
             {
             case PROP_SHORT:
-                val.val = Ogre::Any(static_cast<Property<short>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<short>*>(i->second)->get());
                 break;
             case PROP_UNSIGNED_SHORT:
-                val.val = Ogre::Any(static_cast<Property<unsigned short>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<unsigned short>*>(i->second)->get());
                 break;
             case PROP_INT:
-                val.val = Ogre::Any(static_cast<Property<int>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<int>*>(i->second)->get());
                 break;
             case PROP_UNSIGNED_INT:
-                val.val = Ogre::Any(static_cast<Property<unsigned int>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<unsigned int>*>(i->second)->get());
                 break;
             case PROP_LONG:
-                val.val = Ogre::Any(static_cast<Property<long>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<long>*>(i->second)->get());
                 break;
             case PROP_UNSIGNED_LONG:
-                val.val = Ogre::Any(static_cast<Property<unsigned long>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<unsigned long>*>(i->second)->get());
                 break;
             case PROP_REAL:
-                val.val = Ogre::Any(static_cast<Property<Real>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Real>*>(i->second)->get());
                 break;
             case PROP_STRING:
-                val.val = Ogre::Any(static_cast<Property<String>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<String>*>(i->second)->get());
                 break;
             case PROP_VECTOR2:
-                val.val = Ogre::Any(static_cast<Property<Ogre::Vector2>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::Vector2>*>(i->second)->get());
                 break;
             case PROP_VECTOR3:
-                val.val = Ogre::Any(static_cast<Property<Ogre::Vector3>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::Vector3>*>(i->second)->get());
                 break;
             case PROP_VECTOR4:
-                val.val = Ogre::Any(static_cast<Property<Ogre::Vector4>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::Vector4>*>(i->second)->get());
                 break;
             case PROP_COLOUR:
-                val.val = Ogre::Any(static_cast<Property<Ogre::ColourValue>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::ColourValue>*>(i->second)->get());
                 break;
             case PROP_BOOL:
-                val.val = Ogre::Any(static_cast<Property<bool>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<bool>*>(i->second)->get());
                 break;
             case PROP_QUATERNION:
-                val.val = Ogre::Any(static_cast<Property<Ogre::Quaternion>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::Quaternion>*>(i->second)->get());
                 break;
             case PROP_MATRIX3:
-                val.val = Ogre::Any(static_cast<Property<Ogre::Matrix3>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::Matrix3>*>(i->second)->get());
                 break;
             case PROP_MATRIX4:
-                val.val = Ogre::Any(static_cast<Property<Ogre::Matrix4>*>(p.second)->get());
+                val.val = Ogre::Any(static_cast<Property<Ogre::Matrix4>*>(i->second)->get());
                 break;
             case PROP_UNKNOWN:
             default:
                 break;
             };
-            ret[p.second->getName()] = val;
+            ret[i->second->getName()] = val;
         }
 
         return ret;
@@ -174,76 +174,83 @@ namespace Ogre
     //---------------------------------------------------------------------
     void PropertySet::setValueMap(const PropertyValueMap& values)
     {
-        for (const auto& v : values)
+        for (PropertyValueMap::const_iterator i = values.begin(); i != values.end(); ++i)
         {
-            PropertyMap::iterator j = mPropertyMap.find(v.first);
+            PropertyMap::iterator j = mPropertyMap.find(i->first);
             if (j != mPropertyMap.end())
             {
                 // matching properties
                 // check type
-                if (j->second->getType() != v.second.propType)
+                if (j->second->getType() != i->second.propType)
                 {
                     StringStream msg;
-                    msg << "Property " << v.first << " mismatched type; incoming type: '"
-                        << PropertyDef::getTypeName(v.second.propType) << "', property type: '"
+                    msg << "Property " << i->first << " mismatched type; incoming type: '"
+                        << PropertyDef::getTypeName(i->second.propType) << "', property type: '"
                         << PropertyDef::getTypeName(j->second->getType()) << "'";
                     OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, msg.str(), "PropertySet::setValueMap");
                 }
-                switch(v.second.propType)
+                switch(i->second.propType)
                 {
                 case PROP_SHORT:
-                    static_cast<Property<short>*>(j->second)->set(Ogre::any_cast<short>(v.second.val));
+                    static_cast<Property<short>*>(j->second)->set(Ogre::any_cast<short>(i->second.val));
                     break;
                 case PROP_UNSIGNED_SHORT:
-                    static_cast<Property<short>*>(j->second)->set(Ogre::any_cast<unsigned short>(v.second.val));
+                    static_cast<Property<short>*>(j->second)->set(Ogre::any_cast<unsigned short>(i->second.val));
                     break;
                 case PROP_INT:
-                    static_cast<Property<int>*>(j->second)->set(Ogre::any_cast<int>(v.second.val));
+                    static_cast<Property<int>*>(j->second)->set(Ogre::any_cast<int>(i->second.val));
                     break;
                 case PROP_UNSIGNED_INT:
-                    static_cast<Property<int>*>(j->second)->set(Ogre::any_cast<unsigned int>(v.second.val));
+                    static_cast<Property<int>*>(j->second)->set(Ogre::any_cast<unsigned int>(i->second.val));
                     break;
                 case PROP_LONG:
-                    static_cast<Property<long>*>(j->second)->set(Ogre::any_cast<long>(v.second.val));
+                    static_cast<Property<long>*>(j->second)->set(Ogre::any_cast<long>(i->second.val));
                     break;
                 case PROP_UNSIGNED_LONG:
-                    static_cast<Property<long>*>(j->second)->set(Ogre::any_cast<unsigned long>(v.second.val));
+                    static_cast<Property<long>*>(j->second)->set(Ogre::any_cast<unsigned long>(i->second.val));
                     break;
                 case PROP_REAL:
-                    static_cast<Property<Real>*>(j->second)->set(Ogre::any_cast<Real>(v.second.val));
+                    static_cast<Property<Real>*>(j->second)->set(Ogre::any_cast<Real>(i->second.val));
                     break;
                 case PROP_STRING:
-                    static_cast<Property<String>*>(j->second)->set(Ogre::any_cast<String>(v.second.val));
+                    static_cast<Property<String>*>(j->second)->set(Ogre::any_cast<String>(i->second.val));
                     break;
                 case PROP_VECTOR2:
-                    static_cast<Property<Ogre::Vector2>*>(j->second)->set(Ogre::any_cast<Ogre::Vector2>(v.second.val));
+                    static_cast<Property<Ogre::Vector2>*>(j->second)->set(Ogre::any_cast<Ogre::Vector2>(i->second.val));
                     break;
                 case PROP_VECTOR3:
-                    static_cast<Property<Ogre::Vector3>*>(j->second)->set(Ogre::any_cast<Ogre::Vector3>(v.second.val));
+                    static_cast<Property<Ogre::Vector3>*>(j->second)->set(Ogre::any_cast<Ogre::Vector3>(i->second.val));
                     break;
                 case PROP_VECTOR4:
-                    static_cast<Property<Ogre::Vector4>*>(j->second)->set(Ogre::any_cast<Ogre::Vector4>(v.second.val));
+                    static_cast<Property<Ogre::Vector4>*>(j->second)->set(Ogre::any_cast<Ogre::Vector4>(i->second.val));
                     break;
                 case PROP_COLOUR:
-                    static_cast<Property<Ogre::ColourValue>*>(j->second)->set(Ogre::any_cast<Ogre::ColourValue>(v.second.val));
+                    static_cast<Property<Ogre::ColourValue>*>(j->second)->set(Ogre::any_cast<Ogre::ColourValue>(i->second.val));
                     break;
                 case PROP_BOOL:
-                    static_cast<Property<bool>*>(j->second)->set(Ogre::any_cast<bool>(v.second.val));
+                    static_cast<Property<bool>*>(j->second)->set(Ogre::any_cast<bool>(i->second.val));
                     break;
                 case PROP_QUATERNION:
-                    static_cast<Property<Ogre::Quaternion>*>(j->second)->set(Ogre::any_cast<Ogre::Quaternion>(v.second.val));
+                    static_cast<Property<Ogre::Quaternion>*>(j->second)->set(Ogre::any_cast<Ogre::Quaternion>(i->second.val));
                     break;
                 case PROP_MATRIX3:
-                    static_cast<Property<Ogre::Matrix3>*>(j->second)->set(Ogre::any_cast<Ogre::Matrix3>(v.second.val));
+                    static_cast<Property<Ogre::Matrix3>*>(j->second)->set(Ogre::any_cast<Ogre::Matrix3>(i->second.val));
                     break;
                 case PROP_MATRIX4:
-                    static_cast<Property<Ogre::Matrix4>*>(j->second)->set(Ogre::any_cast<Ogre::Matrix4>(v.second.val));
+                    static_cast<Property<Ogre::Matrix4>*>(j->second)->set(Ogre::any_cast<Ogre::Matrix4>(i->second.val));
                     break;
                 case PROP_UNKNOWN:
                 default:
                     break;
+                        
                 };
+
+
             }
         }
+
+
     }
+
 }
+

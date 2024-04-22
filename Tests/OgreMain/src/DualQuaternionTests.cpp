@@ -27,7 +27,7 @@ THE SOFTWARE.
 */
 #include <gtest/gtest.h>
 #include "OgreDualQuaternion.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 #include "OgreMatrix4.h"
 
 

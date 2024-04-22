@@ -35,10 +35,12 @@ namespace Ogre {
     {
     }
     //---------------------------------------------------------------------
-    void Pose::addVertex(uint32 index, const Vector3f& offset)
+    void Pose::addVertex(size_t index, const Vector3& offset)
     {
-        OgreAssert(mNormalsMap.empty(),
-                   "Inconsistent calls to addVertex, must include normals always or never");
+        if (!mNormalsMap.empty())
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "Inconsistent calls to addVertex, must include normals always or never",
+                "Pose::addVertex");
 
         if(offset.squaredLength() < 1e-6f)
         {
@@ -49,10 +51,12 @@ namespace Ogre {
         mBuffer.reset();
     }
     //---------------------------------------------------------------------
-    void Pose::addVertex(uint32 index, const Vector3f& offset, const Vector3f& normal)
+    void Pose::addVertex(size_t index, const Vector3& offset, const Vector3& normal)
     {
-        OgreAssert(mVertexOffsetMap.empty() || !mNormalsMap.empty(),
-                   "Inconsistent calls to addVertex, must include normals always or never");
+        if (!mVertexOffsetMap.empty() && mNormalsMap.empty())
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "Inconsistent calls to addVertex, must include normals always or never",
+                "Pose::addVertex");
 
         if(offset.squaredLength() < 1e-6f && normal.squaredLength() < 1e-6f)
         {
@@ -64,7 +68,7 @@ namespace Ogre {
         mBuffer.reset();
     }
     //---------------------------------------------------------------------
-    void Pose::removeVertex(uint32 index)
+    void Pose::removeVertex(size_t index)
     {
         VertexOffsetMap::iterator i = mVertexOffsetMap.find(index);
         if (i != mVertexOffsetMap.end())
@@ -161,15 +165,15 @@ namespace Ogre {
                 // Remember, vertex maps are *sparse* so may have missing entries
                 // This is why we skip
                 float* pDst = pFloat + (numFloatsPerVertex * v->first);
-                *pDst++ = v->second[0];
-                *pDst++ = v->second[1];
-                *pDst++ = v->second[2];
+                *pDst++ = v->second.x;
+                *pDst++ = v->second.y;
+                *pDst++ = v->second.z;
                 ++v;
                 if (normals)
                 {
-                    *pDst++ = n->second[0];
-                    *pDst++ = n->second[1];
-                    *pDst++ = n->second[2];
+                    *pDst++ = n->second.x;
+                    *pDst++ = n->second.y;
+                    *pDst++ = n->second.z;
                     ++n;
                 }
                 

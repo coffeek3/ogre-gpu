@@ -31,17 +31,18 @@ THE SOFTWARE.
 namespace Ogre {
 
     RenderWindow::RenderWindow()
-        : RenderTarget(), mIsFullScreen(false), mIsPrimary(false), mClosed(false), mLeft(0), mTop(0), mVSyncInterval(1)
+        : RenderTarget(), mIsFullScreen(false), mIsPrimary(false), mLeft(0), mTop(0)
     {
         mAutoDeactivatedOnFocusChange = true;
     }
 
     //-----------------------------------------------------------------------
-    void RenderWindow::getMetrics(unsigned int& width, unsigned int& height,
+    void RenderWindow::getMetrics(unsigned int& width, unsigned int& height, unsigned int& colourDepth,
         int& left, int& top) const
     {
         width = mWidth;
         height = mHeight;
+        colourDepth = mColourDepth;
         left = mLeft;
         top = mTop;
     }

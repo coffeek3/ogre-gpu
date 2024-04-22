@@ -46,39 +46,58 @@ Ogre material scripts.
 */
 class SGMaterialSerializerListener : public MaterialSerializer::Listener, public RTShaderSystemAlloc
 {
-private:
-    void materialEventRaised(MaterialSerializer* ser,
-        MaterialSerializer::SerializeEvent event, bool& skip, const Material* mat) override;
 
-    void techniqueEventRaised(MaterialSerializer* ser,
-        MaterialSerializer::SerializeEvent event, bool& skip, const Technique* tech) override;
+// Interface.
+public:
 
-    void passEventRaised(MaterialSerializer* ser,
-        MaterialSerializer::SerializeEvent event, bool& skip, const Pass* tech) override;
+    /** 
+    @see MaterialSerializer::Listener::materialEventRaised
+    */
+    virtual void materialEventRaised(MaterialSerializer* ser, 
+        MaterialSerializer::SerializeEvent event, bool& skip, const Material* mat);
 
-    void textureUnitStateEventRaised(MaterialSerializer* ser,
-        MaterialSerializer::SerializeEvent event, bool& skip, const TextureUnitState* textureUnit) override;
+    /** 
+    @see MaterialSerializer::Listener::techniqueEventRaised
+    */
+    virtual void techniqueEventRaised(MaterialSerializer* ser, 
+        MaterialSerializer::SerializeEvent event, bool& skip, const Technique* tech);
+
+    /** 
+    @see MaterialSerializer::Listener::passEventRaised
+    */
+    virtual void passEventRaised(MaterialSerializer* ser, 
+        MaterialSerializer::SerializeEvent event, bool& skip, const Pass* tech);
+
+    /** 
+    @see MaterialSerializer::Listener::textureUnitStateEventRaised
+    */
+    virtual void textureUnitStateEventRaised(MaterialSerializer* ser, 
+        MaterialSerializer::SerializeEvent event, bool& skip, const TextureUnitState* textureUnit);
   
+// Types.
+protected:
     typedef std::vector<ShaderGenerator::SGPass*>  SGPassList;
     typedef SGPassList::iterator                    SGPassListIterator;
     typedef SGPassList::const_iterator              SGPassListConstIterator;
 
+// Protected methods.
+protected:
     /** Will be create and destroyed via ShaderGenerator interface. */ 
     SGMaterialSerializerListener();
 
     /** Internal method that returns SGPass instance from a given source pass. */
     ShaderGenerator::SGPass*    getShaderGeneratedPass  (const Pass* srcPass);
+    
 
-    void serializePassAttributes(MaterialSerializer* ser, ShaderGenerator::SGPass* passEntry);
-
-    void serializeTextureUnitStateAttributes(MaterialSerializer* ser, ShaderGenerator::SGPass* passEntry,
-                                             const TextureUnitState* srcTextureUnit);
-
+// Attributes.
+protected:  
     // The current source material that is being written.
     Material* mSourceMaterial;
     // List of SGPass instances composing this material.
     SGPassList mSGPassList;
-
+    
+    
+private:
     friend class ShaderGenerator;
 };
 

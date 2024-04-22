@@ -38,15 +38,6 @@ namespace Ogre {
 
     #define OGRE_VERSION    ((OGRE_VERSION_MAJOR << 16) | (OGRE_VERSION_MINOR << 8) | OGRE_VERSION_PATCH)
 
-    #define OGRE_MIN_VERSION(MAJOR, MINOR, PATCH) OGRE_VERSION >= ((MAJOR << 16) | (MINOR << 8) | PATCH)
-
-// OSX needs this correctly export typeinfo, however on MSVC there is huge fallout with it. Linux is fine either way.
-#if OGRE_COMPILER == OGRE_COMPILER_MSVC
-    #define _OgreMaybeExport
-#else
-    #define _OgreMaybeExport _OgreExport
-#endif
-
     // define the real number values to be used
     // default to use 'float' unless precompiler option set
     #if OGRE_DOUBLE_PRECISION == 1
@@ -60,6 +51,16 @@ namespace Ogre {
         */
         typedef float Real;
     #endif
+
+    /// @deprecated
+    #define OGRE_HashMap ::std::unordered_map
+    /// @deprecated
+    #define OGRE_HashMultiMap ::std::unordered_multimap
+    /// @deprecated
+    #define OGRE_HashSet ::std::unordered_set
+    /// @deprecated
+    #define OGRE_HashMultiSet ::std::unordered_multiset
+
 
     /** In order to avoid finger-aches :)
     */
@@ -93,13 +94,10 @@ namespace Ogre {
     class ColourValue;
     class ConfigDialog;
     template <typename T> class Controller;
-    typedef Controller<float> ControllerFloat;
-    typedef Controller<float> ControllerReal;
     template <typename T> class ControllerFunction;
     class ControllerManager;
     template <typename T> class ControllerValue;
     class DataStream;
-    class DebugDrawer;
     class DefaultWorkQueue;
     class Degree;
     class DepthBuffer;
@@ -118,17 +116,17 @@ namespace Ogre {
     class GpuProgramParameters;
     class GpuSharedParameters;
     class GpuProgram;
-    class GpuProgramFactory;
-    typedef GpuProgramFactory HighLevelGpuProgramFactory; //!< @deprecated
     class GpuProgramManager;
-    typedef GpuProgramManager HighLevelGpuProgramManager; //!< @deprecated
     class GpuProgramUsage;
-    class HardwareBuffer;
+    class HardwareCounterBuffer;
     class HardwareIndexBuffer;
     class HardwareOcclusionQuery;
+    class HardwareUniformBuffer;
     class HardwareVertexBuffer;
     class HardwarePixelBuffer;
     class HighLevelGpuProgram;
+    class HighLevelGpuProgramManager;
+    class HighLevelGpuProgramFactory;
     class IndexData;
     class InstanceBatch;
     class InstanceBatchHW;
@@ -173,8 +171,8 @@ namespace Ogre {
     class ParticleSystem;
     class ParticleSystemManager;
     class ParticleSystemRenderer;
-    template<typename T> class FactoryObj;
-    typedef FactoryObj<ParticleSystemRenderer> ParticleSystemRendererFactory;
+    class ParticleSystemRendererFactory;
+    class ParticleVisualData;
     class Pass;
     class PatchMesh;
     class PixelBox;
@@ -193,6 +191,8 @@ namespace Ogre {
     class RenderPriorityGroup;
     class RenderQueue;
     class RenderQueueGroup;
+    class RenderQueueInvocation;
+    class RenderQueueInvocationSequence;
     class RenderQueueListener;
     class RenderObjectListener;
     class RenderSystem;
@@ -213,6 +213,8 @@ namespace Ogre {
     class RibbonTrail;
     class Root;
     class SceneManager;
+    class SceneManagerEnumerator;
+    class SceneLoaderManager;
     class SceneNode;
     class SceneQuery;
     class SceneQueryListener;
@@ -238,6 +240,7 @@ namespace Ogre {
     class SubMesh;
     class TagPoint;
     class Technique;
+    class TempBlendedBufferInfo;
     class ExternalTextureSource;
     class TextureUnitState;
     class Texture;
@@ -245,12 +248,10 @@ namespace Ogre {
     class TransformKeyFrame;
     class Timer;
     class UserObjectBindings;
-    template <int dims, typename T> class _OgreMaybeExport Vector;
+    template <int dims, typename T> class Vector;
     typedef Vector<2, Real> Vector2;
-    typedef Vector<2, float> Vector2f;
     typedef Vector<2, int> Vector2i;
     typedef Vector<3, Real> Vector3;
-    typedef Vector<3, float> Vector3f;
     typedef Vector<3, int> Vector3i;
     typedef Vector<4, Real> Vector4;
     typedef Vector<4, float> Vector4f;
@@ -284,28 +285,22 @@ namespace Ogre {
     typedef SharedPtr<GpuLogicalBufferStruct> GpuLogicalBufferStructPtr;
     typedef SharedPtr<GpuSharedParameters> GpuSharedParametersPtr;
     typedef SharedPtr<GpuProgramParameters> GpuProgramParametersPtr;
-    typedef SharedPtr<HardwareBuffer> HardwareBufferPtr;
-    typedef SharedPtr<HardwareIndexBuffer> HardwareIndexBufferPtr;
-    typedef SharedPtr<HardwarePixelBuffer> HardwarePixelBufferPtr;
-    typedef SharedPtr<HardwareVertexBuffer> HardwareVertexBufferPtr;
+    typedef GpuProgramParametersPtr GpuProgramParametersSharedPtr; //!< @deprecated
+    typedef SharedPtr<HardwareCounterBuffer> HardwareCounterBufferSharedPtr;
+    typedef SharedPtr<HardwareIndexBuffer> HardwareIndexBufferSharedPtr;
+    typedef SharedPtr<HardwarePixelBuffer> HardwarePixelBufferSharedPtr;
+    typedef SharedPtr<HardwareUniformBuffer> HardwareUniformBufferSharedPtr;
+    typedef SharedPtr<HardwareVertexBuffer> HardwareVertexBufferSharedPtr;
+    typedef SharedPtr<HighLevelGpuProgram> HighLevelGpuProgramPtr;
     typedef SharedPtr<Material> MaterialPtr;
     typedef SharedPtr<MemoryDataStream> MemoryDataStreamPtr;
     typedef SharedPtr<Mesh> MeshPtr;
     typedef SharedPtr<PatchMesh> PatchMeshPtr;
-    typedef SharedPtr<RenderToVertexBuffer> RenderToVertexBufferPtr;
+    typedef SharedPtr<RenderToVertexBuffer> RenderToVertexBufferSharedPtr;
     typedef SharedPtr<Resource> ResourcePtr;
     typedef SharedPtr<ShadowCameraSetup> ShadowCameraSetupPtr;
     typedef SharedPtr<Skeleton> SkeletonPtr;
     typedef SharedPtr<Texture> TexturePtr;
-
-    typedef RenderToVertexBufferPtr RenderToVertexBufferSharedPtr; //!< @deprecated
-    typedef HardwareIndexBufferPtr HardwareIndexBufferSharedPtr; //!< @deprecated
-    typedef HardwarePixelBufferPtr HardwarePixelBufferSharedPtr; //!< @deprecated
-    typedef HardwareVertexBufferPtr HardwareVertexBufferSharedPtr; //!< @deprecated
-    typedef GpuProgramPtr HighLevelGpuProgramPtr; //!< @deprecated
-    typedef HardwareBufferPtr HardwareUniformBufferSharedPtr; //!< @deprecated
-    typedef HardwareBufferPtr HardwareCounterBufferSharedPtr; //!< @deprecated
-    typedef GpuProgramParametersPtr GpuProgramParametersSharedPtr; //!< @deprecated
 }
 
 /* Include all the standard header *after* all the configuration
@@ -317,30 +312,68 @@ settings have been made.
 
 namespace Ogre
 {
-    typedef std::string String;
-    typedef std::stringstream StringStream;
+    typedef std::string _StringBase;
+    typedef std::basic_stringstream<char,std::char_traits<char>,std::allocator<char> > _StringStreamBase;
+
+    typedef _StringBase String;
+    typedef _StringStreamBase StringStream;
+    typedef StringStream stringstream;
+}
+
+//for stl container
+namespace Ogre
+{
+    template <typename T>
+    struct OGRE_DEPRECATED deque
+    { 
+        typedef typename std::deque<T> type;
+        typedef typename std::deque<T>::iterator iterator;
+        typedef typename std::deque<T>::const_iterator const_iterator;
+    };
+
+    template <typename T>
+    struct OGRE_DEPRECATED vector
+    { 
+        typedef typename std::vector<T> type;
+        typedef typename std::vector<T>::iterator iterator;
+        typedef typename std::vector<T>::const_iterator const_iterator;
+    };
 
     template <typename T, size_t Alignment = OGRE_SIMD_ALIGNMENT>
     using aligned_vector = std::vector<T, AlignedAllocator<T, Alignment>>;
 
-    _OgreExport extern const String MOT_ENTITY;
-    _OgreExport extern const String MOT_LIGHT;
-    _OgreExport extern const String MOT_MANUAL_OBJECT;
-    _OgreExport extern const String MOT_PARTICLE_SYSTEM;
-    _OgreExport extern const String MOT_BILLBOARD_SET;
-    _OgreExport extern const String MOT_BILLBOARD_CHAIN;
-    _OgreExport extern const String MOT_RIBBON_TRAIL;
-    _OgreExport extern const String MOT_RECTANGLE2D;
-    _OgreExport extern const String MOT_STATIC_GEOMETRY;
-    _OgreExport extern const String MOT_CAMERA;
-    /// @deprecated use #MOT_FRUSTUM
-    _OgreExport extern const String MOT_FRUSTRUM;
-    _OgreExport extern const String MOT_FRUSTUM;
-    _OgreExport extern const String MOT_MOVABLE_PLANE;
-    _OgreExport extern const String MOT_INSTANCE_BATCH;
-    _OgreExport extern const String MOT_INSTANCED_ENTITY;
-    _OgreExport extern const String MOT_SIMPLE_RENDERABLE;
-}
+    template <typename T>
+    struct OGRE_DEPRECATED list
+    { 
+        typedef typename std::list<T> type;
+        typedef typename std::list<T>::iterator iterator;
+        typedef typename std::list<T>::const_iterator const_iterator;
+    };
+
+    template <typename T, typename P = std::less<T> >
+    struct OGRE_DEPRECATED set
+    { 
+        typedef typename std::set<T, P> type;
+        typedef typename std::set<T, P>::iterator iterator;
+        typedef typename std::set<T, P>::const_iterator const_iterator;
+    };
+
+    template <typename K, typename V, typename P = std::less<K> >
+    struct OGRE_DEPRECATED map
+    { 
+        typedef typename std::map<K, V, P> type;
+        typedef typename std::map<K, V, P>::iterator iterator;
+        typedef typename std::map<K, V, P>::const_iterator const_iterator;
+    };
+
+    template <typename K, typename V, typename P = std::less<K> >
+    struct OGRE_DEPRECATED multimap
+    { 
+        typedef typename std::multimap<K, V, P> type;
+        typedef typename std::multimap<K, V, P>::iterator iterator;
+        typedef typename std::multimap<K, V, P>::const_iterator const_iterator;
+    };
+} // Ogre
 
 #endif // __OgrePrerequisites_H__
 

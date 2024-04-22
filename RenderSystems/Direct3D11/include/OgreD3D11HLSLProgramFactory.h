@@ -44,9 +44,10 @@ namespace Ogre
         ~D3D11HLSLProgramFactory();
         /// Get the name of the language this factory creates programs for
         const String& getLanguage(void) const;
-        GpuProgram* create(ResourceManager* creator,
+        HighLevelGpuProgram* create(ResourceManager* creator, 
             const String& name, ResourceHandle handle,
             const String& group, bool isManual, ManualResourceLoader* loader);
+        void destroy(HighLevelGpuProgram* prog);
 
     };
 }

@@ -46,7 +46,6 @@ extern "C" struct SDL_Window;
 
 namespace Ogre {
     class OverlaySystem;
-    class ImGuiOverlay;
 }
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
@@ -55,6 +54,13 @@ namespace Ogre {
 
 #include "OgreInput.h"
 
+/** \addtogroup Optional Optional Components
+*  @{
+*/
+/** \defgroup Bites Bites
+* reusable utilities for rapid prototyping
+*  @{
+*/
 namespace OgreBites
 {
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
@@ -62,14 +68,6 @@ namespace OgreBites
 #else
     typedef SDL_Window NativeWindowType;
 #endif
-
-    /** \addtogroup Optional Optional Components
-    *  @{
-    */
-    /** \defgroup Bites Bites
-    * reusable utilities for rapid prototyping
-    *  @{
-    */
 
     /**
      * link between a renderwindow and a platform specific window
@@ -120,12 +118,12 @@ namespace OgreBites
         void closeApp();
 
         // callback interface copied from various listeners to be used by ApplicationContext
-        bool frameStarted(const Ogre::FrameEvent& evt) override {
+        virtual bool frameStarted(const Ogre::FrameEvent& evt) {
             pollEvents();
             return true;
         }
-        bool frameRenderingQueued(const Ogre::FrameEvent& evt) override;
-        bool frameEnded(const Ogre::FrameEvent& evt) override { return true; }
+        virtual bool frameRenderingQueued(const Ogre::FrameEvent& evt);
+        virtual bool frameEnded(const Ogre::FrameEvent& evt) { return true; }
         virtual void windowMoved(Ogre::RenderWindow* rw) {}
         virtual void windowResized(Ogre::RenderWindow* rw) {}
         virtual bool windowClosing(Ogre::RenderWindow* rw) { return true; }
@@ -149,7 +147,7 @@ namespace OgreBites
          *
          * by default all shaders are generated to system memory.
          * Must be called before loadResources
-         * @param write Whether to write out the generated shaders
+         * @param write
          */
         void setRTSSWriteShadersToDisk(bool write);
 
@@ -180,9 +178,6 @@ namespace OgreBites
         */
         virtual void setWindowGrab(NativeWindowType* win, bool grab = true) {}
 
-        /// get the vertical DPI of the display
-        virtual float getDisplayDPI() const { return 96.0f; }
-
         /// @overload
         void setWindowGrab(bool grab = true) {
             OgreAssert(!mWindows.empty(), "create a window first");
@@ -201,8 +196,10 @@ namespace OgreBites
         */
         virtual void loadResources();
 
-        /// @deprecated use do not use
-        OGRE_DEPRECATED void reconfigure(const Ogre::String& renderer, Ogre::NameValuePairList& options);
+        /**
+        Reconfigures the context. Attempts to preserve the current sample state.
+        */
+        virtual void reconfigure(const Ogre::String& renderer, Ogre::NameValuePairList& options);
 
 
         /**
@@ -224,12 +221,6 @@ namespace OgreBites
         Destroys dummy scene.
           */
         void destroyDummyScene();
-
-        /** Show the renderer configuration menu
-         *
-         * creates a dummy scene to allow rendering the dialog
-         */
-        void runRenderingSettingsDialog();
 
         /**
          * enables the caching of compiled shaders to file
@@ -276,13 +267,10 @@ namespace OgreBites
         createWindow(const Ogre::String& name, uint32_t w = 0, uint32_t h = 0,
                      Ogre::NameValuePairList miscParams = Ogre::NameValuePairList());
 
-        /// destroy and erase an NativeWindowPair by name
-        void destroyWindow(const Ogre::String& name);
-
         /**
-         * get the FileSystemLayer instance pointing to an application specific directory
+         * get the FileSystemLayer instace pointing to an application specific directory
          */
-        Ogre::FileSystemLayer& getFSLayer() const { return *mFSLayer; }
+        Ogre::FileSystemLayer& getFSLayer() { return *mFSLayer; }
 
         /**
          * the directory where the media files were installed
@@ -290,17 +278,7 @@ namespace OgreBites
          * same as OGRE_MEDIA_DIR in CMake
          */
         static Ogre::String getDefaultMediaDir();
-
-        /**
-         * Set up the overlay system for usage with ImGui
-         */
-        Ogre::ImGuiOverlay* initialiseImGui();
-
-        InputListener* getImGuiInputListener() const { return mImGuiListener.get(); }
     protected:
-        /// internal method to destroy both the render and the native window
-        virtual void _destroyWindow(const NativeWindowPair& win);
-
         Ogre::OverlaySystem* mOverlaySystem;  // Overlay system
 
         Ogre::FileSystemLayer* mFSLayer; // File system abstraction layer
@@ -316,15 +294,12 @@ namespace OgreBites
         typedef std::set<std::pair<uint32_t, InputListener*> > InputListenerList;
         InputListenerList mInputListeners;
 
-        std::unique_ptr<InputListener> mImGuiListener;
-
 #ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
         Ogre::RTShader::ShaderGenerator*       mShaderGenerator; // The Shader generator instance.
         SGTechniqueResolverListener*       mMaterialMgrListener; // Shader generator material manager listener.
 #endif // INCLUDE_RTSHADER_SYSTEM
     };
-
-    /** @} */
-    /** @} */
 }
+/** @} */
+/** @} */
 #endif

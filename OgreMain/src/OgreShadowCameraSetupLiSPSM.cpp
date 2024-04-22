@@ -29,6 +29,7 @@ THE SOFTWARE.
 
 #include "OgreStableHeaders.h"
 #include "OgreShadowCameraSetupLiSPSM.h"
+#include "OgreLight.h"
 
 namespace Ogre
 {
@@ -204,11 +205,13 @@ namespace Ogre
         OgreAssert(cam != NULL, "Camera (viewer) is NULL");
         OgreAssert(light != NULL, "Light is NULL");
         OgreAssert(texCam != NULL, "Camera (texture) is NULL");
+        mLightFrustumCameraCalculated = false;
+
 
         // calculate standard shadow mapping matrix
-        DefaultShadowCameraSetup::getShadowCamera(sm, cam, vp, light, texCam, iteration);
-        mLightFrustumCamera = texCam;
-
+        Affine3 LView; Matrix4 LProj;
+        calculateShadowMappingMatrix(*sm, *cam, *light, &LView, &LProj, NULL);
+        
         // if the direction of the light and the direction of the camera tend to be parallel,
         // then tweak up the adjust factor
         Real dot = Math::Abs(cam->getDerivedDirection().dotProduct(light->getDerivedDirection()));
@@ -225,12 +228,15 @@ namespace Ogre
         const VisibleObjectsBoundsInfo& visInfo = sm->getVisibleObjectsBoundsInfo(texCam);
         AxisAlignedBox sceneBB = visInfo.aabb;
         AxisAlignedBox receiverAABB = sm->getVisibleObjectsBoundsInfo(cam).receiverAabb;
+        sceneBB.merge(receiverAABB);
         sceneBB.merge(cam->getDerivedPosition());
 
         // in case the sceneBB is empty (e.g. nothing visible to the cam) simply
         // return the standard shadow mapping matrix
         if (sceneBB.isNull())
         {
+            texCam->setCustomViewMatrix(true, LView);
+            texCam->setCustomProjectionMatrix(true, LProj);
             return;
         }
 
@@ -242,11 +248,10 @@ namespace Ogre
         // simply return the standard shadow mapping matrix
         if (mPointListBodyB.getPointCount() == 0)
         {
+            texCam->setCustomViewMatrix(true, LView);
+            texCam->setCustomProjectionMatrix(true, LProj);
             return;
         }
-
-        auto LView = texCam->getViewMatrix();
-        auto LProj = texCam->getProjectionMatrix();
 
         // transform to light space: y -> -z, z -> y
         LProj = msNormalToLightSpace * LProj;
@@ -266,7 +271,7 @@ namespace Ogre
         // - position is the origin
         // - the view direction is the calculated viewDir
         // - the up vector is the y-axis
-        LProj = Matrix4(Math::lookRotation(-viewDir, Vector3::UNIT_Y).transpose()) * LProj;
+        LProj = buildViewMatrix(Vector3::ZERO, viewDir, Vector3::UNIT_Y) * LProj;
 
         // calculate LiSPSM projection
         LProj = calculateLiSPSM(LProj * LView, mPointListBodyB, mPointListBodyLVS, *sm, *cam, *light) * LProj;

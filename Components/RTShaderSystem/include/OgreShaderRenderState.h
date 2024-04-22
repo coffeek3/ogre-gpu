@@ -60,36 +60,39 @@ public:
     virtual ~RenderState();
 
     /** Reset this render state */
-    void resetToBuiltinSubRenderStates();
+    void reset();
 
     /** Add a template sub render state to this render state.
     @param subRenderState The sub render state template to add.
     */
     void addTemplateSubRenderState(SubRenderState* subRenderState);
 
-    /// Add multiple template sub render states by SRS type
-    void addTemplateSubRenderStates(const StringVector& srsTypes);
-
-    /** Remove a sub render state from this render state.
+    /** Remove a template sub render state from this render state.
     @param subRenderState The sub render state to remove.
     */
-    void removeSubRenderState(SubRenderState* subRenderState);
+    void removeTemplateSubRenderState(SubRenderState* subRenderState);
 
-    /** Get the list of the sub render states composing this render state. */
-    const SubRenderStateList& getSubRenderStates() const { return mSubRenderStateList; }
-
-    /// get sub render state by type (uniquely identified) or NULL if not found
-    SubRenderState* getSubRenderState(const String& type) const;
+    /** Get the list of the template sub render states composing this render state. */
+    const SubRenderStateList& getTemplateSubRenderStateList() const { return mSubRenderStateList; }
 
     /** 
-    Set the maximal light count to consider
+    Set the light count per light type.
+    @param 
+    lightCount The light count per type.
+    lightCount[0] defines the point light count.
+    lightCount[1] defines the directional light count.
+    lightCount[2] defines the spot light count.
     */
-    void setLightCount(int32 lightCount) { mLightCount = lightCount;}
+    void setLightCount(const Vector3i& lightCount);
 
     /** 
-    Get the maximal light count to consider
+    Get the light count per light type.
+
+    lightCount[0] defines the point light count.
+    lightCount[1] defines the directional light count.
+    lightCount[2] defines the spot light count.
     */
-    int32 getLightCount() const { return mLightCount; }
+    const Vector3i& getLightCount() const;
 
     /** 
     Set the light count auto update state.
@@ -105,8 +108,7 @@ public:
     */
     bool getLightCountAutoUpdate() const { return mLightCountAutoUpdate; }
 
-    bool haveAreaLights() const { return mHaveAreaLights; }
-    void setHaveAreaLights(bool val) { mHaveAreaLights = val; }
+    
 
 
     // Attributes.
@@ -114,14 +116,13 @@ protected:
     // The sub render states list.  
     SubRenderStateList mSubRenderStateList;
     // The light count per light type definition.
-    int32 mLightCount;
+    Vector3i mLightCount;
     // True if light count was explicitly set.
     bool mLightCountAutoUpdate;
-    bool mHaveAreaLights;
 
 private:
-    void clear();
     friend class ProgramManager;
+    friend class FFPRenderStateBuilder;
 };
 
 /** This is the target render state. This class will hold the actual generated CPU/GPU programs.
@@ -136,19 +137,14 @@ public:
     
     /** Class default constructor. */
     TargetRenderState();
-    ~TargetRenderState();
 
-    /** Add the SubRenderStates of the given render state as templates to this render state.
-    @note Only sub render states with non FFP execution order will be added.
-    @param templateRS The other render state to use as a template.
+    /** Link this target render state with the given render state.
+    Only sub render states with execution order that don't exist in this render state will be added.    
+    @param other The other render state to append to this state.
     @param srcPass The source pass that this render state is constructed from.
     @param dstPass The destination pass that constructed from this render state.
     */
-    void link(const RenderState& templateRS, Pass* srcPass, Pass* dstPass);
-
-    /** Add the SubRenderStates to this render state.
-     */
-    void link(const StringVector& srsTypes, Pass* srcPass, Pass* dstPass);
+    void link(const RenderState& other, Pass* srcPass, Pass* dstPass);
 
     /** Update the GPU programs constant parameters before a renderable is rendered.
     @param rend The renderable object that is going to be rendered.
@@ -163,6 +159,11 @@ public:
     */
     void addSubRenderStateInstance(SubRenderState* subRenderState);
 
+    /** Remove sub render state from this render state.
+    @param subRenderState The sub render state to remove.
+    */
+    void removeSubRenderStateInstance(SubRenderState* subRenderState);
+    
     /** Acquire CPU/GPU programs set associated with the given render state and bind them to the pass.
     @param pass The pass to bind the programs to.
     */
@@ -175,7 +176,8 @@ public:
 
     /// Key name for associating with a Pass instance.
     static const char* UserKey;
-private:
+// Protected methods
+protected:
     /** Bind the uniform parameters of a given CPU and GPU program set. */
     static void bindUniformParameters(Program* pCpuProgram, const GpuProgramParametersSharedPtr& passParams);
 
@@ -194,17 +196,19 @@ private:
     */
     ProgramSet* getProgramSet() { return mProgramSet.get(); }
     
+// Attributes.
+protected:
     // Tells if the list of the sub render states is sorted.
     bool mSubRenderStateSortValid;
     // The program set of this RenderState.
     std::unique_ptr<ProgramSet> mProgramSet;
-    Pass* mParent;
+    
 
 private:
     friend class ProgramManager;
+    friend class FFPRenderStateBuilder;
 };
 
-typedef std::shared_ptr<TargetRenderState> TargetRenderStatePtr;
 
 /** @} */
 /** @} */

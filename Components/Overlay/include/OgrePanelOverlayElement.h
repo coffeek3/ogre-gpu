@@ -41,7 +41,7 @@ namespace Ogre {
     *  @{
     */
     /** OverlayElement representing a flat, single-material (or transparent) panel which can contain other elements.
-
+    @remarks
         This class subclasses OverlayContainer because it can contain other elements. Like other
         containers, if hidden it's contents are also hidden, if moved it's contents also move etc. 
         The panel itself is a 2D rectangle which is either completely transparent, or is rendered 
@@ -63,12 +63,12 @@ namespace Ogre {
         virtual ~PanelOverlayElement();
 
         /** Initialise */
-        void initialise(void) override;
+        virtual void initialise(void);
 
         /** @copydoc OverlayElement::_releaseManualHardwareResources */
-        void _releaseManualHardwareResources() override;
+        virtual void _releaseManualHardwareResources();
         /** @copydoc OverlayElement::_restoreManualHardwareResources */
-        void _restoreManualHardwareResources() override;
+        virtual void _restoreManualHardwareResources();
 
         /** Sets the number of times textures should repeat. 
         @param x The number of times the texture should repeat horizontally
@@ -99,11 +99,35 @@ namespace Ogre {
         /** Returns whether this panel is transparent. */
         bool isTransparent(void) const;
 
-        const String& getTypeName(void) const override;
-        void getRenderOperation(RenderOperation& op) override;
+        /** See OverlayElement. */
+        virtual const String& getTypeName(void) const;
+        /** See Renderable. */
+        void getRenderOperation(RenderOperation& op);
         /** Overridden from OverlayContainer */
-        void _updateRenderQueue(RenderQueue* queue) override;
+        void _updateRenderQueue(RenderQueue* queue);
 
+
+        /** Command object for specifying tiling (see ParamCommand).*/
+        class _OgrePrivate CmdTiling : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
+        /** Command object for specifying transparency (see ParamCommand).*/
+        class _OgrePrivate CmdTransparent : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
+        /** Command object for specifying UV coordinates (see ParamCommand).*/
+        class _OgrePrivate CmdUVCoords : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
     protected:
         /// Flag indicating if this panel should be visual or just group things
         bool mTransparent;
@@ -116,15 +140,21 @@ namespace Ogre {
         RenderOperation mRenderOp;
 
         /// Internal method for setting up geometry, called by OverlayElement::update
-        void updatePositionGeometry(void) override;
+        virtual void updatePositionGeometry(void);
 
         /// Called to update the texture coords when layers change
-        void updateTextureGeometry(void) override;
+        virtual void updateTextureGeometry(void);
 
         /// Method for setting up base parameters for this class
-        void addBaseParameters(void) override;
+        void addBaseParameters(void);
 
         static String msTypeName;
+
+        // Command objects
+        static CmdTiling msCmdTiling;
+        static CmdTransparent msCmdTransparent;
+        static CmdUVCoords msCmdUVCoords;
+
     };
     /** @} */
     /** @} */

@@ -27,8 +27,6 @@ THE SOFTWARE.
 */
 #include "OgreStableHeaders.h"
 #include "OgreHardwareIndexBuffer.h"
-
-#include <memory>
 #include "OgreDefaultHardwareBufferManager.h"
 
 
@@ -36,41 +34,41 @@ namespace Ogre {
 
     //-----------------------------------------------------------------------------
     HardwareIndexBuffer::HardwareIndexBuffer(HardwareBufferManagerBase* mgr, IndexType idxType, 
-        size_t numIndexes, HardwareBuffer::Usage usage, bool useShadowBuffer)
-        : HardwareBuffer(usage, useShadowBuffer)
-        , mIndexType(idxType)
+        size_t numIndexes, HardwareBuffer::Usage usage, 
+        bool useSystemMemory, bool useShadowBuffer) 
+        : HardwareBuffer(usage, useSystemMemory, useShadowBuffer)
         , mMgr(mgr)
+        , mIndexType(idxType)
         , mNumIndexes(numIndexes)
     {
         // Calculate the size of the indexes
-        mIndexSize = indexSize(idxType);
+        switch (mIndexType)
+        {
+        case IT_16BIT:
+            mIndexSize = sizeof(unsigned short);
+            break;
+        case IT_32BIT:
+            mIndexSize = sizeof(unsigned int);
+            break;
+        }
         mSizeInBytes = mIndexSize * mNumIndexes;
 
-        if (idxType == IT_32BIT && Root::getSingletonPtr() && Root::getSingleton().getRenderSystem())
-        {
-            if (!Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_32BIT_INDEX))
-            {
-                OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, "32 bit index buffers are not supported");
-            }
-        }
-
         // Create a shadow buffer if required
-        if (useShadowBuffer)
+        if (mUseShadowBuffer)
         {
-            mShadowBuffer = std::make_unique<DefaultHardwareBuffer>(mSizeInBytes);
+            mShadowBuffer.reset(new DefaultHardwareIndexBuffer(mIndexType,
+                mNumIndexes, HardwareBuffer::HBU_DYNAMIC));
         }
-    }
 
-    HardwareIndexBuffer::HardwareIndexBuffer(HardwareBufferManagerBase* mgr, IndexType idxType,
-                                             size_t numIndexes, HardwareBuffer* delegate)
-        : HardwareIndexBuffer(mgr, idxType, numIndexes, delegate->getUsage(), false)
-    {
-        mDelegate.reset(delegate);
-    }
 
+    }
     //-----------------------------------------------------------------------------
     HardwareIndexBuffer::~HardwareIndexBuffer()
     {
+        if (mMgr)
+        {
+            mMgr->_notifyIndexBufferDestroyed(this);
+        }
     }
 
 }

@@ -35,10 +35,36 @@ same license as the rest of the engine.
 #include "DeferredLightCP.h"
 #include "SSAOLogic.h"
 #include "GBufferSchemeHandler.h"
+#include "NullSchemeHandler.h"
+
+#include "SharedData.h"
+
+namespace Ogre
+{
+    template<> SharedData* Singleton<SharedData>::msSingleton = 0;
+}
+
+SharedData::SharedData()
+    : iRoot(0), iCamera(0), iWindow(0), iSystem(0), iActivate(false),
+      iGlobalActivate(false), iMainLight(0)
+{
+}
+
+SharedData::~SharedData() {}
+
+SharedData* SharedData::getSingletonPtr(void)
+{
+    return msSingleton;
+}
+SharedData& SharedData::getSingleton(void)
+{
+    assert( msSingleton );  return ( *msSingleton );
+}
 
 using namespace Ogre;
 
-const Ogre::uint8 DeferredShadingSystem::POST_GBUFFER_RENDER_QUEUE = Ogre::RENDER_QUEUE_TRANSPARENTS;
+const Ogre::uint8 DeferredShadingSystem::PRE_GBUFFER_RENDER_QUEUE = Ogre::RENDER_QUEUE_1;
+const Ogre::uint8 DeferredShadingSystem::POST_GBUFFER_RENDER_QUEUE = Ogre::RENDER_QUEUE_8;
 
 DeferredShadingSystem::DeferredShadingSystem(
         Viewport *vp, SceneManager *sm,  Camera *cam
@@ -57,8 +83,8 @@ DeferredShadingSystem::DeferredShadingSystem(
 
 void DeferredShadingSystem::initialize()
 {
-    for(auto & i : mInstance)
-        i=0;
+    for(int i=0; i<DSM_COUNT; ++i)
+        mInstance[i]=0;
 
     createResources();
     
@@ -72,8 +98,8 @@ void DeferredShadingSystem::initialize()
 DeferredShadingSystem::~DeferredShadingSystem()
 {
     CompositorChain *chain = CompositorManager::getSingleton().getCompositorChain(mViewport);
-    for(auto & i : mInstance)
-        chain->_removeInstance(i);
+    for(int i=0; i<DSM_COUNT; ++i)
+        chain->_removeInstance(mInstance[i]);
     CompositorManager::getSingleton().removeCompositorChain(mViewport);
 
     Ogre::CompositorManager& compMgr = Ogre::CompositorManager::getSingleton();
@@ -136,10 +162,6 @@ void DeferredShadingSystem::setActive(bool active)
         mActive = active;
         mGBufferInstance->setEnabled(active);
 
-        RTShader::ShaderGenerator& rtShaderGen = RTShader::ShaderGenerator::getSingleton();
-        // we do lights ourselves if active
-        rtShaderGen.getRenderState(MSN_SHADERGEN)->setLightCountAutoUpdate(!mActive);
-
         // mCurrentMode could have changed with a prior call to setMode, so iterate all
         setMode(mCurrentMode);
     }
@@ -154,40 +176,24 @@ void DeferredShadingSystem::createResources(void)
 {
     CompositorManager &compMan = CompositorManager::getSingleton();
 
-    RTShader::ShaderGenerator& rtShaderGen = RTShader::ShaderGenerator::getSingleton();
-
     //Hook up the compositor logic and scheme handlers.
     //This can theoretically happen in a loaded plugin, but in this case the demo contains the code.
     static bool firstTime = true;
     if (firstTime)
     {
         MaterialManager::getSingleton().addListener(new GBufferSchemeHandler, "GBuffer");
+        MaterialManager::getSingleton().addListener(new NullSchemeHandler, "NoGBuffer");
 
         compMan.registerCustomCompositionPass("DeferredLight", new DeferredLightCompositionPass);
 
-        rtShaderGen.createScheme("GBuffer");
-
         firstTime = false;
     }
-
-
-    RTShader::RenderState* schemRenderState = rtShaderGen.getRenderState("GBuffer");
-    schemRenderState->setLightCountAutoUpdate(false); // does not use lights
-    auto subRenderState = rtShaderGen.createSubRenderState(RTShader::SRS_GBUFFER);
-    subRenderState->setParameter("target_buffers", StringVector{"diffuse_specular", "normal_viewdepth"});
-    schemRenderState->addTemplateSubRenderState(subRenderState);
 
     mCompositorLogics["SSAOLogic"] = new SSAOLogic;
     compMan.registerCompositorLogic("SSAOLogic", mCompositorLogics["SSAOLogic"]);
 
     // Create the main GBuffer compositor
     mGBufferInstance = compMan.addCompositor(mViewport, "DeferredShading/GBuffer");
-
-    if(!GpuProgramManager::getSingleton().isSyntaxSupported("hlsl"))
-    {
-        // need to clear depth to 1.0 for GL
-        mGBufferInstance->getTechnique()->getTargetPass(0)->getPass(0)->setClearColour(ColourValue(0.0, 0.0, 0.0, 1.0));
-    }
     
     // Create filters
     mInstance[DSM_SHOWLIT] = compMan.addCompositor(mViewport, "DeferredShading/ShowLit");

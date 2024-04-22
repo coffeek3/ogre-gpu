@@ -29,119 +29,7 @@ THE SOFTWARE.
 #include "OgreVertexIndexData.h"
 #include "OgreHardwareVertexBuffer.h"
 
-#define INT10_MAX ((1 << 9) - 1)
-
 namespace Ogre {
-    static void swapPackedRB(uint32* ptr)
-    {
-        auto cptr = (uint8*)ptr;
-        std::swap(cptr[0], cptr[2]);
-    }
-
-    struct int_10_10_10_2
-    {
-        int32_t x : 10;
-        int32_t y : 10;
-        int32_t z : 10;
-        int32_t w :  2;
-    };
-
-    template<int INCLUDE_W>
-    static void pack_10_10_10_2(uint8* pDst, uint8* pSrc, int elemOffset)
-    {
-        float* pFloat = (float*)(pSrc + elemOffset);
-        int_10_10_10_2 packed = {int(INT10_MAX * pFloat[0]), int(INT10_MAX * pFloat[1]), int(INT10_MAX * pFloat[2]), 1};
-        if(INCLUDE_W)
-            packed.w = int(pFloat[3]);
-        memcpy(pDst + elemOffset, &packed, sizeof(int_10_10_10_2));
-    }
-
-    template<int INCLUDE_W>
-    static void unpack_10_10_10_2(uint8* pDst, uint8* pSrc, int elemOffset)
-    {
-        int_10_10_10_2* pPacked = (int_10_10_10_2*)(pSrc + elemOffset);
-        float* pFloat = (float*)(pDst + elemOffset);
-
-        pFloat[0] = float(pPacked->x) / INT10_MAX;
-        pFloat[1] = float(pPacked->y) / INT10_MAX;
-        pFloat[2] = float(pPacked->z) / INT10_MAX;
-        if(INCLUDE_W)
-            pFloat[3] = pPacked->w;
-    }
-
-    static void copy_float3(uint8* pDst, uint8* pSrc, int elemOffset)
-    {
-        memcpy(pDst, pSrc + elemOffset, sizeof(float) * 3);
-    }
-
-    static void spliceElement(const VertexElement* elem, const HardwareVertexBufferPtr& srcBuf, uint8* pDst,
-                              uint8* pElemDst, uint32 newElemSize, void (*elemConvert)(uint8*, uint8*, int))
-    {
-        auto vertexSize = srcBuf->getVertexSize();
-        auto numVerts = srcBuf->getNumVertices();
-
-        auto elemSize = elem->getSize();
-        auto elemOffset = elem->getOffset();
-
-        auto postVertexOffset = elemOffset + elemSize;
-        auto postVertexSize = vertexSize - postVertexOffset;
-
-        auto elemDstSize = pDst == pElemDst ? newElemSize : 0;
-        size_t newVertexSize = vertexSize - elemSize + elemDstSize;
-        auto elemDstStep = pDst == pElemDst ? newVertexSize : newElemSize;
-
-        HardwareBufferLockGuard srcLock(srcBuf, HardwareBuffer::HBL_READ_ONLY);
-        uint8* pSrc = static_cast<uint8*>(srcLock.pData);
-
-        for (uint32 v = 0; v < numVerts; ++v)
-        {
-            // copy and convert element from vertex
-            elemConvert(pElemDst, pSrc, elemOffset);
-            pElemDst += elemDstStep;
-
-            // copy over other data
-            if (elemOffset)
-                memcpy(pDst, pSrc, elemOffset);
-            if (postVertexSize)
-                memcpy(pDst + elemOffset + elemDstSize, pSrc + postVertexOffset, postVertexSize);
-
-            pSrc += vertexSize;
-            pDst += newVertexSize;
-        }
-    }
-
-    static void updateVertexDeclaration(VertexDeclaration* decl, const VertexElement* elem, VertexElementType newType, uint16 newSource)
-    {
-        auto elemSize = elem->getSize();
-        auto oldElemOffset = elem->getOffset();
-        auto newElemOffset = oldElemOffset;
-
-        auto newElemSize = VertexElement::getTypeSize(newType);
-        auto oldSource = elem->getSource();
-
-        if(newSource != oldSource)
-        {
-            newElemOffset = 0;
-            newElemSize = 0;
-        }
-
-        uint16 idx = 0;
-        for (const auto& e : decl->getElements())
-        {
-            if (&e == elem)
-            {
-                // Modify element
-                decl->modifyElement(idx, newSource, newElemOffset, newType, elem->getSemantic());
-            }
-            else if (e.getSource() == oldSource && e.getOffset() > oldElemOffset)
-            {
-                // shift elements after this one
-                decl->modifyElement(idx, e.getSource(), e.getOffset() - elemSize + newElemSize, e.getType(),
-                                    e.getSemantic(), e.getIndex());
-            }
-            idx++;
-        }
-    }
 
     //-----------------------------------------------------------------------
     VertexData::VertexData(HardwareBufferManagerBase* mgr)
@@ -240,56 +128,6 @@ namespace Ogre {
         
         return dest;
     }
-
-    void VertexData::convertVertexElement(VertexElementSemantic semantic, VertexElementType dstType)
-    {
-        auto elem = vertexDeclaration->findElementBySemantic(semantic);
-
-        if (!elem || VertexElement::getBaseType(elem->getType()) == VertexElement::getBaseType(dstType))
-            return; // nothing to do
-
-        auto srcType = elem->getType();
-        auto vbuf = vertexBufferBinding->getBuffer(elem->getSource());
-
-        size_t newElemSize = VertexElement::getTypeSize(dstType);
-        size_t newVertexSize = vbuf->getVertexSize() - elem->getSize() + newElemSize;
-        auto newVBuf = vbuf->getManager()->createVertexBuffer(newVertexSize, vbuf->getNumVertices(), vbuf->getUsage(),
-                                                              vbuf->hasShadowBuffer());
-
-        {
-            HardwareBufferLockGuard dst(newVBuf, HardwareBuffer::HBL_DISCARD);
-            auto pDst = static_cast<uint8*>(dst.pData);
-
-            if(dstType == VET_INT_10_10_10_2_NORM)
-            {
-                if(srcType == VET_FLOAT3)
-                    spliceElement(elem, vbuf, pDst, pDst, newElemSize, pack_10_10_10_2<false>);
-                else
-                {
-                    OgreAssert(srcType == VET_FLOAT4, "unsupported conversion");
-                    spliceElement(elem, vbuf, pDst, pDst, newElemSize, pack_10_10_10_2<true>);
-                }
-            }
-            else if(dstType == VET_FLOAT3)
-            {
-                OgreAssert(srcType == VET_INT_10_10_10_2_NORM, "unsupported conversion");
-                spliceElement(elem, vbuf, pDst, pDst, newElemSize, unpack_10_10_10_2<false>);
-            }
-            else if(dstType == VET_FLOAT4)
-            {
-                OgreAssert(srcType == VET_INT_10_10_10_2_NORM, "unsupported conversion");
-                spliceElement(elem, vbuf, pDst, pDst, newElemSize, unpack_10_10_10_2<true>);
-            }
-            else
-            {
-                OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "unsupported dstType");
-            }
-        }
-
-        // Bind the new buffer
-        vertexBufferBinding->setBinding(elem->getSource(), newVBuf);
-        updateVertexDeclaration(vertexDeclaration, elem, dstType, elem->getSource());
-    }
     //-----------------------------------------------------------------------
     void VertexData::prepareForShadowVolume(void)
     {
@@ -305,106 +143,201 @@ namespace Ogre {
         when rendering the shadow.
         */
 
+        // Upfront, lets check whether we have vertex program capability
+        RenderSystem* rend = Root::getSingleton().getRenderSystem();
+        bool useVertexPrograms = false;
+        if (rend && rend->getCapabilities()->hasCapability(RSC_VERTEX_PROGRAM))
+        {
+            useVertexPrograms = true;
+        }
+
+
         // Look for a position element
         const VertexElement* posElem = vertexDeclaration->findElementBySemantic(VES_POSITION);
-        if (!posElem)
-            return;
-
-        // Upfront, lets check whether we have vertex program capability
-        bool useVertexPrograms = Root::getSingleton().getRenderSystem() != 0;
-
-        auto vbuf = vertexBufferBinding->getBuffer(posElem->getSource());
-
-        // Are there other elements in the buffer except for the position?
-        // We need to create another buffer to contain the remaining elements
-        // Most drivers don't like gaps in the declaration, and in any case it's waste
-        HardwareVertexBufferPtr newRemainderBuffer;
-        if (vbuf->getVertexSize() > posElem->getSize())
+        if (posElem)
         {
-            newRemainderBuffer = vbuf->getManager()->createVertexBuffer(
-                vbuf->getVertexSize() - posElem->getSize(), vbuf->getNumVertices(), vbuf->getUsage(),
-                vbuf->hasShadowBuffer());
-        }
-        // Allocate new position buffer, will be FLOAT3 and 2x the size
-        size_t oldVertexCount = vbuf->getNumVertices();
-        size_t newVertexCount = oldVertexCount * 2;
-        auto newPosBuffer = vbuf->getManager()->createVertexBuffer(
-            VertexElement::getTypeSize(VET_FLOAT3), newVertexCount, vbuf->getUsage(), vbuf->hasShadowBuffer());
+            size_t v;
+            unsigned short posOldSource = posElem->getSource();
 
-        // Point first destination pointer at the start of the new position buffer,
-        // the other one half way along
-        auto pDest = static_cast<float*>(newPosBuffer->lock(HardwareBuffer::HBL_DISCARD));
-        auto pDest2 = pDest + oldVertexCount * 3;
-
-        if (newRemainderBuffer)
-        {
-            // Basically we just memcpy the vertex excluding the position
-            HardwareBufferLockGuard destRemLock(newRemainderBuffer, HardwareBuffer::HBL_DISCARD);
-            spliceElement(posElem, vbuf, (uint8*)destRemLock.pData, (uint8*)pDest, posElem->getSize(), copy_float3);
-        }
-        else
-        {
-            // Unshared buffer, can block copy the whole thing
-            vbuf->readData(0, vbuf->getSizeInBytes(), pDest);
-        }
-
-        memcpy(pDest2, pDest, oldVertexCount * 3 * sizeof(float));
-
-        newPosBuffer->unlock();
-
-        // At this stage, he original vertex buffer is going to be destroyed
-        // So we should force the deallocation of any temporary copies
-        vbuf->getManager()->_forceReleaseBufferCopies(vbuf);
-
-        if (useVertexPrograms)
-        {
-            // Now it's time to set up the w buffer
-            hardwareShadowVolWBuffer =
-                vbuf->getManager()->createVertexBuffer(sizeof(float), newVertexCount, HBU_GPU_ONLY, false);
-            // Fill the first half with 1.0, second half with 0.0
-            pDest = static_cast<float*>(hardwareShadowVolWBuffer->lock(HardwareBuffer::HBL_DISCARD));
-            for (size_t v = 0; v < oldVertexCount; ++v)
+            HardwareVertexBufferSharedPtr vbuf = vertexBufferBinding->getBuffer(posOldSource);
+            bool wasSharedBuffer = false;
+            // Are there other elements in the buffer except for the position?
+            if (vbuf->getVertexSize() > posElem->getSize())
             {
-                *pDest++ = 1.0f;
+                // We need to create another buffer to contain the remaining elements
+                // Most drivers don't like gaps in the declaration, and in any case it's waste
+                wasSharedBuffer = true;
             }
-            // Fill the second half with 0.0
-            memset(pDest, 0, sizeof(float) * oldVertexCount);
-            hardwareShadowVolWBuffer->unlock();
+            HardwareVertexBufferSharedPtr newPosBuffer, newRemainderBuffer;
+            if (wasSharedBuffer)
+            {
+                newRemainderBuffer = vbuf->getManager()->createVertexBuffer(
+                    vbuf->getVertexSize() - posElem->getSize(), vbuf->getNumVertices(), vbuf->getUsage(),
+                    vbuf->hasShadowBuffer());
+            }
+            // Allocate new position buffer, will be FLOAT3 and 2x the size
+            size_t oldVertexCount = vbuf->getNumVertices();
+            size_t newVertexCount = oldVertexCount * 2;
+            newPosBuffer = vbuf->getManager()->createVertexBuffer(
+                VertexElement::getTypeSize(VET_FLOAT3), newVertexCount, vbuf->getUsage(), 
+                vbuf->hasShadowBuffer());
+
+            // Iterate over the old buffer, copying the appropriate elements and initialising the rest
+            float* pSrc;
+            unsigned char *pBaseSrc = static_cast<unsigned char*>(
+                vbuf->lock(HardwareBuffer::HBL_READ_ONLY));
+            // Point first destination pointer at the start of the new position buffer,
+            // the other one half way along
+            float *pDest = static_cast<float*>(newPosBuffer->lock(HardwareBuffer::HBL_DISCARD));
+            float* pDest2 = pDest + oldVertexCount * 3; 
+
+            // Precalculate any dimensions of vertex areas outside the position
+            size_t prePosVertexSize = 0;
+            unsigned char *pBaseDestRem = 0;
+            if (wasSharedBuffer)
+            {
+                size_t postPosVertexSize, postPosVertexOffset;
+                pBaseDestRem = static_cast<unsigned char*>(
+                    newRemainderBuffer->lock(HardwareBuffer::HBL_DISCARD));
+                prePosVertexSize = posElem->getOffset();
+                postPosVertexOffset = prePosVertexSize + posElem->getSize();
+                postPosVertexSize = vbuf->getVertexSize() - postPosVertexOffset;
+                // the 2 separate bits together should be the same size as the remainder buffer vertex
+                assert (newRemainderBuffer->getVertexSize() == prePosVertexSize + postPosVertexSize);
+
+                // Iterate over the vertices
+                for (v = 0; v < oldVertexCount; ++v)
+                {
+                    // Copy position, into both buffers
+                    posElem->baseVertexPointerToElement(pBaseSrc, &pSrc);
+                    *pDest++ = *pDest2++ = *pSrc++;
+                    *pDest++ = *pDest2++ = *pSrc++;
+                    *pDest++ = *pDest2++ = *pSrc++;
+
+                    // now deal with any other elements 
+                    // Basically we just memcpy the vertex excluding the position
+                    if (prePosVertexSize > 0)
+                        memcpy(pBaseDestRem, pBaseSrc, prePosVertexSize);
+                    if (postPosVertexSize > 0)
+                        memcpy(pBaseDestRem + prePosVertexSize, 
+                            pBaseSrc + postPosVertexOffset, postPosVertexSize);
+                    pBaseDestRem += newRemainderBuffer->getVertexSize();
+
+                    pBaseSrc += vbuf->getVertexSize();
+
+                } // next vertex
+            }
+            else
+            {
+                // Unshared buffer, can block copy the whole thing
+                memcpy(pDest, pBaseSrc, vbuf->getSizeInBytes());
+                memcpy(pDest2, pBaseSrc, vbuf->getSizeInBytes());
+            }
+
+            vbuf->unlock();
+            newPosBuffer->unlock();
+            if (wasSharedBuffer)
+                newRemainderBuffer->unlock();
+
+            // At this stage, he original vertex buffer is going to be destroyed
+            // So we should force the deallocation of any temporary copies
+            vbuf->getManager()->_forceReleaseBufferCopies(vbuf);
+
+            if (useVertexPrograms)
+            {
+                // Now it's time to set up the w buffer
+                hardwareShadowVolWBuffer = vbuf->getManager()->createVertexBuffer(
+                    sizeof(float), newVertexCount, HardwareBuffer::HBU_STATIC_WRITE_ONLY, false);
+                // Fill the first half with 1.0, second half with 0.0
+                pDest = static_cast<float*>(
+                    hardwareShadowVolWBuffer->lock(HardwareBuffer::HBL_DISCARD));
+                for (v = 0; v < oldVertexCount; ++v)
+                {
+                    *pDest++ = 1.0f;
+                }
+                for (v = 0; v < oldVertexCount; ++v)
+                {
+                    *pDest++ = 0.0f;
+                }
+                hardwareShadowVolWBuffer->unlock();
+            }
+
+            unsigned short newPosBufferSource; 
+            if (wasSharedBuffer)
+            {
+                // Get the a new buffer binding index
+                newPosBufferSource= vertexBufferBinding->getNextIndex();
+                // Re-bind the old index to the remainder buffer
+                vertexBufferBinding->setBinding(posOldSource, newRemainderBuffer);
+            }
+            else
+            {
+                // We can just re-use the same source idex for the new position buffer
+                newPosBufferSource = posOldSource;
+            }
+            // Bind the new position buffer
+            vertexBufferBinding->setBinding(newPosBufferSource, newPosBuffer);
+
+            // Now, alter the vertex declaration to change the position source
+            // and the offsets of elements using the same buffer
+            VertexDeclaration::VertexElementList::const_iterator elemi = 
+                vertexDeclaration->getElements().begin();
+            VertexDeclaration::VertexElementList::const_iterator elemiend = 
+                vertexDeclaration->getElements().end();
+            unsigned short idx;
+            for(idx = 0; elemi != elemiend; ++elemi, ++idx) 
+            {
+                if (&(*elemi) == posElem)
+                {
+                    // Modify position to point at new position buffer
+                    vertexDeclaration->modifyElement(
+                        idx, 
+                        newPosBufferSource, // new source buffer
+                        0, // no offset now
+                        VET_FLOAT3, 
+                        VES_POSITION);
+                }
+                else if (wasSharedBuffer &&
+                    elemi->getSource() == posOldSource &&
+                    elemi->getOffset() > prePosVertexSize )
+                {
+                    // This element came after position, remove the position's
+                    // size
+                    vertexDeclaration->modifyElement(
+                        idx, 
+                        posOldSource, // same old source
+                        elemi->getOffset() - posElem->getSize(), // less offset now
+                        elemi->getType(), 
+                        elemi->getSemantic(),
+                        elemi->getIndex());
+
+                }
+
+            }
+
+
+            // Note that we don't change vertexCount, because the other buffer(s) are still the same
+            // size after all
+
+
         }
-
-        auto newPosBufferSource = posElem->getSource();
-        if (newRemainderBuffer)
-        {
-            // Get the a new buffer binding index
-            newPosBufferSource= vertexBufferBinding->getNextIndex();
-            // Re-bind the old index to the remainder buffer
-            vertexBufferBinding->setBinding(posElem->getSource(), newRemainderBuffer);
-        }
-
-        // Bind the new position buffer
-        vertexBufferBinding->setBinding(newPosBufferSource, newPosBuffer);
-
-        // Now, alter the vertex declaration to change the position source
-        // and the offsets of elements using the same buffer
-        // Note that we don't change vertexCount, because the other buffer(s) are still the same
-        // size after all
-        updateVertexDeclaration(vertexDeclaration, posElem, VET_FLOAT3, newPosBufferSource);
     }
     //-----------------------------------------------------------------------
-    void VertexData::reorganiseBuffers(VertexDeclaration* newDeclaration, const BufferUsageList& bufferUsages,
-                                       HardwareBufferManagerBase* mgr)
+    void VertexData::reorganiseBuffers(VertexDeclaration* newDeclaration, 
+        const BufferUsageList& bufferUsages, HardwareBufferManagerBase* mgr)
     {
         HardwareBufferManagerBase* pManager = mgr ? mgr : mMgr;
         // Firstly, close up any gaps in the buffer sources which might have arisen
         newDeclaration->closeGapsInSource();
 
         // Build up a list of both old and new elements in each buffer
-        std::vector<uint8*> oldBufferLocks;
+        unsigned short buf = 0;
+        std::vector<void*> oldBufferLocks;
         std::vector<size_t> oldBufferVertexSizes;
-        std::vector<uint8*> newBufferLocks;
+        std::vector<void*> newBufferLocks;
         std::vector<size_t> newBufferVertexSizes;
         VertexBufferBinding* newBinding = pManager->createVertexBufferBinding();
-        const auto& oldBindingMap = vertexBufferBinding->getBindings();
+        const VertexBufferBinding::VertexBufferBindingMap& oldBindingMap = vertexBufferBinding->getBindings();
         VertexBufferBinding::VertexBufferBindingMap::const_iterator itBinding;
 
         // Pre-allocate old buffer locks
@@ -418,64 +351,90 @@ namespace Ogre {
         bool useShadowBuffer = false;
 
         // Lock all the old buffers for reading
-        for (const auto& it : oldBindingMap)
+        for (itBinding = oldBindingMap.begin(); itBinding != oldBindingMap.end(); ++itBinding)
         {
-            assert(it.second->getNumVertices() >= vertexCount);
+            assert(itBinding->second->getNumVertices() >= vertexCount);
 
-            oldBufferVertexSizes[it.first] = it.second->getVertexSize();
-            oldBufferLocks[it.first] = (uint8*)it.second->lock(HardwareBuffer::HBL_READ_ONLY);
+            oldBufferVertexSizes[itBinding->first] =
+                itBinding->second->getVertexSize();
+            oldBufferLocks[itBinding->first] =
+                itBinding->second->lock(
+                    HardwareBuffer::HBL_READ_ONLY);
 
-            useShadowBuffer |= it.second->hasShadowBuffer();
+            useShadowBuffer |= itBinding->second->hasShadowBuffer();
         }
         
         // Create new buffers and lock all for writing
-        uint16 buf = 0;
+        buf = 0;
         while (!newDeclaration->findElementsBySource(buf).empty())
         {
             size_t vertexSize = newDeclaration->getVertexSize(buf);
 
-            auto vbuf = pManager->createVertexBuffer(vertexSize, vertexCount, bufferUsages[buf], useShadowBuffer);
+            HardwareVertexBufferSharedPtr vbuf = 
+                pManager->createVertexBuffer(
+                    vertexSize,
+                    vertexCount, 
+                    bufferUsages[buf], useShadowBuffer);
             newBinding->setBinding(buf, vbuf);
 
             newBufferVertexSizes.push_back(vertexSize);
-            newBufferLocks.push_back((uint8*)vbuf->lock(HardwareBuffer::HBL_DISCARD));
+            newBufferLocks.push_back(
+                vbuf->lock(HardwareBuffer::HBL_DISCARD));
             buf++;
         }
 
         // Map from new to old elements
-        std::map<const VertexElement*, const VertexElement*>  newToOldElementMap;
-        const auto& newElemList = newDeclaration->getElements();
-        for (const auto& newElem : newElemList)
+        typedef std::map<const VertexElement*, const VertexElement*> NewToOldElementMap;
+        NewToOldElementMap newToOldElementMap;
+        const VertexDeclaration::VertexElementList& newElemList = newDeclaration->getElements();
+        VertexDeclaration::VertexElementList::const_iterator ei, eiend;
+        eiend = newElemList.end();
+        for (ei = newElemList.begin(); ei != eiend; ++ei)
         {
             // Find corresponding old element
-            auto oldElem = vertexDeclaration->findElementBySemantic(newElem.getSemantic(), newElem.getIndex());
+            const VertexElement* oldElem = 
+                vertexDeclaration->findElementBySemantic(
+                    (*ei).getSemantic(), (*ei).getIndex());
             if (!oldElem)
             {
                 // Error, cannot create new elements with this method
-                OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, "Element not found in old vertex declaration");
+                OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, 
+                    "Element not found in old vertex declaration", 
+                    "VertexData::reorganiseBuffers");
             }
-            newToOldElementMap[&newElem] = oldElem;
+            newToOldElementMap[&(*ei)] = oldElem;
         }
         // Now iterate over the new buffers, pulling data out of the old ones
         // For each vertex
         for (size_t v = 0; v < vertexCount; ++v)
         {
             // For each (new) element
-            for (const auto& newElem : newElemList)
+            for (ei = newElemList.begin(); ei != eiend; ++ei)
             {
-                const VertexElement* oldElem = newToOldElementMap[&newElem];
-                auto oldBufferNo = oldElem->getSource();
-                auto newBufferNo = newElem.getSource();
-                auto pSrc = oldBufferLocks[oldBufferNo] + v * oldBufferVertexSizes[oldBufferNo];
-                auto pDst = newBufferLocks[newBufferNo] + v * newBufferVertexSizes[newBufferNo];
-                memcpy(pDst + newElem.getOffset(), pSrc + oldElem->getOffset(), newElem.getSize());
+                const VertexElement* newElem = &(*ei);
+                NewToOldElementMap::iterator noi = newToOldElementMap.find(newElem);
+                const VertexElement* oldElem = noi->second;
+                unsigned short oldBufferNo = oldElem->getSource();
+                unsigned short newBufferNo = newElem->getSource();
+                void* pSrcBase = static_cast<void*>(
+                    static_cast<unsigned char*>(oldBufferLocks[oldBufferNo])
+                    + v * oldBufferVertexSizes[oldBufferNo]);
+                void* pDstBase = static_cast<void*>(
+                    static_cast<unsigned char*>(newBufferLocks[newBufferNo])
+                    + v * newBufferVertexSizes[newBufferNo]);
+                void *pSrc, *pDst;
+                oldElem->baseVertexPointerToElement(pSrcBase, &pSrc);
+                newElem->baseVertexPointerToElement(pDstBase, &pDst);
+                
+                memcpy(pDst, pSrc, newElem->getSize());
+                
             }
         }
 
         // Unlock all buffers
-        for (const auto& it : oldBindingMap)
+        for (itBinding = oldBindingMap.begin(); itBinding != oldBindingMap.end(); ++itBinding)
         {
-            it.second->unlock();
+            itBinding->second->unlock();
         }
         for (buf = 0; buf < newBinding->getBufferCount(); ++buf)
         {
@@ -506,10 +465,14 @@ namespace Ogre {
         for (unsigned short b = 0; b <= newDeclaration->getMaxSource(); ++b)
         {
             VertexDeclaration::VertexElementList destElems = newDeclaration->findElementsBySource(b);
-            // Initialise with most restrictive version
-            uint8 final = HBU_GPU_ONLY;
-            for (VertexElement& destelem : destElems)
+            // Initialise with most restrictive version 
+            // (not really a usable option, but these flags will be removed)
+            HardwareBuffer::Usage final = static_cast<HardwareBuffer::Usage>(
+                HardwareBuffer::HBU_STATIC_WRITE_ONLY | HardwareBuffer::HBU_DISCARDABLE);
+            VertexDeclaration::VertexElementList::iterator v;
+            for (v = destElems.begin(); v != destElems.end(); ++v)
             {
+                VertexElement& destelem = *v;
                 // get source
                 const VertexElement* srcelem =
                     vertexDeclaration->findElementBySemantic(
@@ -518,20 +481,30 @@ namespace Ogre {
                 HardwareVertexBufferSharedPtr srcbuf = 
                     vertexBufferBinding->getBuffer(srcelem->getSource());
                 // improve flexibility only
-                if (srcbuf->getUsage() & HBU_CPU_ONLY)
+                if (srcbuf->getUsage() & HardwareBuffer::HBU_DYNAMIC)
                 {
                     // remove static
-                    final &= ~HBU_GPU_TO_CPU;
+                    final = static_cast<HardwareBuffer::Usage>(
+                        final & ~HardwareBuffer::HBU_STATIC);
                     // add dynamic
-                    final |= HBU_CPU_ONLY;
+                    final = static_cast<HardwareBuffer::Usage>(
+                        final | HardwareBuffer::HBU_DYNAMIC);
                 }
-                if (!(srcbuf->getUsage() & HBU_DETAIL_WRITE_ONLY))
+                if (!(srcbuf->getUsage() & HardwareBuffer::HBU_WRITE_ONLY))
                 {
                     // remove write only
-                    final &= ~HBU_DETAIL_WRITE_ONLY;
+                    final = static_cast<HardwareBuffer::Usage>(
+                        final & ~HardwareBuffer::HBU_WRITE_ONLY);
                 }
+                if (!(srcbuf->getUsage() & HardwareBuffer::HBU_DISCARDABLE))
+                {
+                    // remove discardable
+                    final = static_cast<HardwareBuffer::Usage>(
+                        final & ~HardwareBuffer::HBU_DISCARDABLE);
+                }
+                
             }
-            usages.push_back(static_cast<HardwareBufferUsage>(final));
+            usages.push_back(final);
         }
         // Call specific method
         reorganiseBuffers(newDeclaration, usages, mgr);
@@ -546,9 +519,11 @@ namespace Ogre {
         // Check for error first
         const VertexDeclaration::VertexElementList& allelems = 
             vertexDeclaration->getElements();
-        for (auto& e : allelems)
+        VertexDeclaration::VertexElementList::const_iterator ai;
+        for (ai = allelems.begin(); ai != allelems.end(); ++ai)
         {
-            if (!vertexBufferBinding->isBufferBound(e.getSource()))
+            const VertexElement& elem = *ai;
+            if (!vertexBufferBinding->isBufferBound(elem.getSource()))
             {
                 OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
                     "No buffer is bound to that element source.",
@@ -562,7 +537,7 @@ namespace Ogre {
 
         // Modify vertex elements to reference to new buffer index
         unsigned short elemIndex = 0;
-        for (auto ai = allelems.begin(); ai != allelems.end(); ++ai, ++elemIndex)
+        for (ai = allelems.begin(); ai != allelems.end(); ++ai, ++elemIndex)
         {
             const VertexElement& elem = *ai;
             VertexBufferBinding::BindingIndexMap::const_iterator it =
@@ -585,9 +560,11 @@ namespace Ogre {
         // Collect used buffers
         const VertexDeclaration::VertexElementList& allelems = 
             vertexDeclaration->getElements();
-        for (auto& e : allelems)
+        VertexDeclaration::VertexElementList::const_iterator ai;
+        for (ai = allelems.begin(); ai != allelems.end(); ++ai)
         {
-            usedBuffers.insert(e.getSource());
+            const VertexElement& elem = *ai;
+            usedBuffers.insert(elem.getSource());
         }
 
         // Unset unused buffer bindings
@@ -605,20 +582,35 @@ namespace Ogre {
         closeGapsInBindings();
     }
     //-----------------------------------------------------------------------
-    void VertexData::convertPackedColour(VertexElementType, VertexElementType destType)
+    void VertexData::convertPackedColour(
+        VertexElementType srcType, VertexElementType destType)
     {
-        OgreAssert(destType == VET_UBYTE4_NORM, "Not supported");
+        if (destType != VET_COLOUR_ABGR && destType != VET_COLOUR_ARGB)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                "Invalid destType parameter", "VertexData::convertPackedColour");
+        }
+        if (srcType != VET_COLOUR_ABGR && srcType != VET_COLOUR_ARGB)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                "Invalid srcType parameter", "VertexData::convertPackedColour");
+        }
 
         const VertexBufferBinding::VertexBufferBindingMap& bindMap = 
             vertexBufferBinding->getBindings();
-        for (auto& m : bindMap)
+        VertexBufferBinding::VertexBufferBindingMap::const_iterator bindi;
+        for (bindi = bindMap.begin(); bindi != bindMap.end(); ++bindi)
         {
-            const auto& elems =
-                vertexDeclaration->findElementsBySource(m.first);
+            VertexDeclaration::VertexElementList elems = 
+                vertexDeclaration->findElementsBySource(bindi->first);
             bool conversionNeeded = false;
-            for (auto& e : elems)
+            VertexDeclaration::VertexElementList::iterator elemi;
+            for (elemi = elems.begin(); elemi != elems.end(); ++elemi)
             {
-                if (e.getType() == _DETAIL_SWAP_RB)
+                VertexElement& elem = *elemi;
+                if (elem.getType() == VET_COLOUR || 
+                    ((elem.getType() == VET_COLOUR_ABGR || elem.getType() == VET_COLOUR_ARGB) 
+                    && elem.getType() != destType))
                 {
                     conversionNeeded = true;
                 }
@@ -626,41 +618,54 @@ namespace Ogre {
 
             if (conversionNeeded)
             {
-                void* pBase = m.second->lock(HardwareBuffer::HBL_NORMAL);
+                void* pBase = bindi->second->lock(HardwareBuffer::HBL_NORMAL);
 
-                for (size_t v = 0; v < m.second->getNumVertices(); ++v)
+                for (size_t v = 0; v < bindi->second->getNumVertices(); ++v)
                 {
 
-                    for (auto& e : elems)
+                    for (elemi = elems.begin(); elemi != elems.end(); ++elemi)
                     {
-                        if (e.getType() == _DETAIL_SWAP_RB)
+                        VertexElement& elem = *elemi;
+                        VertexElementType currType = (elem.getType() == VET_COLOUR) ?
+                            srcType : elem.getType();
+                        if (elem.getType() == VET_COLOUR || 
+                            ((elem.getType() == VET_COLOUR_ABGR || elem.getType() == VET_COLOUR_ARGB) 
+                            && elem.getType() != destType))
                         {
                             uint32* pRGBA;
-                            e.baseVertexPointerToElement(pBase, &pRGBA);
-                            swapPackedRB(pRGBA);
+                            elem.baseVertexPointerToElement(pBase, &pRGBA);
+                            VertexElement::convertColourValue(currType, destType, pRGBA);
                         }
                     }
                     pBase = static_cast<void*>(
-                        static_cast<char*>(pBase) + m.second->getVertexSize());
+                        static_cast<char*>(pBase) + bindi->second->getVertexSize());
                 }
-                m.second->unlock();
+                bindi->second->unlock();
 
                 // Modify the elements to reflect the changed type
                 const VertexDeclaration::VertexElementList& allelems = 
                     vertexDeclaration->getElements();
+                VertexDeclaration::VertexElementList::const_iterator ai;
                 unsigned short elemIndex = 0;
-                for (auto& e : allelems)
+                for (ai = allelems.begin(); ai != allelems.end(); ++ai, ++elemIndex)
                 {
-                    if (e.getType() == _DETAIL_SWAP_RB)
+                    const VertexElement& elem = *ai;
+                    if (elem.getType() == VET_COLOUR || 
+                        ((elem.getType() == VET_COLOUR_ABGR || elem.getType() == VET_COLOUR_ARGB) 
+                        && elem.getType() != destType))
                     {
-                        vertexDeclaration->modifyElement(elemIndex,
-                            e.getSource(), e.getOffset(), destType,
-                            e.getSemantic(), e.getIndex());
+                        vertexDeclaration->modifyElement(elemIndex, 
+                            elem.getSource(), elem.getOffset(), destType, 
+                            elem.getSemantic(), elem.getIndex());
                     }
-                    ++elemIndex;
                 }
+
             }
+
+
         } // each buffer
+
+
     }
     //-----------------------------------------------------------------------
     ushort VertexData::allocateHardwareAnimationElements(ushort count, bool animateNormals)
@@ -690,43 +695,6 @@ namespace Ogre {
         }
         
         return supportedCount;
-    }
-    VertexData* VertexData::_cloneRemovingBlendData() const
-    {
-        // Clone without copying data
-        VertexData* ret = clone(false);
-        bool removeIndices = Root::getSingleton().isBlendIndicesGpuRedundant();
-        bool removeWeights = Root::getSingleton().isBlendWeightsGpuRedundant();
-
-        unsigned short safeSource = 0xFFFF;
-        auto blendIndexElem = vertexDeclaration->findElementBySemantic(VES_BLEND_INDICES);
-        if (blendIndexElem && removeIndices)
-        {
-            //save the source in order to prevent the next stage from unbinding it.
-            safeSource = blendIndexElem->getSource();
-            // Remove buffer reference
-            ret->vertexBufferBinding->unsetBinding(blendIndexElem->getSource());
-        }
-
-        // Remove blend weights
-        const VertexElement* blendWeightElem = vertexDeclaration->findElementBySemantic(VES_BLEND_WEIGHTS);
-        if (removeWeights && blendWeightElem && blendWeightElem->getSource() != safeSource)
-        {
-            // Remove buffer reference
-            ret->vertexBufferBinding->unsetBinding(blendWeightElem->getSource());
-        }
-
-        // remove elements from declaration
-        if (removeIndices)
-            ret->vertexDeclaration->removeElement(VES_BLEND_INDICES);
-        if (removeWeights)
-            ret->vertexDeclaration->removeElement(VES_BLEND_WEIGHTS);
-
-        // Close gaps in bindings for effective and safely
-        if (removeWeights || removeIndices)
-            ret->closeGapsInBindings();
-
-        return ret;
     }
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
@@ -791,13 +759,6 @@ namespace Ogre {
         inline Triangle( const Triangle& t )
             : a( t.a ), b( t.b ), c( t.c )
         {
-        }
-
-        inline Triangle& operator=(const Triangle& rhs) {
-            a = rhs.a;
-            b = rhs.b;
-            c = rhs.c;
-            return *this;
         }
 
         inline bool sharesEdge(const Triangle& t) const
@@ -989,8 +950,6 @@ namespace Ogre {
         }
 
         indexBuffer->unlock();
-
-        triangles += indexBuffer->getNumIndexes()/3;
     }
 
     //-----------------------------------------------------------------------

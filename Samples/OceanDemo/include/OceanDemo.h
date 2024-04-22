@@ -63,15 +63,15 @@ protected:
     
     void setupGUI();
     void setupScene();
-    void setupContent() override;
-    void cleanupContent() override;
+    virtual void setupContent();
+    virtual void cleanupContent();
     
-    void sliderMoved(Slider* slider) override;
-    void buttonHit(OgreBites::Button* button) override;
-    void checkBoxToggled(CheckBox* box) override;
-    void itemSelected(SelectMenu* menu) override;
+    void sliderMoved(Slider* slider);
+    void buttonHit(OgreBites::Button* button);
+    void checkBoxToggled(CheckBox* box);
+    void itemSelected(SelectMenu* menu);
     void changePage(int nextPage = -1);
-    bool frameRenderingQueued(const FrameEvent& evt) override;
+    virtual bool frameRenderingQueued(const FrameEvent& evt);
 };
 
 /**********************************************************************
@@ -181,7 +181,9 @@ void Sample_Ocean::setupContent(void)
     mCameraNode->lookAt(Ogre::Vector3(0,0,-300), Ogre::Node::TS_PARENT);
     mCamera->setNearClipDistance(1);
 
+#if OGRE_PLATFORM != OGRE_PLATFORM_APPLE_IOS
     setDragLook(true);
+#endif
 }
 
 void Sample_Ocean::setupScene()
@@ -199,12 +201,13 @@ void Sample_Ocean::setupScene()
         mLightPivots[i]->rotate(mLightRotationAxes[i], Ogre::Angle(mLightRotationAngles[i]));
         // Create a light, use default parameters
         mLights[i] = mSceneMgr->createLight("Light" + Ogre::StringConverter::toString(i));
+        mLights[i]->setPosition(mLightPositions[i]);
         mLights[i]->setDiffuseColour(mDiffuseLightColours[i]);
         mLights[i]->setSpecularColour(mSpecularLightColours[i]);
         mLights[i]->setVisible(mLightState[i]);
         //mLights[i]->setAttenuation(400, 0.1 , 1 , 0);
         // Attach light
-        mLightPivots[i]->createChildSceneNode(mLightPositions[i])->attachObject(mLights[i]);
+        mLightPivots[i]->attachObject(mLights[i]);
         // Create billboard for light
         mLightFlareSets[i] = mSceneMgr->createBillboardSet("Flare" + Ogre::StringConverter::toString(i));
         mLightFlareSets[i]->setMaterialName("LightFlare");

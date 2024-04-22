@@ -43,13 +43,6 @@ namespace OgreBites {
 class TrayManager;
 class ParamsPanel;
 
-/** \addtogroup Optional
-*  @{
-*/
-/** \addtogroup Bites
-*  @{
-*/
-
 /**
    - F:        Toggle frame rate stats on/off
    - G:        Toggle advanced frame stats on/off
@@ -74,9 +67,9 @@ public:
     AdvancedRenderControls(TrayManager* trayMgr, Ogre::Camera* cam);
     ~AdvancedRenderControls();
 
-    bool keyPressed(const KeyboardEvent& evt) override;
+    bool keyPressed(const KeyboardEvent& evt);
 
-    void frameRendered(const Ogre::FrameEvent& evt) override;
+    void frameRendered(const Ogre::FrameEvent& evt);
 
 protected:
     Ogre::Root* mRoot;
@@ -87,8 +80,7 @@ protected:
     Ogre::RTShader::ShaderGenerator* mShaderGenerator;
 #endif
 };
-/** @} */
-/** @} */
+
 } /* namespace OgreBites */
 
 #endif /* COMPONENTS_BITES_INCLUDE_OGREADVANCEDRENDERCONTROLS_H_ */

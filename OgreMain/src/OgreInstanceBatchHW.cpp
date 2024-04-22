@@ -71,11 +71,13 @@ namespace Ogre
         //We need to clone the VertexData (but just reference all buffers, except the last one)
         //because last buffer contains data specific to this batch, we need a different binding
         mRenderOperation.vertexData = mRenderOperation.vertexData->clone( false );
-        mRemoveOwnVertexData = true;
         VertexData *thisVertexData      = mRenderOperation.vertexData;
         const unsigned short lastSource = thisVertexData->vertexDeclaration->getMaxSource();
-        auto vertexBuffer = HardwareBufferManager::getSingleton().createVertexBuffer(
-            thisVertexData->vertexDeclaration->getVertexSize(lastSource), mInstancesPerBatch, HBU_CPU_TO_GPU);
+        HardwareVertexBufferSharedPtr vertexBuffer =
+                                        HardwareBufferManager::getSingleton().createVertexBuffer(
+                                        thisVertexData->vertexDeclaration->getVertexSize(lastSource),
+                                        mInstancesPerBatch,
+                                        HardwareBuffer::HBU_STATIC_WRITE_ONLY );
         thisVertexData->vertexBufferBinding->setBinding( lastSource, vertexBuffer );
         vertexBuffer->setIsInstanceData( true );
         vertexBuffer->setInstanceDataStepRate( 1 );
@@ -83,17 +85,19 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void InstanceBatchHW::setupVertices( const SubMesh* baseSubMesh )
     {
-        //No skeletal animation support in this technique, sorry
-        mRenderOperation.vertexData = baseSubMesh->vertexData->_cloneRemovingBlendData();
+        mRenderOperation.vertexData = baseSubMesh->vertexData->clone();
         mRemoveOwnVertexData = true; //Raise flag to remove our own vertex data in the end (not always needed)
         
         VertexData *thisVertexData = mRenderOperation.vertexData;
+
+        //No skeletal animation support in this technique, sorry
+        removeBlendData();
 
         //Modify the declaration so it contains an extra source, where we can put the per instance data
         size_t offset               = 0;
         unsigned short nextTexCoord = thisVertexData->vertexDeclaration->getNextFreeTextureCoordinate();
         const unsigned short newSource = thisVertexData->vertexDeclaration->getMaxSource() + 1;
-        for (unsigned char i = 0; i < 3 + mCreator->getNumCustomParams(); ++i)
+        for( unsigned char i=0; i<3 + mCreator->getNumCustomParams(); ++i )
         {
             thisVertexData->vertexDeclaration->addElement( newSource, offset, VET_FLOAT4,
                                                             VES_TEXTURE_COORDINATES, nextTexCoord++ );
@@ -101,8 +105,11 @@ namespace Ogre
         }
 
         //Create the vertex buffer containing per instance data
-        auto vertexBuffer = HardwareBufferManager::getSingleton().createVertexBuffer(
-            thisVertexData->vertexDeclaration->getVertexSize(newSource), mInstancesPerBatch, HBU_CPU_TO_GPU);
+        HardwareVertexBufferSharedPtr vertexBuffer =
+                                        HardwareBufferManager::getSingleton().createVertexBuffer(
+                                        thisVertexData->vertexDeclaration->getVertexSize(newSource),
+                                        mInstancesPerBatch,
+                                        HardwareBuffer::HBU_STATIC_WRITE_ONLY );
         thisVertexData->vertexBufferBinding->setBinding( newSource, vertexBuffer );
         vertexBuffer->setIsInstanceData( true );
         vertexBuffer->setInstanceDataStepRate( 1 );
@@ -114,6 +121,34 @@ namespace Ogre
         //the pointer, and we can't give it something that doesn't belong to us.
         mRenderOperation.indexData = baseSubMesh->indexData->clone( true );
         mRemoveOwnIndexData = true; //Raise flag to remove our own index data in the end (not always needed)
+    }
+    //-----------------------------------------------------------------------
+    void InstanceBatchHW::removeBlendData()
+    {
+        VertexData *thisVertexData = mRenderOperation.vertexData;
+
+        unsigned short safeSource = 0xFFFF;
+        const VertexElement* blendIndexElem = thisVertexData->vertexDeclaration->findElementBySemantic(
+                                                                                VES_BLEND_INDICES );
+        if( blendIndexElem )
+        {
+            //save the source in order to prevent the next stage from unbinding it.
+            safeSource = blendIndexElem->getSource();
+            // Remove buffer reference
+            thisVertexData->vertexBufferBinding->unsetBinding( blendIndexElem->getSource() );
+        }
+        // Remove blend weights
+        const VertexElement* blendWeightElem = thisVertexData->vertexDeclaration->findElementBySemantic(
+                                                                                VES_BLEND_WEIGHTS );
+        if( blendWeightElem && blendWeightElem->getSource() != safeSource )
+        {
+            // Remove buffer reference
+            thisVertexData->vertexBufferBinding->unsetBinding( blendWeightElem->getSource() );
+        }
+
+        thisVertexData->vertexDeclaration->removeElement(VES_BLEND_INDICES);
+        thisVertexData->vertexDeclaration->removeElement(VES_BLEND_WEIGHTS);
+        thisVertexData->closeGapsInBindings();
     }
     //-----------------------------------------------------------------------
     bool InstanceBatchHW::checkSubMeshCompatibility( const SubMesh* baseSubMesh )
@@ -149,30 +184,39 @@ namespace Ogre
         const ushort bufferIdx = ushort(binding->getBufferCount()-1);
         HardwareBufferLockGuard vertexLock(binding->getBuffer(bufferIdx), HardwareBuffer::HBL_DISCARD);
         float *pDest = static_cast<float*>(vertexLock.pData);
+
+        InstancedEntityVec::const_iterator itor = mInstancedEntities.begin();
+        InstancedEntityVec::const_iterator end  = mInstancedEntities.end();
+
         unsigned char numCustomParams           = mCreator->getNumCustomParams();
         size_t customParamIdx                   = 0;
 
-        for (auto *e : mInstancedEntities)
+        while( itor != end )
         {
             //Cull on an individual basis, the less entities are visible, the less instances we draw.
             //No need to use null matrices at all!
-            if (e->findVisible(currentCamera ))
+            if( (*itor)->findVisible( currentCamera ) )
             {
-                const size_t floatsWritten = e->getTransforms3x4( (Matrix3x4f*)pDest);
+                const size_t floatsWritten = (*itor)->getTransforms3x4( (Matrix3x4f*)pDest );
 
                 if( mManager->getCameraRelativeRendering() )
-                    makeMatrixCameraRelative3x4((Matrix3x4f*)pDest, floatsWritten / 12);
+                    makeMatrixCameraRelative3x4( (Matrix3x4f*)pDest, floatsWritten / 12 );
 
                 pDest += floatsWritten;
 
                 //Write custom parameters, if any
-                for (unsigned char i = 0; i < numCustomParams; ++i)
+                for( unsigned char i=0; i<numCustomParams; ++i )
                 {
-                    memcpy(pDest, mCustomParams[customParamIdx+i].ptr(), sizeof(Vector4f));
-                    pDest += 4;
+                    *pDest++ = mCustomParams[customParamIdx+i].x;
+                    *pDest++ = mCustomParams[customParamIdx+i].y;
+                    *pDest++ = mCustomParams[customParamIdx+i].z;
+                    *pDest++ = mCustomParams[customParamIdx+i].w;
                 }
+
                 ++retVal;
             }
+            ++itor;
+
             customParamIdx += numCustomParams;
         }
 
@@ -209,6 +253,11 @@ namespace Ogre
         *xform = Matrix4::IDENTITY;
     }
     //-----------------------------------------------------------------------
+    unsigned short InstanceBatchHW::getNumWorldTransforms(void) const
+    {
+        return 1;
+    }
+    //-----------------------------------------------------------------------
     void InstanceBatchHW::_updateRenderQueue( RenderQueue* queue )
     {
         if( !mKeepStatic )
@@ -220,9 +269,12 @@ namespace Ogre
         }
         else
         {
-            OgreAssert(!mManager->getCameraRelativeRendering(),
-                       "Camera-relative rendering is incompatible with Instancing's static batches. "
-                       "Disable at least one of them");
+            if( mManager->getCameraRelativeRendering() )
+            {
+                OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Camera-relative rendering is incompatible"
+                    " with Instancing's static batches. Disable at least one of them",
+                    "InstanceBatch::_updateRenderQueue");
+            }
 
             //Don't update when we're static
             if( mRenderOperation.numberOfInstances )

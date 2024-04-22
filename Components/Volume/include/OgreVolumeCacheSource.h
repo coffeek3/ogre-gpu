@@ -28,7 +28,7 @@ THE SOFTWARE.
 #ifndef __Ogre_Volume_CacheSource_H__
 #define __Ogre_Volume_CacheSource_H__
 
-#include "OgreVector.h"
+#include "OgreVector4.h"
 
 #include "OgreVolumeSource.h"
 #include "OgreVolumePrerequisites.h"
@@ -96,11 +96,11 @@ namespace Volume {
         
         /** Overridden from Source.
         */
-        Vector4 getValueAndGradient(const Vector3 &position) const override;
+        virtual Vector4 getValueAndGradient(const Vector3 &position) const;
         
         /** Overridden from Source.
         */
-        Real getValue(const Vector3 &position) const override;
+        virtual Real getValue(const Vector3 &position) const;
 
     };
     /** @} */

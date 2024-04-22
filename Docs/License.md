@@ -1,5 +1,5 @@
 
-# License Information
+# Licence Information
 
 
 <p>OGRE is released under an <a href="http://www.opensource.org/">open source</a> license, specifically the MIT License.
@@ -27,24 +27,72 @@ licenses when distributing an application since most require you to
 include the license in your documentation. All the license texts are
 included in the Docs/licenses folder.
 
-### zip
+### STB Image
+
+<table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
+<tbody>
+
+<tr>
+    <td style="width: 20%;">Original Authors:</td>
+    <td>Sean Barrett<br />
+    </td>
+</tr>
+
+<tr>
+    <td>Website:</td>
+    <td>https://github.com/nothings/stb<br />
+    </td>
+</tr>
+
+<tr>
+    <td>Licensed Under:</td>
+    <td>public domain</td>
+</tr>
+
+</tbody>
+</table>
+
+### Zlib
 
 <table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
 <tbody>
 
 <tr>
 <td style="width: 20%;">Original Authors:</td>
-<td>Rich Geldreich and Kuba Podgórski</td>
+<td>Jean-loup Gailly and Mark Adler</td>
 </tr>
 
 <tr>
 <td>Website:</td>
-<td>https://github.com/kuba--/zip</td>
+<td>http://www.zlib.net</td>
 </tr>
 
 <tr>
 <td>Licensed Under:</td>
-<td><a href="https://unlicense.org/">Unlicense (Public Domain)</a></td>
+<td><a href="licenses/zlib.txt">Zlib License</a></td>
+</tr>
+
+</tbody>
+</table>
+
+### Zziplib
+
+<table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
+<tbody>
+
+<tr>
+<td style="width: 20%;">Original Author:</td>
+<td>Guido Draheim</td>
+</tr>
+
+<tr>
+<td>Website:</td>
+<td>http://zziplib.sourceforge.net</td>
+</tr>
+
+<tr>
+<td>Licensed Under:</td>
+<td><a href="licenses/mpl.txt">Mozilla Public License 1.1</a></td>
 </tr>
 
 </tbody>
@@ -111,36 +159,6 @@ Bites Component</td>
 </tbody>
 </table>
 
-### STB Image
-
-<table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
-<tbody>
-
-<tr>
-    <td style="width: 20%;">Original Authors:</td>
-    <td>Sean Barrett<br />
-    </td>
-</tr>
-
-<tr>
-    <td>Website:</td>
-    <td>https://github.com/nothings/stb<br />
-    </td>
-</tr>
-
-<tr>
-    <td>Licensed Under:</td>
-    <td>public domain</td>
-</tr>
-
-<tr>
-<td>Needed By:</td>
-<td>Codec_STBI</td>
-</tr>
-
-</tbody>
-</table>
-
 ### OpenEXR
 
 <table style="text-align: left; width: 100%;" border="0" cellpadding="0" cellspacing="0">
@@ -163,42 +181,12 @@ Bites Component</td>
 
 <tr>
 <td>Needed By:</td>
-<td>Codec_EXR</td>
+<td>Plugin_EXRCodec</td>
 </tr>
 
 </tbody>
 </table>
-
-### pugixml
-
-<table>
-<tbody>
-<tr>
-<td style="width: 20%;">
-Original Authors:</td>
-<td>
-Arseny Kapoulkine</td>
-</tr>
-<tr>
-<td>
-Website:</td>
-<td>
- https://pugixml.org/</td>
-</tr>
-<tr>
-<td>
-Licensed Under:</td>
-<td>
-<a href="licenses/mit.txt">MIT License</a></td>
-</tr>
-
-<tr>
-<td>Needed By:</td>
-<td>OgreXMLConverter, Plugin_DotScene</td>
-</tr>
-
-</tbody>
-</table>
+<br />
 
 ## Source code used in-place in OGRE
 
@@ -252,7 +240,7 @@ Licensed Under:</td>
         <p>Grass texture is courtesy of Mathias 'freezer' Walc</p>
     </li>
     <li>
-        <p>The 'Cuckoo' TrueType font is provided by http://www.downloadheaven.co.uk.</p>
+        <p>The 'Cuckoo' TrueType font is provided by <a href="http://www.grsites.com">http://www.grsites.com</a>.</p>
     </li>
     <li>SoftImage|XSI sample media files (facial.mesh, jaiqua.mesh and associated files) are provided courtesy of Avid Technology, Inc.<br />
         &copy; 2004 Avid Technology, Inc. All rights
@@ -265,13 +253,6 @@ Licensed Under:</td>
     <li>
         <p>Battle Damaged Sci-fi Helmet - PBR by theblueturtle_, published under a Creative Commons Attribution-NonCommercial license</p>
     </li>
-    <li>
-        <p>Smoke15Frames.png by Beast, published under CC-0 https://opengameart.org/content/smoke-aura</p>
-    </li>
-    <li>
-        <p>Earth-Color10x6.astc and Texture.pkm by ARM Limited, published under MIT https://github.com/ARM-software/opengl-es-sdk-for-android</p>
-    </li>
-    <li>
-        <p>studio_garden.jpg adapted from Sergej Majboroda, published under CC-0 https://polyhaven.com/a/studio_garden</p>
-    </li>
 </ul>
+
+<p>Copyright &copy; 2013 by The OGRE Team</p>

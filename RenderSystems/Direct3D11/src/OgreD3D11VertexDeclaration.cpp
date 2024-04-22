@@ -66,40 +66,51 @@ namespace Ogre {
     D3D11_INPUT_ELEMENT_DESC * D3D11VertexDeclaration::getD3DVertexDeclaration(D3D11HLSLProgram* boundVertexProgram, VertexBufferBinding* binding)
     {
         // Create D3D elements
+        size_t iNumElements = boundVertexProgram->getNumInputs();
+
         if (mD3delems.find(boundVertexProgram) == mD3delems.end())
         {
             std::vector<D3D11_INPUT_ELEMENT_DESC> D3delems;
 
-            for (const D3D11_SIGNATURE_PARAMETER_DESC& inputDesc : boundVertexProgram->getInputParams())
+            unsigned int idx;
+            for (idx = 0; idx < iNumElements; ++idx)
             {
-                D3D11_INPUT_ELEMENT_DESC elem = {};
-                for (const auto& e : mElementList)
+                D3D11_SIGNATURE_PARAMETER_DESC inputDesc = boundVertexProgram->getInputParamDesc(idx);
+                VertexElementList::const_iterator i, iend;
+                iend = mElementList.end();
+                bool found = false;
+                for (i = mElementList.begin(); i != iend; ++i)
                 {
-                    LPCSTR semanticName         = D3D11Mappings::get(e.getSemantic());
-                    if (strcmp(semanticName, inputDesc.SemanticName) == 0 && e.getIndex() == inputDesc.SemanticIndex)
+                    LPCSTR semanticName         = D3D11Mappings::get(i->getSemantic());
+                    UINT semanticIndex          = i->getIndex();
+                    if(
+                        strcmp(semanticName, inputDesc.SemanticName) == 0
+                        && semanticIndex == inputDesc.SemanticIndex
+                      )
                     {
-                        elem.Format                = D3D11Mappings::get(e.getType());
-                        elem.InputSlot             = e.getSource();
-                        elem.AlignedByteOffset     = static_cast<WORD>(e.getOffset());
+                        found = true;
                         break;
                     }
                 }
 
-                if (elem.Format == DXGI_FORMAT_UNKNOWN)
+                if (!found)
                 {
-                    OGRE_EXCEPT(
-                        Exception::ERR_RENDERINGAPI_ERROR,
-                        StringUtil::format("Vertex Shader %s consumes semantic %s%d but no such VertexElement provided",
-                                           boundVertexProgram->getName().c_str(), inputDesc.SemanticName,
-                                           inputDesc.SemanticIndex));
+                    OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
+                                StringUtil::format("No VertexElement for semantic %s in shader %s found",
+                                                   inputDesc.SemanticName, boundVertexProgram->getName().c_str()));
                 }
 
+                D3D11_INPUT_ELEMENT_DESC elem = {};
                 elem.SemanticName          = inputDesc.SemanticName;
                 elem.SemanticIndex         = inputDesc.SemanticIndex;
+                elem.Format                = D3D11Mappings::get(i->getType());
+                elem.InputSlot             = i->getSource();
+                elem.AlignedByteOffset     = static_cast<WORD>(i->getOffset());
                 elem.InputSlotClass        = D3D11_INPUT_PER_VERTEX_DATA;
                 elem.InstanceDataStepRate  = 0;
 
-                auto foundIter = binding->getBindings().find(elem.InputSlot);
+                VertexBufferBinding::VertexBufferBindingMap::const_iterator foundIter;
+                foundIter = binding->getBindings().find(i->getSource());
                 if ( foundIter != binding->getBindings().end() )
                 {
                     HardwareVertexBufferSharedPtr bufAtSlot = foundIter->second;
@@ -146,7 +157,7 @@ namespace Ogre {
             //  pVertexDecl->Format = DXGI_FORMAT_R16G16_FLOAT;
             HRESULT hr = mlpD3DDevice->CreateInputLayout( 
                 pVertexDecl, 
-                boundVertexProgram->getInputParams().size(),
+                boundVertexProgram->getNumInputs(), 
                 &vSBuf[0], 
                 vSBuf.size(),
                 pVertexLayout.ReleaseAndGetAddressOf() );

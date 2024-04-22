@@ -42,9 +42,9 @@ namespace Ogre {
         GLPBRenderTexture(GLPBRTTManager *manager, const String &name, const GLSurfaceDesc &target, bool writeGamma, uint fsaa);
         virtual ~GLPBRenderTexture();
         
-        void getCustomAttribute(const String& name, void* pData) override;
+        virtual void getCustomAttribute(const String& name, void* pData);
 
-        GLContext* getContext() const override;
+        GLContext* getContext() const;
     protected:
         GLPBRTTManager *mManager;
         PixelComponentType mPBFormat;
@@ -57,9 +57,11 @@ namespace Ogre {
     public:
         GLPBRTTManager(GLNativeSupport *support, RenderTarget *mainwindow);
         virtual ~GLPBRTTManager();
-
-        RenderTexture *createRenderTexture(const String &name,
-            const GLSurfaceDesc &target, bool writeGamma, uint fsaa) override;
+        
+        /** @copydoc GLRTTManager::createRenderTexture
+        */
+        virtual RenderTexture *createRenderTexture(const String &name, 
+            const GLSurfaceDesc &target, bool writeGamma, uint fsaa);
         
          /** @copydoc GLRTTManager::checkFormat
         */
@@ -67,11 +69,11 @@ namespace Ogre {
         
         /** @copydoc GLRTTManager::bind
         */
-        void bind(RenderTarget *target) override;
+        virtual void bind(RenderTarget *target);
         
         /** @copydoc GLRTTManager::unbind
         */
-        void unbind(RenderTarget *target) override;
+        virtual void unbind(RenderTarget *target);
         
         /** Create PBuffer for a certain pixel format and size
         */

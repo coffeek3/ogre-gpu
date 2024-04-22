@@ -40,36 +40,43 @@ namespace Ogre {
     *  @{
     */
     /** Particle emitter which emits particles randomly from points inside a hollow ellipsoid.
+
+        This particle emitter emits particles from a hollow ellipsoid area.
+        The initial direction of these particles can either be a single
+        direction (i.e. a line), a random scattering inside a cone, or a random
+        scattering in all directions, depending the 'angle' parameter, which
+        is the angle across which to scatter the particles either side of the
+        base direction of the emitter.
     */
-    class HollowEllipsoidEmitter : public EllipsoidEmitter
+    class _OgreParticleFXExport HollowEllipsoidEmitter : public EllipsoidEmitter
     {
     public:
         /** Command object for inner size (see ParamCommand).*/
         class CmdInnerX : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /** Command object for inner size (see ParamCommand).*/
         class CmdInnerY : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /** Command object for inner size (see ParamCommand).*/
         class CmdInnerZ : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         // See AreaEmitter
 
         HollowEllipsoidEmitter(ParticleSystem* psys);
 
-        void _initParticle(Particle* pParticle) override;
+        void _initParticle(Particle* pParticle);
 
         /** Sets the size of the clear space inside the area from where NO particles are emitted.
         @param x,y,z

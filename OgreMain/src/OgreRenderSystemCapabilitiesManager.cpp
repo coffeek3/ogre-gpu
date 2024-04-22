@@ -29,8 +29,8 @@ THE SOFTWARE.
 
 #include "OgreRenderSystemCapabilitiesManager.h"
 #include "OgreRenderSystemCapabilitiesSerializer.h"
-#include "OgreConfigFile.h"
-#include "OgreFileSystemLayer.h"
+
+
 
 namespace Ogre {
 
@@ -53,45 +53,13 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     RenderSystemCapabilitiesManager::~RenderSystemCapabilitiesManager()
     {
-        for (auto& cm : mCapabilitiesMap)
+        for (CapabilitiesMap::iterator it = mCapabilitiesMap.begin(), end = mCapabilitiesMap.end(); it != end; ++it)
         {
         // free memory in RenderSystemCapabilities*
-            OGRE_DELETE cm.second;
+            OGRE_DELETE it->second;
         }
 
         OGRE_DELETE mSerializer;
-    }
-
-    RenderSystemCapabilities* RenderSystemCapabilitiesManager::loadCapabilitiesConfig(const String& customConfig)
-    {
-        ConfigFile cfg;
-        cfg.load(customConfig, "\t:=", false);
-
-        // resolve relative path with regards to configfile
-        String baseDir, unused;
-        StringUtil::splitFilename(customConfig, unused, baseDir);
-
-        // Capabilities Database setting must be in the same format as
-        // resources.cfg in Ogre examples.
-        for(auto& it : cfg.getSettings("Capabilities Database"))
-        {
-            String filename = it.second;
-            if(filename.empty() || filename[0] == '.')
-                filename = baseDir + it.second;
-
-            filename = FileSystemLayer::resolveBundlePath(filename);
-            parseCapabilitiesFromArchive(filename, it.first, true);
-        }
-
-        String capsName = cfg.getSetting("Custom Capabilities");
-        // The custom capabilities have been parsed, let's retrieve them
-        RenderSystemCapabilities* rsc = loadParsedCapabilities(capsName);
-        if (rsc == 0)
-        {
-            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, "Cannot load a RenderSystemCapability named '" + capsName + "'");
-        }
-
-        return rsc;
     }
 
     //-----------------------------------------------------------------------
@@ -102,9 +70,9 @@ namespace Ogre {
         StringVectorPtr files = arch->find(mScriptPattern, recursive);
 
         // loop through .rendercaps files and load each one
-        for (auto& f : *files)
+        for (StringVector::iterator it = files->begin(), end = files->end(); it != end; ++it)
         {
-            DataStreamPtr stream = arch->open(f);
+            DataStreamPtr stream = arch->open(*it);
             mSerializer->parseScript(stream);
             stream->close();
         }

@@ -80,14 +80,23 @@ namespace Ogre {
         /// internal method, create a blank cube texture        
         void _createVolumeTex(IDirect3DDevice9* d3d9Device);
 
+        /// internal method, return a D3D pixel format for texture creation
+        D3DFORMAT _chooseD3DFormat(IDirect3DDevice9* d3d9Device);
+
         /// @copydoc Resource::calculateSize
         size_t calculateSize(void) const;
+        /// @copydoc Texture::createInternalResources
+        void createInternalResources(void);
+        /// @copydoc Texture::freeInternalResources
+        void freeInternalResources(void);
         /// @copydoc Texture::createInternalResourcesImpl
         void createInternalResourcesImpl(void);
         /// Creates this texture resources on the specified device.
         void createInternalResourcesImpl(IDirect3DDevice9* d3d9Device);
         /// free internal resources
         void freeInternalResourcesImpl(void);
+        /// internal method, set Texture class source image protected attributes
+        void _setSrcAttributes(unsigned long width, unsigned long height, unsigned long depth, PixelFormat format);
         /// internal method, set Texture class final texture protected attributes
         void _setFinalAttributes(IDirect3DDevice9* d3d9Device, TextureResources* textureResources, 
             unsigned long width, unsigned long height, unsigned long depth, PixelFormat format);
@@ -142,7 +151,7 @@ namespace Ogre {
         IDirect3DCubeTexture9 *getCubeTexture();
 
         /** Indicates whether the hardware gamma is actually enabled and supported. 
-
+        @remarks
             Because hardware gamma might not actually be supported, we need to 
             ignore it sometimes. Because D3D doesn't encode sRGB in the format but
             as a sampler state, and we don't want to change the original requested
@@ -182,7 +191,6 @@ namespace Ogre {
         /// Override needed to deal with FSAA
         void swapBuffers();
 
-        void _setDepthBuffer(DepthBuffer *depthBuffer) { mDepthBuffer = depthBuffer; }
     };
 
 }

@@ -43,13 +43,13 @@ namespace Ogre {
         //it seems they are not used outside this class.
         Window mParentWindow;
         Window mExternalWindow;
-        void getLeftAndTopFromNativeWindow(int & left, int & top, uint width, uint height);
-        void initNativeCreatedWindow(const NameValuePairList *miscParams);
-        void createNativeWindow( int &left, int &top, uint &width, uint &height, String &title );
-        void reposition(int left, int top) override;
-        void resize(unsigned int width, unsigned int height) override;
-        void windowMovedOrResized() override;
-        void switchFullScreen(bool fullscreen) override;
+        virtual void getLeftAndTopFromNativeWindow(int & left, int & top, uint width, uint height);
+        virtual void initNativeCreatedWindow(const NameValuePairList *miscParams);
+        virtual void createNativeWindow( int &left, int &top, uint &width, uint &height, String &title );
+        virtual void reposition(int left, int top);
+        virtual void resize(unsigned int width, unsigned int height);
+        virtual void windowMovedOrResized();
+        virtual void switchFullScreen(bool fullscreen);
 
 
     public:
@@ -57,19 +57,19 @@ namespace Ogre {
            virtual  ~X11EGLWindow();
 
             /**
-
+            @remarks
             * Get custom attribute; the following attributes are valid:
             * XDISPLAY        The X Display connection behind that context.
             * XWINDOW        The X NativeWindowType connection behind that context.
             * ATOM           The X Atom used in client delete events.
             */
-            void getCustomAttribute(const String& name, void* pData) override;
+            virtual void getCustomAttribute(const String& name, void* pData);
 
-            void setFullscreen (bool fullscreen, uint width, uint height) override;
+            virtual void setFullscreen (bool fullscreen, uint width, uint height);
 
         //Moved this from EGLWindow because it has some native calls.
             void create(const String& name, unsigned int width, unsigned int height,
-                        bool fullScreen, const NameValuePairList *miscParams) override;
+                        bool fullScreen, const NameValuePairList *miscParams);
     };
 }
 

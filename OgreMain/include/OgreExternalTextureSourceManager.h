@@ -82,7 +82,7 @@ namespace Ogre
         static ExternalTextureSourceManager& getSingleton(void);
         /// @copydoc Singleton::getSingleton()
         static ExternalTextureSourceManager* getSingletonPtr(void);
-    private:
+    protected:
         /// The current texture controller selected
         ExternalTextureSource* mCurrExternalTextureSource;
         

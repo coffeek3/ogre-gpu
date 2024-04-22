@@ -33,7 +33,7 @@ namespace RTShader {
 /************************************************************************/
 /*                                                                      */
 /************************************************************************/
-const String SRS_VERTEX_COLOUR = "FFP_Colour";
+String FFPColour::Type = "FFP_Colour";
 
 //-----------------------------------------------------------------------
 FFPColour::FFPColour()
@@ -44,7 +44,7 @@ FFPColour::FFPColour()
 //-----------------------------------------------------------------------
 const String& FFPColour::getType() const
 {
-    return SRS_VERTEX_COLOUR;
+    return Type;
 }
 
 
@@ -191,7 +191,7 @@ bool FFPColour::preAddToRenderState(const RenderState* renderState, Pass* srcPas
 //-----------------------------------------------------------------------
 const String& FFPColourFactory::getType() const
 {
-    return SRS_VERTEX_COLOUR;
+    return FFPColour::Type;
 }
 
 //-----------------------------------------------------------------------
@@ -202,7 +202,15 @@ SubRenderState* FFPColourFactory::createInstance(ScriptCompiler* compiler,
     {
         if(prop->values.size() == 1)
         {
-            if (prop->values.front()->getString() == "ffp")
+            String modelType;
+
+            if(false == SGScriptTranslator::getString(prop->values.front(), &modelType))
+            {
+                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                return NULL;
+            }
+
+            if (modelType == "ffp")
             {
                 return createOrRetrieveInstance(translator);
             }

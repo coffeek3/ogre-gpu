@@ -61,14 +61,4 @@ namespace Ogre
         }
         return startIndex;
     }
-
-    void logMaterialNotFound(const String& name, const String& groupName, const String& destType,
-                             const String& destName, LogMessageLevel lml)
-    {
-        LogManager::getSingleton().logMessage(
-            StringUtil::format("Can't assign material to %s '%s'. Material '%s' not found in group '%s'. Have you "
-                               "forgotten to define it in a .material script?",
-                               destType.c_str(), destName.c_str(), name.c_str(), groupName.c_str()),
-            lml);
-    }
 }

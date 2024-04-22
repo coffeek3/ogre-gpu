@@ -29,7 +29,7 @@ THE SOFTWARE.
 #include "OgreGL3PlusFrameBufferObject.h"
 #include "OgreGL3PlusHardwarePixelBuffer.h"
 #include "OgreGL3PlusFBORenderTexture.h"
-#include "OgreGLDepthBufferCommon.h"
+#include "OgreGL3PlusDepthBuffer.h"
 #include "OgreGL3PlusStateCacheManager.h"
 #include "OgreGLRenderSystemCommon.h"
 #include "OgreRoot.h"
@@ -107,13 +107,13 @@ namespace Ogre {
         // Bind simple buffer to add colour attachments
         mManager->getStateCacheManager()->bindGLFrameBuffer( GL_FRAMEBUFFER, mFB );
 
+        bool isDepth = PixelUtil::isDepth(getFormat());
+
         // Bind all attachment points to frame buffer
         for(unsigned int x = 0; x < maxSupportedMRTs; ++x)
         {
             if(mColour[x].buffer)
             {
-                bool isDepth = PixelUtil::isDepth(mColour[x].buffer->getFormat());
-
                 if(mColour[x].buffer->getWidth() != width || mColour[x].buffer->getHeight() != height)
                 {
                     StringStream ss;
@@ -136,7 +136,7 @@ namespace Ogre {
         }
 
         // Now deal with depth / stencil
-        if (mMultisampleFB && !PixelUtil::isDepth(getFormat()))
+        if (mMultisampleFB)
         {
             // Bind multisample buffer
             mManager->getStateCacheManager()->bindGLFrameBuffer( GL_FRAMEBUFFER, mMultisampleFB );
@@ -165,12 +165,9 @@ namespace Ogre {
             // Fill attached colour buffers
             if(mColour[x].buffer)
             {
-                bool isDepth = PixelUtil::isDepth(mColour[x].buffer->getFormat());
-
-                bufs[x] = isDepth ? GL_NONE : (GL_COLOR_ATTACHMENT0 + x);
+                bufs[x] = isDepth ? GL_DEPTH_ATTACHMENT : (GL_COLOR_ATTACHMENT0 + x);
                 // Keep highest used buffer + 1
-                if(!isDepth)
-                    n = x+1;
+                n = x+1;
             }
             else
             {
@@ -179,7 +176,19 @@ namespace Ogre {
         }
 
         // Drawbuffer extension supported, use it
-        OGRE_CHECK_GL_ERROR(glDrawBuffers(n, bufs));
+        if(!isDepth)
+            OGRE_CHECK_GL_ERROR(glDrawBuffers(n, bufs));
+
+        if (mMultisampleFB)
+        {
+            // we need a read buffer because we'll be blitting to mFB
+            OGRE_CHECK_GL_ERROR(glReadBuffer(bufs[0]));
+        }
+        else
+        {
+            // No read buffer, by default, if we want to read anyway we must not forget to set this.
+            OGRE_CHECK_GL_ERROR(glReadBuffer(GL_NONE));
+        }
         
         // Check status
         GLuint status;
@@ -279,7 +288,7 @@ namespace Ogre {
     {
         bind(true); // recreate FBO if unusable with current context, bind it
 
-        GLDepthBufferCommon *glDepthBuffer = static_cast<GLDepthBufferCommon*>(depthBuffer);
+        GL3PlusDepthBuffer *glDepthBuffer = static_cast<GL3PlusDepthBuffer*>(depthBuffer);
         if( glDepthBuffer )
         {
             auto *depthBuf   = glDepthBuffer->getDepthBuffer();

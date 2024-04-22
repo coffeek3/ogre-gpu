@@ -81,16 +81,18 @@ namespace Ogre
             }
         }
         mCurrExternalTextureSource = 0;
+        LogManager::getSingleton().logMessage( "ExternalTextureSourceManager::SetCurrentPlugIn(ENUM) failed setting texture plugin ", LML_CRITICAL);
     }
 
     //****************************************************************************************
     void ExternalTextureSourceManager::destroyAdvancedTexture( const String& sTextureName,
         const String& groupName )
     {
-        for(auto& t : mTextureSystems)
+        TextureSystemList::iterator i;
+        for( i = mTextureSystems.begin(); i != mTextureSystems.end(); ++i )
         {
             //Broadcast to every registered System... Only the true one will destroy texture
-            t.second->destroyAdvancedTexture( sTextureName, groupName );
+            i->second->destroyAdvancedTexture( sTextureName, groupName );
         }
     }
 
@@ -100,18 +102,20 @@ namespace Ogre
         LogManager::getSingleton().logMessage( "Registering Texture Controller: Type = "
                         + sTexturePlugInType + " Name = " + pTextureSystem->getPluginStringName());
 
-        for(auto& t : mTextureSystems)
+        TextureSystemList::iterator i;
+            
+        for( i = mTextureSystems.begin(); i != mTextureSystems.end(); ++i )
         {
-            if( t.first == sTexturePlugInType )
+            if( i->first == sTexturePlugInType )
             {
-                LogManager::getSingleton().logMessage( "Shutting Down Texture Controller: "
-                        + t.second->getPluginStringName()
+                LogManager::getSingleton().logMessage( "Shutting Down Texture Controller: " 
+                        + i->second->getPluginStringName() 
                         + " To be replaced by: "
                         + pTextureSystem->getPluginStringName());
 
-                t.second->shutDown();              //Only one plugIn of Sent Type can be registered at a time
+                i->second->shutDown();              //Only one plugIn of Sent Type can be registered at a time
                                                     //so shut down old plugin before starting new plugin
-                t.second = pTextureSystem;
+                i->second = pTextureSystem;
                 // **Moved this line b/c Rendersystem needs to be selected before things
                 // such as framelistners can be added
                 // pTextureSystem->Initialise();
@@ -124,10 +128,11 @@ namespace Ogre
     //****************************************************************************************
     ExternalTextureSource* ExternalTextureSourceManager::getExternalTextureSource( const String& sTexturePlugInType )
     {
-        for(auto& t : mTextureSystems)
+        TextureSystemList::iterator i;
+        for( i = mTextureSystems.begin(); i != mTextureSystems.end(); ++i )
         {
-            if(t.first == sTexturePlugInType)
-                return t.second;
+            if( i->first == sTexturePlugInType )
+                return i->second;
         }
         return 0;
     }

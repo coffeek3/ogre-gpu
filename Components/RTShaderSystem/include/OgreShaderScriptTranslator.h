@@ -53,15 +53,15 @@ public:
     /**
     *@see ScriptTranslator::translate.
     */
-    void translate(ScriptCompiler *compiler, const AbstractNodePtr &node) override;
+    virtual void translate(ScriptCompiler *compiler, const AbstractNodePtr &node);
 
     using ScriptTranslator::getBoolean;
-    using ScriptTranslator::getColour;
+    using ScriptTranslator::getString;
+    using ScriptTranslator::getReal;
     using ScriptTranslator::getFloat;
     using ScriptTranslator::getInt;
-    using ScriptTranslator::getReal;
     using ScriptTranslator::getUInt;
-    using ScriptTranslator::getVector;
+    using ScriptTranslator::getColour;
 
     /**
     * Returns a sub render state of a given name which has already 
@@ -105,7 +105,7 @@ protected:
         const String& groupName, unsigned short passIndex);
 
             
-private:
+protected:
 
     //Render state created as a result of the current node being parsed
     RenderState* mGeneratedRenderState;

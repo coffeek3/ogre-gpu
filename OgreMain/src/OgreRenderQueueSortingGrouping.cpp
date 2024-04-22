@@ -29,71 +29,13 @@ THE SOFTWARE.
 #include "OgreRenderQueueSortingGrouping.h"
 
 namespace Ogre {
-namespace {
-    /// Comparator to order objects by descending camera distance
-    struct DistanceSortDescendingLess
-    {
-        const Camera* camera;
+    // Init statics
+    RadixSort<QueuedRenderableCollection::RenderablePassList,
+        RenderablePass, uint32> QueuedRenderableCollection::msRadixSorter1;
+    RadixSort<QueuedRenderableCollection::RenderablePassList,
+        RenderablePass, float> QueuedRenderableCollection::msRadixSorter2;
 
-        DistanceSortDescendingLess(const Camera* cam)
-            : camera(cam)
-        {
-        }
 
-        bool operator()(const RenderablePass& a, const RenderablePass& b) const
-        {
-            if (a.renderable == b.renderable)
-            {
-                // Same renderable, sort by pass hash
-                return a.pass->getHash() < b.pass->getHash();
-            }
-            else
-            {
-                // Different renderables, sort by distance
-                Real adist = a.renderable->getSquaredViewDepth(camera);
-                Real bdist = b.renderable->getSquaredViewDepth(camera);
-                if (Math::RealEqual(adist, bdist))
-                {
-                    // Must return deterministic result, doesn't matter what
-                    return a.pass < b.pass;
-                }
-                else
-                {
-                    // Sort DESCENDING by dist (i.e. far objects first)
-                    return (adist > bdist);
-                }
-            }
-
-        }
-    };
-
-    /// Functor for accessing sort value 1 for radix sort (Pass)
-    struct RadixSortFunctorPass
-    {
-        uint32 operator()(const RenderablePass& p) const
-        {
-            return p.pass->getHash();
-        }
-    };
-
-    /// Functor for descending sort value 2 for radix sort (distance)
-    struct RadixSortFunctorDistance
-    {
-        const Camera* camera;
-
-        RadixSortFunctorDistance(const Camera* cam)
-            : camera(cam)
-        {
-        }
-
-        float operator()(const RenderablePass& p) const
-        {
-            // Sort DESCENDING by depth (ie far objects first), use negative distance
-            // here because radix sorter always dealing with accessing sort
-            return static_cast<float>(- p.renderable->getSquaredViewDepth(camera));
-        }
-    };
-}
     //-----------------------------------------------------------------------
     RenderPriorityGroup::RenderPriorityGroup(RenderQueueGroup* parent, 
             bool splitPassesByLightingType,
@@ -138,14 +80,6 @@ namespace {
         addOrganisationMode(QueuedRenderableCollection::OM_PASS_GROUP);
     }
     //-----------------------------------------------------------------------
-    //-----------------------------------------------------------------------
-    static void addPassesTo(QueuedRenderableCollection& collection, Technique* pTech, Renderable* rend)
-    {
-        for (auto* p : pTech->getPasses())
-        {
-            collection.addRenderable(p, rend);
-        }
-    }
     void RenderPriorityGroup::addRenderable(Renderable* rend, Technique* pTech)
     {
         // Transparent and depth/colour settings mean depth sorting is required?
@@ -158,9 +92,9 @@ namespace {
              pTech->hasColourWriteDisabled())))
         {
             if (pTech->isTransparentSortingEnabled())
-                addPassesTo(mTransparents, pTech, rend);
+                addTransparentRenderable(pTech, rend);
             else
-                addPassesTo(mTransparentsUnsorted, pTech, rend);
+                addUnsortedTransparentRenderable(pTech, rend);
         }
         else
         {
@@ -170,7 +104,7 @@ namespace {
                  (rend->getCastsShadows() && mShadowCastersNotReceivers)))
             {
                 // Add solid renderable and add passes to no-shadow group
-                addPassesTo(mSolidsNoShadowReceive, pTech, rend);
+                addSolidRenderable(pTech, rend, true);
             }
             else
             {
@@ -180,11 +114,33 @@ namespace {
                 }
                 else
                 {
-                    addPassesTo(mSolidsBasic, pTech, rend);
+                    addSolidRenderable(pTech, rend, false);
                 }
             }
         }
 
+    }
+    //-----------------------------------------------------------------------
+    void RenderPriorityGroup::addSolidRenderable(Technique* pTech, 
+        Renderable* rend, bool addToNoShadow)
+    {
+        QueuedRenderableCollection* collection;
+        if (addToNoShadow)
+        {
+            collection = &mSolidsNoShadowReceive;
+        }
+        else
+        {
+            collection = &mSolidsBasic;
+        }
+
+
+        Technique::Passes::const_iterator i;
+        for(i = pTech->getPasses().begin(); i != pTech->getPasses().end(); ++i)
+        {
+            // Insert into solid list
+            collection->addRenderable(*i, rend);
+        }
     }
     //-----------------------------------------------------------------------
     void RenderPriorityGroup::addSolidRenderableSplitByLightType(Technique* pTech,
@@ -193,8 +149,9 @@ namespace {
         // Divide the passes into the 3 categories
         const IlluminationPassList& passes = pTech->getIlluminationPasses();
 
-        for(auto p : passes)
+        for(size_t i = 0; i < passes.size(); i++)
         {
+            IlluminationPass* p = passes[i];
             // Insert into solid list
             QueuedRenderableCollection* collection = NULL;
             switch(p->stage)
@@ -213,6 +170,26 @@ namespace {
             };
 
             collection->addRenderable(p->pass, rend);
+        }
+    }
+    //-----------------------------------------------------------------------
+    void RenderPriorityGroup::addUnsortedTransparentRenderable(Technique* pTech, Renderable* rend)
+    {
+        Technique::Passes::const_iterator i;
+        for(i = pTech->getPasses().begin(); i != pTech->getPasses().end(); ++i)
+        {
+            // Insert into transparent list
+            mTransparentsUnsorted.addRenderable(*i, rend);
+        }
+    }
+    //-----------------------------------------------------------------------
+    void RenderPriorityGroup::addTransparentRenderable(Technique* pTech, Renderable* rend)
+    {
+        Technique::Passes::const_iterator i;
+        for(i = pTech->getPasses().begin(); i != pTech->getPasses().end(); ++i)
+        {
+            // Insert into transparent list
+            mTransparents.addRenderable(*i, rend);
         }
     }
     //-----------------------------------------------------------------------
@@ -235,9 +212,11 @@ namespace {
             // Hmm, a bit hacky but least obtrusive for now
                     OGRE_LOCK_MUTEX(Pass::msPassGraveyardMutex);
             const Pass::PassSet& graveyardList = Pass::getPassGraveyard();
-            for (auto* p : graveyardList)
+            Pass::PassSet::const_iterator gi, giend;
+            giend = graveyardList.end();
+            for (gi = graveyardList.begin(); gi != giend; ++gi)
             {
-                removePassEntry(p);
+                removePassEntry(*gi);
             }
         }
 
@@ -248,9 +227,11 @@ namespace {
             // Hmm, a bit hacky but least obtrusive for now
                     OGRE_LOCK_MUTEX(Pass::msDirtyHashListMutex);
             const Pass::PassSet& dirtyList = Pass::getDirtyHashList();
-            for (auto* p : dirtyList)
+            Pass::PassSet::const_iterator di, diend;
+            diend = dirtyList.end();
+            for (di = dirtyList.begin(); di != diend; ++di)
             {
-                removePassEntry(p);
+                removePassEntry(*di);
             }
         }
         // NB we do NOT clear the graveyard or the dirty list here, because 
@@ -298,10 +279,12 @@ namespace {
     //-----------------------------------------------------------------------
     void QueuedRenderableCollection::clear(void)
     {
-        for (auto& i : mGrouped)
+        PassGroupRenderableMap::iterator i, iend;
+        iend = mGrouped.end();
+        for (i = mGrouped.begin(); i != iend; ++i)
         {
             // Clear the list associated with this pass, but leave the pass entry
-            i.second.clear();
+            i->second.clear();
         }
 
         // Clear sorted list
@@ -322,11 +305,6 @@ namespace {
     //-----------------------------------------------------------------------
     void QueuedRenderableCollection::sort(const Camera* cam)
     {
-        /// Radix sorter for accessing sort value 1 (Pass)
-        static RadixSort<RenderablePassList, RenderablePass, uint32> msRadixSorter1;
-        /// Radix sorter for sort value 2 (distance)
-        static RadixSort<RenderablePassList, RenderablePass, float> msRadixSorter2;
-
         // ascending and descending sort both set bit 1
         // We always sort descending, because the only difference is in the
         // acceptVisitor method, where we iterate in reverse in ascending mode
@@ -355,7 +333,7 @@ namespace {
             {
                 std::stable_sort(
                     mSortedDescending.begin(), mSortedDescending.end(), 
-                    DistanceSortDescendingLess(cam));
+                    DepthSortDescendingLess(cam));
             }
         }
 
@@ -423,12 +401,14 @@ namespace {
     void QueuedRenderableCollection::acceptVisitorGrouped(
         QueuedRenderableVisitor* visitor) const
     {
-        for (auto& ipass : mGrouped)
+        PassGroupRenderableMap::const_iterator ipass, ipassend;
+        ipassend = mGrouped.end();
+        for (ipass = mGrouped.begin(); ipass != ipassend; ++ipass)
         {
             // Fast bypass if this group is now empty
-            if (ipass.second.empty()) continue;
+            if (ipass->second.empty()) continue;
 
-            visitor->visit(ipass.first, const_cast<RenderableList&>(ipass.second));
+            visitor->visit(ipass->first, const_cast<RenderableList&>(ipass->second));
         } 
 
     }
@@ -437,9 +417,12 @@ namespace {
         QueuedRenderableVisitor* visitor) const
     {
         // List is already in descending order, so iterate forward
-        for (const auto& i : mSortedDescending)
+        RenderablePassList::const_iterator i, iend;
+
+        iend = mSortedDescending.end();
+        for (i = mSortedDescending.begin(); i != iend; ++i)
         {
-            visitor->visit(const_cast<RenderablePass*>(&i));
+            visitor->visit(const_cast<RenderablePass*>(&(*i)));
         }
     }
     //-----------------------------------------------------------------------
@@ -461,17 +444,20 @@ namespace {
     {
         mSortedDescending.insert( mSortedDescending.end(), rhs.mSortedDescending.begin(), rhs.mSortedDescending.end() );
 
-        for (const auto& srcGroup : rhs.mGrouped)
+        PassGroupRenderableMap::const_iterator srcGroup;
+        for( srcGroup = rhs.mGrouped.begin(); srcGroup != rhs.mGrouped.end(); ++srcGroup )
         {
             // Optionally create new pass entry, build a new list
             // Note that this pass and list are never destroyed until the
             // engine shuts down, or a pass is destroyed or has it's hash
             // recalculated, although the lists will be cleared
-            PassGroupRenderableMap::iterator dstGroup = mGrouped.emplace(srcGroup.first, RenderableList()).first;
+            PassGroupRenderableMap::iterator dstGroup = mGrouped.emplace(srcGroup->first, RenderableList()).first;
 
             // Insert renderable
-            dstGroup->second.insert(dstGroup->second.end(), srcGroup.second.begin(), srcGroup.second.end() );
+            dstGroup->second.insert( dstGroup->second.end(), srcGroup->second.begin(), srcGroup->second.end() );
         }
     }
+
+
 }
 

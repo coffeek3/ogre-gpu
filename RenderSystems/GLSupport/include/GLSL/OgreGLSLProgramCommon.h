@@ -33,8 +33,7 @@ THE SOFTWARE.
 #include "OgreConfig.h"
 #include "OgreHardwareVertexBuffer.h"
 #include "OgreGLSLShaderCommon.h"
-
-#include <array>
+#include "OgreHardwareUniformBuffer.h"
 
 namespace Ogre
 {
@@ -51,13 +50,32 @@ struct GLUniformReference
 typedef std::vector<GLUniformReference> GLUniformReferenceList;
 typedef GLUniformReferenceList::iterator GLUniformReferenceIterator;
 
-typedef  std::array<GLSLShaderCommon*, GPT_COUNT> GLShaderList;
+typedef std::vector<HardwareUniformBufferSharedPtr> GLUniformBufferList;
+typedef GLUniformBufferList::iterator GLUniformBufferIterator;
 
 class GLSLProgramCommon
 {
 public:
-    explicit GLSLProgramCommon(const GLShaderList& shaders);
+    GLSLProgramCommon(GLSLShaderCommon* vertexShader);
     virtual ~GLSLProgramCommon() {}
+
+    void extractLayoutQualifiers(void);
+
+    /** Sets whether the linked program includes the required instructions
+        to perform skeletal animation.
+        @remarks
+        If this is set to true, OGRE will not blend the geometry according to
+        skeletal animation, it will expect the vertex program to do it.
+    */
+    void setSkeletalAnimationIncluded(bool included) { mSkeletalAnimation = included; }
+
+    /** Returns whether the linked program includes the required instructions
+        to perform skeletal animation.
+        @remarks
+         If this returns true, OGRE will not blend the geometry according to
+         skeletal animation, it will expect the vertex program to do it.
+                                                                         */
+    bool isSkeletalAnimationIncluded(void) const { return mSkeletalAnimation; }
 
     /// Get the GL Handle for the program object
     uint getGLProgramHandle(void) const { return mGLProgramHandle; }
@@ -67,12 +85,22 @@ public:
     virtual void activate(void) = 0;
 
     /// query if the program is using the given shader
-    bool isUsingShader(GLSLShaderCommon* shader) const { return mShaders[shader->getType()] == shader; }
+    virtual bool isUsingShader(GLSLShaderCommon* shader) const = 0;
 
     /** Updates program object uniforms using data from GpuProgramParameters.
         Normally called by GLSLShader::bindParameters() just before rendering occurs.
     */
-    virtual void updateUniforms(GpuProgramParametersPtr params, uint16 mask, GpuProgramType fromProgType) = 0;
+    virtual void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) = 0;
+
+    /** Updates program object uniform blocks using data from GpuProgramParameters.
+        Normally called by GLSLShader::bindParameters() just before rendering occurs.
+    */
+    virtual void updateUniformBlocks(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) = 0;
+
+    /** Updates program object uniforms using data from pass iteration GpuProgramParameters.
+        Normally called by GLSLShader::bindMultiPassParameters() just before multi pass rendering occurs.
+    */
+    virtual void updatePassIterationUniforms(GpuProgramParametersSharedPtr params) = 0;
 
     /** Get the fixed attribute bindings normally used by GL for a semantic. */
     static int32 getFixedAttributeIndex(VertexElementSemantic semantic, uint index);
@@ -86,9 +114,11 @@ public:
 protected:
     /// Container of uniform references that are active in the program object
     GLUniformReferenceList mGLUniformReferences;
+    /// Container of uniform buffer references that are active in the program object
+    GLUniformBufferList mGLUniformBufferReferences;
 
-    /// Linked shaders
-    GLShaderList mShaders;
+    /// Linked vertex shader.
+    GLSLShaderCommon* mVertexShader;
 
     /// Flag to indicate that uniform references have already been built
     bool mUniformRefsBuilt;
@@ -96,12 +126,21 @@ protected:
     uint mGLProgramHandle;
     /// Flag indicating that the program or pipeline object has been successfully linked
     int mLinked;
+    /// Flag indicating skeletal animation is being performed
+    bool mSkeletalAnimation;
+    /// A value to define the case we didn't look for the attributes since the contractor
+    static const int NULL_CUSTOM_ATTRIBUTES_INDEX = -2;
+    /// A value to define the attribute has not been found (this is also the result when glGetAttribLocation fails)
+    static const int NOT_FOUND_CUSTOM_ATTRIBUTES_INDEX = -1;
+
+    /// An array to hold the attributes indexes
+    int mCustomAttributesIndexes[VES_COUNT][OGRE_MAX_TEXTURE_COORD_SETS];
 
     /// Compiles and links the vertex and fragment programs
     virtual void compileAndLink(void) = 0;
 
-    uint32 getCombinedHash();
-    String getCombinedName();
+    static VertexElementSemantic getAttributeSemanticEnum(const String& type);
+    static const char * getAttributeSemanticString(VertexElementSemantic semantic);
 
     /// Name / attribute list
     struct CustomAttribute

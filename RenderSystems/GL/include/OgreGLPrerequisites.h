@@ -36,28 +36,35 @@ namespace Ogre {
     class GLRenderSystem;
     class GLTexture;
     class GLTextureManager;
-    struct GLGpuProgramBase;
     class GLGpuProgram;
     class GLContext;
     class GLRTTManager;
     class GLFBOManager;
     class GLHardwarePixelBuffer;
     class GLRenderBuffer;
+    class GLDepthBuffer;
 
     typedef shared_ptr<GLGpuProgram> GLGpuProgramPtr;
     typedef shared_ptr<GLTexture> GLTexturePtr;
 }
 
-#if (OGRE_PLATFORM == OGRE_PLATFORM_WIN32)
-#   ifndef WIN32_LEAN_AND_MEAN
-#       define WIN32_LEAN_AND_MEAN 1
-#   endif
-#   ifndef NOMINMAX
-#       define NOMINMAX // required to stop windows.h messing up std::min
-#   endif
+#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+#if !defined( __MINGW32__ )
+#   define WIN32_LEAN_AND_MEAN
+#  ifndef NOMINMAX
+#   define NOMINMAX // required to stop windows.h messing up std::min
+#  endif
 #endif
-
-#include <glad/glad.h>
+#   include <windows.h>
+#   include <wingdi.h>
+#   include <GL/glew.h>
+#   include <GL/wglew.h>
+#elif OGRE_PLATFORM == OGRE_PLATFORM_LINUX
+#   include <GL/glew.h>
+#   define GL_GLEXT_PROTOTYPES
+#elif OGRE_PLATFORM == OGRE_PLATFORM_APPLE
+#   include <GL/glew.h>
+#endif
 
 namespace Ogre {
     inline const char* glErrorToString(GLenum glErr) {
@@ -69,7 +76,7 @@ namespace Ogre {
                 return "GL_INVALID_VALUE";
             case GL_INVALID_OPERATION:
                 return "GL_INVALID_OPERATION";
-            case GL_INVALID_FRAMEBUFFER_OPERATION_EXT:
+            case GL_INVALID_FRAMEBUFFER_OPERATION:
                 return "GL_INVALID_FRAMEBUFFER_OPERATION";
             case GL_OUT_OF_MEMORY:
                 return "GL_OUT_OF_MEMORY";
@@ -78,6 +85,11 @@ namespace Ogre {
         }
     }
 }
+
+/// Lots of generated code in here which triggers the new VC CRT security warnings
+#if !defined( _CRT_SECURE_NO_DEPRECATE )
+#define _CRT_SECURE_NO_DEPRECATE
+#endif
 
 #if (OGRE_PLATFORM == OGRE_PLATFORM_WIN32) && !defined(__MINGW32__) && !defined(OGRE_STATIC_LIB)
 #   ifdef OGRE_GLPLUGIN_EXPORTS

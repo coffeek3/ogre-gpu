@@ -46,15 +46,17 @@ namespace Ogre
 
     /** Page class
     */
-    class _OgrePagingExport Page
+    class _OgrePagingExport Page : public WorkQueue::RequestHandler, 
+        public WorkQueue::ResponseHandler, public PageAlloc
     {
     public:
         typedef std::vector<PageContentCollection*> ContentCollectionList;
-    private:
+    protected:
         PageID mID;
         PagedWorldSection* mParent;
         unsigned long mFrameLastHeld;
         ContentCollectionList mContentCollections;
+        uint16 mWorkQueueChannel;
         bool mDeferredProcessInProgress;
         bool mModified;
 
@@ -69,11 +71,18 @@ namespace Ogre
         struct PageRequest
         {
             Page* srcPage;
+            _OgrePagingExport friend std::ostream& operator<<(std::ostream& o, const PageRequest& r)
+            { return o; }       
+
             PageRequest(Page* p): srcPage(p) {}
         };
         struct PageResponse
         {
             PageData* pageData;
+
+            _OgrePagingExport friend std::ostream& operator<<(std::ostream& o, const PageResponse& r)
+            { return o; }       
+
             PageResponse() : pageData(0) {}
         };
 
@@ -85,10 +94,6 @@ namespace Ogre
 
         String generateFilename() const;
 
-        /// WorkQueue::RequestHandler override
-        WorkQueue::Response* handleRequest(const WorkQueue::Request* req, const WorkQueue* srcQ);
-        /// WorkQueue::ResponseHandler override
-        void handleResponse(const WorkQueue::Response* res, const WorkQueue* srcQ);
     public:
         static const uint32 CHUNK_ID;
         static const uint16 CHUNK_VERSION;
@@ -109,7 +114,7 @@ namespace Ogre
         /// Get the PagedWorldSection this page belongs to
         virtual PagedWorldSection* getParentSection() const { return mParent; }
         /** Get the frame number in which this Page was last loaded or held.
-
+        @remarks
             A Page that has not been requested to be loaded or held in the recent
             past will be a candidate for removal.
         */
@@ -169,9 +174,22 @@ namespace Ogre
         /// Get the list of content collections
         const ContentCollectionList& getContentCollectionList() const;
 
+        /// WorkQueue::RequestHandler override
+        bool canHandleRequest(const WorkQueue::Request* req, const WorkQueue* srcQ);
+        /// WorkQueue::RequestHandler override
+        WorkQueue::Response* handleRequest(const WorkQueue::Request* req, const WorkQueue* srcQ);
+        /// WorkQueue::ResponseHandler override
+        bool canHandleResponse(const WorkQueue::Response* res, const WorkQueue* srcQ);
+        /// WorkQueue::ResponseHandler override
+        void handleResponse(const WorkQueue::Response* res, const WorkQueue* srcQ);
+
+
         /// Tell the page that it is modified
         void _notifyModified() { mModified = true; }
         bool isModified() const { return mModified; }
+
+        static const uint16 WORKQUEUE_PREPARE_REQUEST;
+        static const uint16 WORKQUEUE_CHANGECOLLECTION_REQUEST;
 
         /** Function for writing to a stream.
         */

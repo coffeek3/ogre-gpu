@@ -32,6 +32,8 @@ namespace Ogre {
     DefaultIntersectionSceneQuery::DefaultIntersectionSceneQuery(SceneManager* creator)
     : IntersectionSceneQuery(creator)
     {
+        // No world geometry results supported
+        mSupportedWorldFragments.insert(SceneQuery::WFT_NONE);
     }
     //---------------------------------------------------------------------
     DefaultIntersectionSceneQuery::~DefaultIntersectionSceneQuery()
@@ -41,31 +43,34 @@ namespace Ogre {
     void DefaultIntersectionSceneQuery::execute(IntersectionSceneQueryListener* listener)
     {
         // Iterate over all movable types
-        const auto& factories = Root::getSingleton().getMovableObjectFactories();
-        auto factIt = factories.begin();
-        while(factIt != factories.end())
+        Root::MovableObjectFactoryIterator factIt = 
+            Root::getSingleton().getMovableObjectFactoryIterator();
+        while(factIt.hasMoreElements())
         {
-            const auto& objsA = mParentSceneMgr->getMovableObjects((factIt++)->first);
-            auto objItA = objsA.begin();
-            while (objItA != objsA.end())
+            SceneManager::MovableObjectIterator objItA = 
+                mParentSceneMgr->getMovableObjectIterator(
+                    factIt.getNext()->getType());
+            while (objItA.hasMoreElements())
             {
-                MovableObject* a = (objItA++)->second;
+                MovableObject* a = objItA.getNext();
                 // skip entire section if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
                 // Skip if a does not pass the mask
-                if (!(a->getQueryFlags() & mQueryMask) || !a->isInScene())
+                if (!(a->getQueryFlags() & mQueryMask) ||
+                    !a->isInScene())
                     continue;
 
                 // Check against later objects in the same group
-                auto objItB = objItA;
-                while (objItB != objsA.end())
+                SceneManager::MovableObjectIterator objItB = objItA;
+                while (objItB.hasMoreElements())
                 {
-                    MovableObject* b = (objItB++)->second;
+                    MovableObject* b = objItB.getNext();
 
                     // Apply mask to b (both must pass)
-                    if ((b->getQueryFlags() & mQueryMask) && b->isInScene())
+                    if ((b->getQueryFlags() & mQueryMask) && 
+                        b->isInScene())
                     {
                         const AxisAlignedBox& box1 = a->getWorldBoundingBox();
                         const AxisAlignedBox& box2 = b->getWorldBoundingBox();
@@ -77,19 +82,22 @@ namespace Ogre {
                     }
                 }
                 // Check  against later groups
-                auto factItLater = factIt;
-                while (factItLater != factories.end())
+                Root::MovableObjectFactoryIterator factItLater = factIt;
+                while (factItLater.hasMoreElements())
                 {
-                    for (const auto& objItC :
-                         mParentSceneMgr->getMovableObjects((factItLater++)->first))
+                    SceneManager::MovableObjectIterator objItC = 
+                        mParentSceneMgr->getMovableObjectIterator(
+                            factItLater.getNext()->getType());
+                    while (objItC.hasMoreElements())
                     {
-                        MovableObject* c = objItC.second;
+                        MovableObject* c = objItC.getNext();
                         // skip entire section if type doesn't match
                         if (!(c->getTypeFlags() & mQueryTypeMask))
                             break;
 
                         // Apply mask to c (both must pass)
-                        if ((c->getQueryFlags() & mQueryMask) && c->isInScene())
+                        if ((c->getQueryFlags() & mQueryMask) &&
+                            c->isInScene())
                         {
                             const AxisAlignedBox& box1 = a->getWorldBoundingBox();
                             const AxisAlignedBox& box2 = c->getWorldBoundingBox();
@@ -114,6 +122,8 @@ namespace Ogre {
     DefaultAxisAlignedBoxSceneQuery(SceneManager* creator)
     : AxisAlignedBoxSceneQuery(creator)
     {
+        // No world geometry results supported
+        mSupportedWorldFragments.insert(SceneQuery::WFT_NONE);
     }
     //---------------------------------------------------------------------
     DefaultAxisAlignedBoxSceneQuery::~DefaultAxisAlignedBoxSceneQuery()
@@ -123,16 +133,22 @@ namespace Ogre {
     void DefaultAxisAlignedBoxSceneQuery::execute(SceneQueryListener* listener)
     {
         // Iterate over all movable types
-        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
+        Root::MovableObjectFactoryIterator factIt = 
+            Root::getSingleton().getMovableObjectFactoryIterator();
+        while(factIt.hasMoreElements())
         {
-            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
+            SceneManager::MovableObjectIterator objItA = 
+                mParentSceneMgr->getMovableObjectIterator(
+                factIt.getNext()->getType());
+            while (objItA.hasMoreElements())
             {
-                MovableObject* a = objIt.second;
+                MovableObject* a = objItA.getNext();
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
-                if ((a->getQueryFlags() & mQueryMask) && a->isInScene() &&
+                if ((a->getQueryFlags() & mQueryMask) && 
+                    a->isInScene() &&
                     mAABB.intersects(a->getWorldBoundingBox()))
                 {
                     if (!listener->queryResult(a)) return;
@@ -144,6 +160,8 @@ namespace Ogre {
     DefaultRaySceneQuery::
     DefaultRaySceneQuery(SceneManager* creator) : RaySceneQuery(creator)
     {
+        // No world geometry results supported
+        mSupportedWorldFragments.insert(SceneQuery::WFT_NONE);
     }
     //---------------------------------------------------------------------
     DefaultRaySceneQuery::~DefaultRaySceneQuery()
@@ -159,19 +177,26 @@ namespace Ogre {
         // required to fulfil the query
 
         // Iterate over all movable types
-        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
+        Root::MovableObjectFactoryIterator factIt = 
+            Root::getSingleton().getMovableObjectFactoryIterator();
+        while(factIt.hasMoreElements())
         {
-            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
+            SceneManager::MovableObjectIterator objItA = 
+                mParentSceneMgr->getMovableObjectIterator(
+                factIt.getNext()->getType());
+            while (objItA.hasMoreElements())
             {
-                MovableObject* a = objIt.second;
+                MovableObject* a = objItA.getNext();
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
-                if ((a->getQueryFlags() & mQueryMask) && a->isInScene())
+                if( (a->getQueryFlags() & mQueryMask) &&
+                    a->isInScene())
                 {
                     // Do ray / box test
-                    std::pair<bool, Real> result = mRay.intersects(a->getWorldBoundingBox());
+                    std::pair<bool, Real> result =
+                        mRay.intersects(a->getWorldBoundingBox());
 
                     if (result.first)
                     {
@@ -186,6 +211,8 @@ namespace Ogre {
     DefaultSphereSceneQuery::
     DefaultSphereSceneQuery(SceneManager* creator) : SphereSceneQuery(creator)
     {
+        // No world geometry results supported
+        mSupportedWorldFragments.insert(SceneQuery::WFT_NONE);
     }
     //---------------------------------------------------------------------
     DefaultSphereSceneQuery::~DefaultSphereSceneQuery()
@@ -194,21 +221,31 @@ namespace Ogre {
     //---------------------------------------------------------------------
     void DefaultSphereSceneQuery::execute(SceneQueryListener* listener)
     {
+        Sphere testSphere;
+
         // Iterate over all movable types
-        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
+        Root::MovableObjectFactoryIterator factIt = 
+            Root::getSingleton().getMovableObjectFactoryIterator();
+        while(factIt.hasMoreElements())
         {
-            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
+            SceneManager::MovableObjectIterator objItA = 
+                mParentSceneMgr->getMovableObjectIterator(
+                factIt.getNext()->getType());
+            while (objItA.hasMoreElements())
             {
-                MovableObject* a = objIt.second;
+                MovableObject* a = objItA.getNext();
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
                 // Skip unattached
-                if (!a->isInScene() || !(a->getQueryFlags() & mQueryMask))
+                if (!a->isInScene() || 
+                    !(a->getQueryFlags() & mQueryMask))
                     continue;
 
                 // Do sphere / sphere test
-                if (mSphere.intersects(a->getWorldBoundingSphere()))
+                testSphere.setCenter(a->getParentNode()->_getDerivedPosition());
+                testSphere.setRadius(a->getBoundingRadius());
+                if (mSphere.intersects(testSphere))
                 {
                     if (!listener->queryResult(a)) return;
                 }
@@ -220,6 +257,8 @@ namespace Ogre {
     DefaultPlaneBoundedVolumeListSceneQuery(SceneManager* creator) 
     : PlaneBoundedVolumeListSceneQuery(creator)
     {
+        // No world geometry results supported
+        mSupportedWorldFragments.insert(SceneQuery::WFT_NONE);
     }
     //---------------------------------------------------------------------
     DefaultPlaneBoundedVolumeListSceneQuery::~DefaultPlaneBoundedVolumeListSceneQuery()
@@ -229,19 +268,28 @@ namespace Ogre {
     void DefaultPlaneBoundedVolumeListSceneQuery::execute(SceneQueryListener* listener)
     {
         // Iterate over all movable types
-        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
+        Root::MovableObjectFactoryIterator factIt = 
+            Root::getSingleton().getMovableObjectFactoryIterator();
+        while(factIt.hasMoreElements())
         {
-            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
+            SceneManager::MovableObjectIterator objItA = 
+                mParentSceneMgr->getMovableObjectIterator(
+                factIt.getNext()->getType());
+            while (objItA.hasMoreElements())
             {
-                MovableObject* a = objIt.second;
+                MovableObject* a = objItA.getNext();
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
-                for (const auto& vol : mVolumes)
+                PlaneBoundedVolumeList::iterator pi, piend;
+                piend = mVolumes.end();
+                for (pi = mVolumes.begin(); pi != piend; ++pi)
                 {
+                    PlaneBoundedVolume& vol = *pi;
                     // Do AABB / plane volume test
-                    if ((a->getQueryFlags() & mQueryMask) && a->isInScene() &&
+                    if ((a->getQueryFlags() & mQueryMask) && 
+                        a->isInScene() && 
                         vol.intersects(a->getWorldBoundingBox()))
                     {
                         if (!listener->queryResult(a)) return;

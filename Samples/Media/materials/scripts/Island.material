@@ -62,6 +62,7 @@ material Ogre/Island/RefractionDepthManualResolve
 			}
 			
 			cull_hardware none
+			cull_software none
 			depth_check off
 			depth_write off
 		}
@@ -77,6 +78,7 @@ material Ogre/Island/RefractionDepthManualResolve
 			}
 			
 			cull_hardware none
+			cull_software none
 			depth_check off
 			depth_write off	
 		}
@@ -92,6 +94,7 @@ material Ogre/Island/RefractionDepthManualResolve
 			}
 			
 			cull_hardware none
+			cull_software none
 			depth_check off
 			depth_write off
 		}
@@ -127,6 +130,7 @@ material Ogre/Island/MainToBackBuffer
 			}
 			
 			cull_hardware none
+			cull_software none
 			depth_check off
 			depth_write off
 		}
@@ -174,6 +178,7 @@ material Ogre/Island/WaterNormalmapCombine
 			}
 			
 			cull_hardware none
+			cull_software none
 			depth_check off
 			depth_write off
 		}
@@ -277,6 +282,7 @@ material Ogre/Island/RenderHeightfield
 			
 			}
 			
+			cull_software back
 			depth_check on
 			depth_write on
 		}
@@ -300,6 +306,7 @@ material Ogre/Island/RenderHeightfield
 			
 			}
 			
+			cull_software back
 			depth_check on
 			depth_write on
 		}
@@ -367,7 +374,8 @@ material Ogre/Island/RenderWater
 			{
 			
 			}
-
+			
+			cull_software back
 			depth_check on
 			depth_write on
 		}

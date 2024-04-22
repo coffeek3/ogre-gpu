@@ -207,14 +207,6 @@ namespace Ogre
         return true;
     }
     //-----------------------------------------------------------------------
-    Polygon& Polygon::operator=(const Ogre::Polygon& rhs)
-    {
-        mIsNormalSet = rhs.mIsNormalSet;
-        mNormal = rhs.mNormal;
-        mVertexList = rhs.mVertexList;
-        return *this;
-    }
-    //-----------------------------------------------------------------------
     std::ostream& operator<< ( std::ostream& strm, const Polygon& poly )
     {
         strm << "NUM VERTICES: " << poly.getVertexCount() << std::endl;

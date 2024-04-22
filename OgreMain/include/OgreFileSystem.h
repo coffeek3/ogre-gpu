@@ -45,9 +45,6 @@ namespace Ogre {
     *  @{
     */
 
-    /// internal method to open a FileStreamDataStream
-    DataStreamPtr _openFileStream(const String& path, std::ios::openmode mode, const String& name = "");
-
     /** Specialisation of the ArchiveFactory to allow reading of files from
         filesystem folders / directories.
     */
@@ -55,11 +52,13 @@ namespace Ogre {
     {
     public:
         /// @copydoc FactoryObj::getType
-        const String& getType(void) const override;
+        const String& getType(void) const;
 
         using ArchiveFactory::createInstance;
 
-        Archive *createInstance( const String& name, bool readOnly ) override;
+        Archive *createInstance( const String& name, bool readOnly );
+        /// @copydoc FactoryObj::destroyInstance
+        void destroyInstance(Archive* ptr) { OGRE_DELETE ptr; }
 
         /// Set whether filesystem enumeration will include hidden files or not.
         /// This should be called prior to declaring and/or initializing filesystem
@@ -76,9 +75,11 @@ namespace Ogre {
         APKFileSystemArchiveFactory(AAssetManager* assetMgr) : mAssetMgr(assetMgr) {}
         virtual ~APKFileSystemArchiveFactory() {}
         /// @copydoc FactoryObj::getType
-        const String& getType(void) const override;
+        const String& getType(void) const;
         /// @copydoc ArchiveFactory::createInstance
-        Archive *createInstance( const String& name, bool readOnly ) override;
+        Archive *createInstance( const String& name, bool readOnly );
+        /// @copydoc FactoryObj::destroyInstance
+        void destroyInstance( Archive* ptr) { OGRE_DELETE ptr; }
     private:
         AAssetManager* mAssetMgr;
     };

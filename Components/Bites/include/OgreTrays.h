@@ -43,18 +43,14 @@
 
 #include <iomanip>
 
+/** \addtogroup Optional
+*  @{
+*/
+/** \addtogroup Bites
+*  @{
+*/
 namespace OgreBites
 {
-    /** \addtogroup Optional
-    *  @{
-    */
-    /** \addtogroup Bites
-    *  @{
-    */
-    /** @defgroup Trays Trays
-     * Simplistic GUI System build with Overlays
-     * @{
-     */
     enum TrayLocation   /// enumerator values for widget tray anchoring locations
     {
         TL_TOPLEFT,
@@ -213,13 +209,13 @@ namespace OgreBites
 
         const ButtonState& getState() { return mState; }
 
-        void _cursorPressed(const Ogre::Vector2& cursorPos) override;
+        void _cursorPressed(const Ogre::Vector2& cursorPos);
 
-        void _cursorReleased(const Ogre::Vector2& cursorPos) override;
+        void _cursorReleased(const Ogre::Vector2& cursorPos);
 
-        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta) override;
+        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta);
 
-        void _focusLost() override;
+        void _focusLost();
 
     protected:
 
@@ -309,16 +305,16 @@ namespace OgreBites
             return (unsigned int) ((mElement->getHeight() - 2 * mPadding - mCaptionBar->getHeight() + 5) / mTextArea->getCharHeight());
         }
 
-        void _cursorPressed(const Ogre::Vector2& cursorPos) override;
+        void _cursorPressed(const Ogre::Vector2& cursorPos);
 
-        void _cursorReleased(const Ogre::Vector2& cursorPos) override
+        void _cursorReleased(const Ogre::Vector2& cursorPos)
         {
             mDragging = false;
         }
 
-        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta) override;
+        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta);
 
-        void _focusLost() override
+        void _focusLost()
         {
             mDragging = false;  // stop dragging if cursor was lost
         }
@@ -410,16 +406,16 @@ namespace OgreBites
             return mSelectionIndex;
         }
 
-        void _cursorPressed(const Ogre::Vector2& cursorPos) override;
+        void _cursorPressed(const Ogre::Vector2& cursorPos);
 
-        void _cursorReleased(const Ogre::Vector2& cursorPos) override
+        void _cursorReleased(const Ogre::Vector2& cursorPos)
         {
             mDragging = false;
         }
 
-        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta) override;
+        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta);
 
-        void _focusLost() override
+        void _focusLost()
         {
             if (mExpandedBox->isVisible()) retract();
         }
@@ -476,7 +472,7 @@ namespace OgreBites
             mTextArea->setCaption(caption);
         }
 
-        void _cursorPressed(const Ogre::Vector2& cursorPos) override;
+        void _cursorPressed(const Ogre::Vector2& cursorPos);
 
         bool _isFitToTray()
         {
@@ -552,13 +548,13 @@ namespace OgreBites
 
         void setCaption(const Ogre::DisplayString& caption);
 
-        void _cursorPressed(const Ogre::Vector2& cursorPos) override;
+        void _cursorPressed(const Ogre::Vector2& cursorPos);
 
-        void _cursorReleased(const Ogre::Vector2& cursorPos) override;
+        void _cursorReleased(const Ogre::Vector2& cursorPos);
 
-        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta) override;
+        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta);
 
-        void _focusLost() override
+        void _focusLost()
         {
             mDragging = false;
         }
@@ -660,11 +656,11 @@ namespace OgreBites
 
         void toggle(bool notifyListener = true);
 
-        void _cursorPressed(const Ogre::Vector2& cursorPos) override;
+        void _cursorPressed(const Ogre::Vector2& cursorPos);
 
-        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta) override;
+        void _cursorMoved(const Ogre::Vector2& cursorPos, float wheelDelta);
 
-        void _focusLost() override;
+        void _focusLost();
 
     protected:
 
@@ -1077,55 +1073,55 @@ namespace OgreBites
         Process frame events. Updates frame statistics widget set and deletes
         all widgets queued for destruction.
         */
-        void frameRendered(const Ogre::FrameEvent& evt) override;
+        void frameRendered(const Ogre::FrameEvent& evt);
 
         void windowUpdate();
 
-        void resourceGroupScriptingStarted(const Ogre::String& groupName, size_t scriptCount) override
+        void resourceGroupScriptingStarted(const Ogre::String& groupName, size_t scriptCount)
         {
             mLoadInc = mGroupInitProportion / float(scriptCount);
             mLoadBar->setCaption("Parsing...");
             windowUpdate();
         }
 
-        void scriptParseStarted(const Ogre::String& scriptName, bool& skipThisScript) override
+        void scriptParseStarted(const Ogre::String& scriptName, bool& skipThisScript)
         {
             mLoadBar->setComment(scriptName);
             windowUpdate();
         }
 
-        void scriptParseEnded(const Ogre::String& scriptName, bool skipped) override
+        void scriptParseEnded(const Ogre::String& scriptName, bool skipped)
         {
             mLoadBar->setProgress(mLoadBar->getProgress() + mLoadInc);
             windowUpdate();
         }
 
-        void resourceGroupLoadStarted(const Ogre::String& groupName, size_t resourceCount) override
+        void resourceGroupLoadStarted(const Ogre::String& groupName, size_t resourceCount)
         {
             mLoadInc = mGroupLoadProportion / float(resourceCount);
             mLoadBar->setCaption("Loading...");
             windowUpdate();
         }
 
-        void resourceLoadStarted(const Ogre::ResourcePtr& resource) override
+        void resourceLoadStarted(const Ogre::ResourcePtr& resource)
         {
             mLoadBar->setComment(resource->getName());
             windowUpdate();
         }
 
-        void resourceLoadEnded() override
+        void resourceLoadEnded()
         {
             mLoadBar->setProgress(mLoadBar->getProgress() + mLoadInc);
             windowUpdate();
         }
 
-        void customStageStarted(const Ogre::String& description) override
+        void worldGeometryStageStarted(const Ogre::String& description)
         {
             mLoadBar->setComment(description);
             windowUpdate();
         }
 
-        void customStageEnded() override
+        void worldGeometryStageEnded()
         {
             mLoadBar->setProgress(mLoadBar->getProgress() + mLoadInc);
             windowUpdate();
@@ -1134,32 +1130,30 @@ namespace OgreBites
         /**
         Toggles visibility of advanced statistics.
         */
-        void labelHit(Label* label) override;
+        void labelHit(Label* label);
 
         /**
         Destroys dialog widgets, notifies listener, and ends high priority session.
         */
-        void buttonHit(Button* button) override;
+        void buttonHit(Button* button);
 
         /**
         Processes mouse button down events. Returns true if the event was
         consumed and should not be passed on to other handlers.
         */
-        bool mousePressed(const MouseButtonEvent& evt) override;
+        bool mousePressed(const MouseButtonEvent& evt);
 
         /**
         Processes mouse button up events. Returns true if the event was
         consumed and should not be passed on to other handlers.
         */
-        bool mouseReleased(const MouseButtonEvent& evt) override;
+        bool mouseReleased(const MouseButtonEvent& evt);
 
         /**
         Updates cursor position. Returns true if the event was
         consumed and should not be passed on to other handlers.
         */
-        bool mouseMoved(const MouseMotionEvent& evt) override;
-
-        bool mouseWheelRolled(const MouseWheelEvent& evt) override;
+        bool mouseMoved(const MouseMotionEvent& evt);
 
     protected:
 
@@ -1204,8 +1198,8 @@ namespace OgreBites
         Ogre::Vector2 mCursorPos;             // current cursor position
 
     };
-    /** @} */
-    /** @} */
-    /** @} */
 }
+
+/** @} */
+/** @} */
 #endif

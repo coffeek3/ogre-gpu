@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include "OgreETCCodec.h"
 #include "OgreImage.h"
 
+#define FOURCC(c0, c1, c2, c3) (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24))
 #define KTX_ENDIAN_REF      (0x04030201)
 #define KTX_ENDIAN_REF_REV  (0x01020304)
 
@@ -129,16 +130,53 @@ namespace Ogre {
     {
     }
     //---------------------------------------------------------------------
-    void ETCCodec::decode(const DataStreamPtr& stream, const Any& output) const
+    DataStreamPtr ETCCodec::encode(const MemoryDataStreamPtr& input,
+                                   const Codec::CodecDataPtr& pData) const
     {
-        Image* image = any_cast<Image*>(output);
+        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+                    "ETC encoding not supported",
+                    "ETCCodec::encode" ) ;
+    }
+    //---------------------------------------------------------------------
+    void ETCCodec::encodeToFile(const MemoryDataStreamPtr& input, const String& outFileName,
+                                const Codec::CodecDataPtr& pData) const
+    {
+        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+                    "ETC encoding not supported",
+                    "ETCCodec::encodeToFile" ) ;
+    }
+    //---------------------------------------------------------------------
+    Codec::DecodeResult ETCCodec::decode(const DataStreamPtr& stream) const
+    {
+        DecodeResult ret;
+        if (decodeKTX(stream, ret))
+            return ret;
 
-        mType == "pkm" ? decodePKM(stream, image) : decodeKTX(stream, image);
+        stream->seek(0);
+        if (decodePKM(stream, ret))
+            return ret;
+
+        OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                    "This is not a valid ETC file!", "ETCCodec::decode");
     }
     //---------------------------------------------------------------------
     String ETCCodec::getType() const
     {
         return mType;
+    }
+    //---------------------------------------------------------------------
+    void ETCCodec::flipEndian(void * pData, size_t size, size_t count)
+    {
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+        Bitwise::bswapChunks(pData, size, count);
+#endif
+    }
+    //---------------------------------------------------------------------
+    void ETCCodec::flipEndian(void * pData, size_t size)
+    {
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+        Bitwise::bswapBuffer(pData, size);
+#endif
     }
     //---------------------------------------------------------------------
     String ETCCodec::magicNumberToFileExt(const char *magicNumberPtr, size_t maxbytes) const
@@ -159,7 +197,7 @@ namespace Ogre {
         return BLANKSTRING;
     }
     //---------------------------------------------------------------------
-    void ETCCodec::decodePKM(const DataStreamPtr& stream, Image* image)
+    bool ETCCodec::decodePKM(const DataStreamPtr& stream, DecodeResult& result) const
     {
         PKMHeader header;
 
@@ -167,172 +205,202 @@ namespace Ogre {
         stream->read(&header, sizeof(PKMHeader));
 
         if (PKM_MAGIC != FOURCC(header.name[0], header.name[1], header.name[2], header.name[3]) ) // "PKM 10"
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "No PKM header found");
+            return false;
 
         uint16 width = (header.iWidthMSB << 8) | header.iWidthLSB;
         uint16 height = (header.iHeightMSB << 8) | header.iHeightLSB;
-        //uint16 paddedWidth = (header.iPaddedWidthMSB << 8) | header.iPaddedWidthLSB;
-        //uint16 paddedHeight = (header.iPaddedHeightMSB << 8) | header.iPaddedHeightLSB;
+        uint16 paddedWidth = (header.iPaddedWidthMSB << 8) | header.iPaddedWidthLSB;
+        uint16 paddedHeight = (header.iPaddedHeightMSB << 8) | header.iPaddedHeightLSB;
         uint16 type = (header.iTextureTypeMSB << 8) | header.iTextureTypeLSB;
 
-        PixelFormat format = PF_UNKNOWN;
+        ImageData *imgData = OGRE_NEW ImageData();
+        imgData->depth = 1;
+        imgData->width = width;
+        imgData->height = height;
 
         // File version 2.0 supports ETC2 in addition to ETC1
         if(header.version[0] == '2' && header.version[1] == '0')
         {
             switch (type) {
                 case 0:
-                    format = PF_ETC1_RGB8;
+                    imgData->format = PF_ETC1_RGB8;
                     break;
 
                     // GL_COMPRESSED_RGB8_ETC2
                 case 1:
-                    format = PF_ETC2_RGB8;
+                    imgData->format = PF_ETC2_RGB8;
                     break;
 
                     // GL_COMPRESSED_RGBA8_ETC2_EAC
                 case 3:
-                    format = PF_ETC2_RGBA8;
+                    imgData->format = PF_ETC2_RGBA8;
                     break;
 
                     // GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2
                 case 4:
-                    format = PF_ETC2_RGB8A1;
+                    imgData->format = PF_ETC2_RGB8A1;
                     break;
 
                     // Default case is ETC1
                 default:
-                    format = PF_ETC1_RGB8;
+                    imgData->format = PF_ETC1_RGB8;
                     break;
             }
         }
         else
-            format = PF_ETC1_RGB8;
+            imgData->format = PF_ETC1_RGB8;
 
         // ETC has no support for mipmaps - malideveloper.com has a example
         // where the load mipmap levels from different external files
-        image->create(format, width, height);
-        stream->read(image->getData(), image->getSize());
+        imgData->num_mipmaps = 0;
+
+        // ETC is a compressed format
+        imgData->flags |= IF_COMPRESSED;
+
+        // Calculate total size from number of mipmaps, faces and size
+        imgData->size = (paddedWidth * paddedHeight) >> 1;
+
+        // Bind output buffer
+        MemoryDataStreamPtr output(OGRE_NEW MemoryDataStream(imgData->size));
+
+        // Now deal with the data
+        void *destPtr = output->getPtr();
+        stream->read(destPtr, imgData->size);
+        destPtr = static_cast<void*>(static_cast<uchar*>(destPtr));
+
+        DecodeResult ret;
+        ret.first = output;
+        ret.second = CodecDataPtr(imgData);
+
+        return true;
     }
     //---------------------------------------------------------------------
-    void ETCCodec::decodeKTX(const DataStreamPtr& stream, Image* image)
+    bool ETCCodec::decodeKTX(const DataStreamPtr& stream, DecodeResult& result) const
     {
         KTXHeader header;
         // Read the KTX header
         stream->read(&header, sizeof(KTXHeader));
 
         const uint8 KTXFileIdentifier[12] = { 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A };
-        if (memcmp(KTXFileIdentifier, &header.identifier, sizeof(KTXFileIdentifier)) != 0)
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "No KTX header found");
+        if (memcmp(KTXFileIdentifier, &header.identifier, sizeof(KTXFileIdentifier)) != 0 )
+            return false;
 
         if (header.endianness == KTX_ENDIAN_REF_REV)
             flipEndian(&header.glType, sizeof(uint32));
 
-        PixelFormat format = PF_UNKNOWN;
+        ImageData *imgData = OGRE_NEW ImageData();
+        imgData->depth = 1;
+        imgData->width = header.pixelWidth;
+        imgData->height = header.pixelHeight;
+        imgData->num_mipmaps = static_cast<uint8>(header.numberOfMipmapLevels - 1);
 
         switch(header.glInternalFormat)
         {
         case 37492: // GL_COMPRESSED_RGB8_ETC2
-            format = PF_ETC2_RGB8;
+            imgData->format = PF_ETC2_RGB8;
             break;
         case 37496:// GL_COMPRESSED_RGBA8_ETC2_EAC
-            format = PF_ETC2_RGBA8;
+            imgData->format = PF_ETC2_RGBA8;
             break;
         case 37494: // GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2
-            format = PF_ETC2_RGB8A1;
+            imgData->format = PF_ETC2_RGB8A1;
             break;
         case 35986: // ATC_RGB
-            format = PF_ATC_RGB;
+            imgData->format = PF_ATC_RGB;
             break;
         case 35987: // ATC_RGB_Explicit
-            format = PF_ATC_RGBA_EXPLICIT_ALPHA;
+            imgData->format = PF_ATC_RGBA_EXPLICIT_ALPHA;
             break;
         case 34798: // ATC_RGB_Interpolated
-            format = PF_ATC_RGBA_INTERPOLATED_ALPHA;
+            imgData->format = PF_ATC_RGBA_INTERPOLATED_ALPHA;
             break;
         case 33777: // DXT 1
-            format = PF_DXT1;
+            imgData->format = PF_DXT1;
             break;
         case 33778: // DXT 3
-            format = PF_DXT3;
+            imgData->format = PF_DXT3;
             break;
         case 33779: // DXT 5
-            format = PF_DXT5;
+            imgData->format = PF_DXT5;
             break;
          case 0x8c00: // COMPRESSED_RGB_PVRTC_4BPPV1_IMG
-            format = PF_PVRTC_RGB4;
+            imgData->format = PF_PVRTC_RGB4;
             break;
         case 0x8c01: // COMPRESSED_RGB_PVRTC_2BPPV1_IMG
-            format = PF_PVRTC_RGB2;
+            imgData->format = PF_PVRTC_RGB2;
             break;
         case 0x8c02: // COMPRESSED_RGBA_PVRTC_4BPPV1_IMG
-            format = PF_PVRTC_RGBA4;
+            imgData->format = PF_PVRTC_RGBA4;
             break;
         case 0x8c03: // COMPRESSED_RGBA_PVRTC_2BPPV1_IMG
-            format = PF_PVRTC_RGBA2;
+            imgData->format = PF_PVRTC_RGBA2;
             break;
         case 0x93B0: // COMPRESSED_RGBA_ASTC_4x4_KHR
-            format = PF_ASTC_RGBA_4X4_LDR;
+            imgData->format = PF_ASTC_RGBA_4X4_LDR;
             break;
         case 0x93B1: // COMPRESSED_RGBA_ASTC_5x4_KHR
-            format = PF_ASTC_RGBA_5X4_LDR;
+            imgData->format = PF_ASTC_RGBA_5X4_LDR;
             break;
         case 0x93B2: // COMPRESSED_RGBA_ASTC_5x5_KHR
-            format = PF_ASTC_RGBA_5X5_LDR;
+            imgData->format = PF_ASTC_RGBA_5X5_LDR;
             break;
         case 0x93B3: // COMPRESSED_RGBA_ASTC_6x5_KHR
-            format = PF_ASTC_RGBA_6X5_LDR;
+            imgData->format = PF_ASTC_RGBA_6X5_LDR;
             break;
         case 0x93B4: // COMPRESSED_RGBA_ASTC_6x6_KHR
-            format = PF_ASTC_RGBA_6X6_LDR;
+            imgData->format = PF_ASTC_RGBA_6X6_LDR;
             break;
         case 0x93B5: // COMPRESSED_RGBA_ASTC_8x5_KHR
-            format = PF_ASTC_RGBA_8X5_LDR;
+            imgData->format = PF_ASTC_RGBA_8X5_LDR;
             break;
         case 0x93B6: // COMPRESSED_RGBA_ASTC_8x6_KHR
-            format = PF_ASTC_RGBA_8X6_LDR;
+            imgData->format = PF_ASTC_RGBA_8X6_LDR;
             break;
         case 0x93B7: // COMPRESSED_RGBA_ASTC_8x8_KHR
-            format = PF_ASTC_RGBA_8X8_LDR;
+            imgData->format = PF_ASTC_RGBA_8X8_LDR;
             break;
         case 0x93B8: // COMPRESSED_RGBA_ASTC_10x5_KHR
-            format = PF_ASTC_RGBA_10X5_LDR;
+            imgData->format = PF_ASTC_RGBA_10X5_LDR;
             break;
         case 0x93B9: // COMPRESSED_RGBA_ASTC_10x6_KHR
-            format = PF_ASTC_RGBA_10X6_LDR;
+            imgData->format = PF_ASTC_RGBA_10X6_LDR;
             break;
         case 0x93BA: // COMPRESSED_RGBA_ASTC_10x8_KHR
-            format = PF_ASTC_RGBA_10X8_LDR;
+            imgData->format = PF_ASTC_RGBA_10X8_LDR;
             break;
         case 0x93BB: // COMPRESSED_RGBA_ASTC_10x10_KHR
-            format = PF_ASTC_RGBA_10X10_LDR;
+            imgData->format = PF_ASTC_RGBA_10X10_LDR;
             break;
         case 0x93BC: // COMPRESSED_RGBA_ASTC_12x10_KHR
-            format = PF_ASTC_RGBA_12X10_LDR;
+            imgData->format = PF_ASTC_RGBA_12X10_LDR;
             break;
         case 0x93BD: // COMPRESSED_RGBA_ASTC_12x12_KHR
-            format = PF_ASTC_RGBA_12X12_LDR;
-            break;
-        case 0x8D64: // GL_ETC1_RGB8_OES
-            format = PF_ETC1_RGB8;
-            break;
-        case 0x8C3A: // GL_R11F_G11F_B10F
-            format = PF_R11G11B10_FLOAT;
+            imgData->format = PF_ASTC_RGBA_12X12_LDR;
             break;
         default:
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Unsupported glInternalFormat");
+            imgData->format = PF_ETC1_RGB8;
+            break;
         }
 
-        image->create(format, header.pixelWidth, header.pixelHeight, 1, header.numberOfFaces,
-                      header.numberOfMipmapLevels - 1);
+        imgData->flags = 0;
+        if (header.glType == 0 || header.glFormat == 0)
+            imgData->flags |= IF_COMPRESSED;
+
+        size_t numFaces = header.numberOfFaces;
+        if (numFaces > 1)
+            imgData->flags |= IF_CUBEMAP;
+        // Calculate total size from number of mipmaps, faces and size
+        imgData->size = Image::calculateSize(imgData->num_mipmaps, numFaces,
+                                             imgData->width, imgData->height, imgData->depth, imgData->format);
 
         stream->skip(header.bytesOfKeyValueData);
 
+        // Bind output buffer
+        MemoryDataStreamPtr output(OGRE_NEW MemoryDataStream(imgData->size));
+
         // Now deal with the data
-        uchar* destPtr = image->getData();
+        uchar* destPtr = output->getPtr();
         uint32 mipOffset = 0;
-        uint32 numFaces = header.numberOfFaces;
-        size_t size = image->getSize();
         for (uint32 level = 0; level < header.numberOfMipmapLevels; ++level)
         {
             uint32 imageSize = 0;
@@ -340,10 +408,15 @@ namespace Ogre {
 
             for(uint32 face = 0; face < numFaces; ++face)
             {
-                uchar* placePtr = destPtr + ((size)/numFaces)*face + mipOffset; // shuffle mip and face
+                uchar* placePtr = destPtr + ((imgData->size)/numFaces)*face + mipOffset; // shuffle mip and face
                 stream->read(placePtr, imageSize);
             }
             mipOffset += imageSize;
         }
+
+        result.first = output;
+        result.second = CodecDataPtr(imgData);
+
+        return true;
     }
 }

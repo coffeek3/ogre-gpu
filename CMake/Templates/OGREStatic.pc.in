@@ -2,7 +2,7 @@ prefix=@OGRE_PREFIX_PATH@
 exec_prefix=${prefix}
 libdir=${prefix}/@OGRE_LIB_DIRECTORY@
 includedir=${prefix}/include
-plugindir=${prefix}/@OGRE_PLUGINS_PATH@
+plugindir=${libdir}/OGRE
 
 Name: OGRE (static lib)
 Description: Object-Oriented Graphics Rendering Engine

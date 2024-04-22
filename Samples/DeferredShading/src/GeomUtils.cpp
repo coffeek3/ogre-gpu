@@ -30,7 +30,7 @@ void GeomUtils::createSphere(  const String& strName
 {
     MeshPtr pSphere = MeshManager::getSingleton().createManual(strName, ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     SubMesh *pSphereVertex = pSphere->createSubMesh();
-    pSphere->createVertexData();
+    pSphere->sharedVertexData = new VertexData();
 
     createSphere(pSphere->sharedVertexData, pSphereVertex->indexData
         , radius
@@ -61,12 +61,15 @@ void GeomUtils::createSphere(VertexData*& vertexData, IndexData*& indexData
     VertexDeclaration* vertexDecl = vertexData->vertexDeclaration;
     size_t currOffset = 0;
     // positions
-    currOffset += vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_POSITION).getSize();
+    vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_POSITION);
+    currOffset += VertexElement::getTypeSize(VET_FLOAT3);
 
     if (bNormals)
     {
         // normals
-        currOffset += vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_NORMAL).getSize();
+        vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_NORMAL);
+        currOffset += VertexElement::getTypeSize(VET_FLOAT3);
+
     }
     // two dimensional texture coordinates
     if (bTexCoords)
@@ -171,7 +174,7 @@ void GeomUtils::createCone(const Ogre::String& strName , float radius , float he
 {
     MeshPtr pCone = MeshManager::getSingleton().createManual(strName, ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     SubMesh *pConeVertex = pCone->createSubMesh();
-    pCone->createVertexData();
+    pCone->sharedVertexData = new VertexData();
 
     createCone(pCone->sharedVertexData, pConeVertex->indexData
         , radius

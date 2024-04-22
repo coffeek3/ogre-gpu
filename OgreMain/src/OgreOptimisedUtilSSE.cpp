@@ -81,7 +81,7 @@ namespace Ogre {
         OptimisedUtilSSE(void);
 
         /// @copydoc OptimisedUtil::softwareVertexSkinning
-        void __OGRE_SIMD_ALIGN_ATTRIBUTE softwareVertexSkinning(
+        virtual void __OGRE_SIMD_ALIGN_ATTRIBUTE softwareVertexSkinning(
             const float *srcPosPtr, float *destPosPtr,
             const float *srcNormPtr, float *destNormPtr,
             const float *blendWeightPtr, const unsigned char* blendIndexPtr,
@@ -90,50 +90,50 @@ namespace Ogre {
             size_t srcNormStride, size_t destNormStride,
             size_t blendWeightStride, size_t blendIndexStride,
             size_t numWeightsPerVertex,
-            size_t numVertices) override;
+            size_t numVertices);
 
         /// @copydoc OptimisedUtil::softwareVertexMorph
-        void __OGRE_SIMD_ALIGN_ATTRIBUTE softwareVertexMorph(
-            float t,
+        virtual void __OGRE_SIMD_ALIGN_ATTRIBUTE softwareVertexMorph(
+            Real t,
             const float *srcPos1, const float *srcPos2,
             float *dstPos,
             size_t pos1VSize, size_t pos2VSize, size_t dstVSize, 
             size_t numVertices,
-            bool morphNormals) override;
+            bool morphNormals);
 
         /// @copydoc OptimisedUtil::concatenateAffineMatrices
-        void __OGRE_SIMD_ALIGN_ATTRIBUTE concatenateAffineMatrices(
+        virtual void __OGRE_SIMD_ALIGN_ATTRIBUTE concatenateAffineMatrices(
             const Affine3& baseMatrix,
             const Affine3* srcMatrices,
             Affine3* dstMatrices,
-            size_t numMatrices) override;
+            size_t numMatrices);
 
         /// @copydoc OptimisedUtil::calculateFaceNormals
-        void __OGRE_SIMD_ALIGN_ATTRIBUTE calculateFaceNormals(
+        virtual void __OGRE_SIMD_ALIGN_ATTRIBUTE calculateFaceNormals(
             const float *positions,
             const EdgeData::Triangle *triangles,
             Vector4 *faceNormals,
-            size_t numTriangles) override;
+            size_t numTriangles);
 
         /// @copydoc OptimisedUtil::calculateLightFacing
-        void __OGRE_SIMD_ALIGN_ATTRIBUTE calculateLightFacing(
+        virtual void __OGRE_SIMD_ALIGN_ATTRIBUTE calculateLightFacing(
             const Vector4& lightPos,
             const Vector4* faceNormals,
             char* lightFacings,
-            size_t numFaces) override;
+            size_t numFaces);
 
         /// @copydoc OptimisedUtil::extrudeVertices
-        void __OGRE_SIMD_ALIGN_ATTRIBUTE extrudeVertices(
+        virtual void __OGRE_SIMD_ALIGN_ATTRIBUTE extrudeVertices(
             const Vector4& lightPos,
             Real extrudeDist,
             const float* srcPositions,
             float* destPositions,
-            size_t numVertices) override;
+            size_t numVertices);
     };
 
 #if defined(__OGRE_SIMD_ALIGN_STACK)
     /** Stack-align implementation of OptimisedUtil.
-
+    @remarks
         User code compiled by icc and gcc might not align stack
         properly, we need ensure stack align to a 16-bytes boundary
         when execute SSE function.
@@ -185,7 +185,7 @@ namespace Ogre {
 
         /// @copydoc OptimisedUtil::softwareVertexMorph
         virtual void softwareVertexMorph(
-            float t,
+            Real t,
             const float *srcPos1, const float *srcPos2,
             float *dstPos,
             size_t pos1VSize, size_t pos2VSize, size_t dstVSize, 
@@ -1282,15 +1282,13 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void OptimisedUtilSSE::softwareVertexMorph(
-        float t,
+        Real t,
         const float *pSrc1, const float *pSrc2,
         float *pDst,
         size_t pos1VSize, size_t pos2VSize, size_t dstVSize, 
         size_t numVertices,
         bool morphNormals)
-    {
-        OgreAssert(pos1VSize == pos2VSize && pos2VSize == dstVSize && dstVSize == (morphNormals ? 24 : 12),
-                   "stride not supported");
+    {   
         __OGRE_CHECK_STACK_ALIGNED_FOR_SSE();
 
         __m128 src01, src02, src11, src12, src21, src22;

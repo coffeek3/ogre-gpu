@@ -27,24 +27,6 @@ THE SOFTWARE.
 */
 #include "OgreStableHeaders.h"
 
-// A quick define to overcome different names for the same function
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32 || OGRE_PLATFORM == OGRE_PLATFORM_WINRT
-#   define strtod_l _strtod_l
-#   define strtoul_l _strtoul_l
-#   define strtol_l _strtol_l
-#   define strtoull_l _strtoull_l
-#   define strtoll_l _strtoll_l
-#endif
-
-#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN || \
-	(OGRE_PLATFORM == OGRE_PLATFORM_LINUX && OGRE_NO_LOCALE_STRCONVERT == 1)
-#   define strtod_l(ptr, end, l) strtod(ptr, end)
-#   define strtoul_l(ptr, end, base, l) strtoul(ptr, end, base)
-#   define strtol_l(ptr, end, base, l) strtol(ptr, end, base)
-#   define strtoull_l(ptr, end, base, l) strtoull(ptr, end, base)
-#   define strtoll_l(ptr, end, base, l) strtoll(ptr, end, base)
-#endif
-
 #if (OGRE_PLATFORM == OGRE_PLATFORM_WIN32 || OGRE_PLATFORM == OGRE_PLATFORM_WINRT) && !defined(__MINGW32__)
 #   define LC_NUMERIC_MASK LC_NUMERIC
 #   define newlocale(cat, loc, base) _create_locale(cat, loc)
@@ -252,58 +234,51 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------
-    template <typename T> static bool assignValid(bool valid, const T& val, T& ret)
-    {
-        if (valid)
-            ret = val;
-        return valid;
-    }
-
     bool StringConverter::parse(const String& val, float& ret)
     {
         char* end;
-        auto tmp = (float)strtod_l(val.c_str(), &end, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = (float)strtod_l(val.c_str(), &end, _numLocale);
+        return val.c_str() != end;
     }
     bool StringConverter::parse(const String& val, double& ret)
     {
         char* end;
-        auto tmp = strtod_l(val.c_str(), &end, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = strtod_l(val.c_str(), &end, _numLocale);
+        return val.c_str() != end;
     }
     //-----------------------------------------------------------------------
     bool StringConverter::parse(const String& val, int32& ret)
     {
         char* end;
-        auto tmp = (int32)strtol_l(val.c_str(), &end, 0, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = (int32)strtol_l(val.c_str(), &end, 0, _numLocale);
+        return val.c_str() != end;
     }
     //-----------------------------------------------------------------------
     bool StringConverter::parse(const String& val, int64& ret)
     {
         char* end;
-        int64 tmp = strtoll_l(val.c_str(), &end, 0, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = strtoll_l(val.c_str(), &end, 0, _numLocale);
+        return val.c_str() != end;
     }
     //-----------------------------------------------------------------------
     bool StringConverter::parse(const String& val, unsigned long& ret)
     {
         char* end;
-        unsigned long tmp = strtoull_l(val.c_str(), &end, 0, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = strtoull_l(val.c_str(), &end, 0, _numLocale);
+        return val.c_str() != end;
     }
     bool StringConverter::parse(const String& val, unsigned long long& ret)
     {
         char* end;
-        unsigned long long tmp = strtoull_l(val.c_str(), &end, 0, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = strtoull_l(val.c_str(), &end, 0, _numLocale);
+        return val.c_str() != end;
     }
     //-----------------------------------------------------------------------
     bool StringConverter::parse(const String& val, uint32& ret)
     {
         char* end;
-        auto tmp = (uint32)strtoul_l(val.c_str(), &end, 0, _numLocale);
-        return assignValid(val.c_str() != end, tmp, ret);
+        ret = (uint32)strtoul_l(val.c_str(), &end, 0, _numLocale);
+        return val.c_str() != end;
     }
     bool StringConverter::parse(const String& val, bool& ret)
     {
@@ -393,6 +368,80 @@ namespace Ogre {
         strtod(val.c_str(), &end);
         return end == (val.c_str() + val.size());
     }
+	//-----------------------------------------------------------------------
+    String StringConverter::toString(ColourBufferType val)
+    {
+		StringStream stream;
+		switch (val)
+		{
+		case CBT_BACK:
+		  stream << "Back";
+		  break;
+		case CBT_BACK_LEFT:
+		  stream << "Back Left";
+		  break;
+		case CBT_BACK_RIGHT:
+		  stream << "Back Right";
+		  break;
+		default:
+		  OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Unsupported colour buffer value", "StringConverter::toString(const ColourBufferType& val)");
+		}
+
+		return stream.str();
+    }
+    //-----------------------------------------------------------------------
+    ColourBufferType StringConverter::parseColourBuffer(const String& val, ColourBufferType defaultValue)
+    {
+		ColourBufferType result = defaultValue;
+		if (val.compare("Back") == 0)
+		{
+			result = CBT_BACK;
+		}
+		else if (val.compare("Back Left") == 0)
+		{
+			result = CBT_BACK_LEFT;
+		}
+		else if (val.compare("Back Right") == 0)
+		{
+			result = CBT_BACK_RIGHT;
+		}		
+		
+		return result;
+    }
+    //-----------------------------------------------------------------------
+    String StringConverter::toString(StereoModeType val)
+    {
+		StringStream stream;
+		switch (val)
+		{
+		case SMT_NONE:
+		  stream << "None";
+		  break;
+		case SMT_FRAME_SEQUENTIAL:
+		  stream << "Frame Sequential";
+		  break;
+		default:
+		  OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Unsupported stereo mode value", "StringConverter::toString(const StereoModeType& val)");
+		}
+
+		return stream.str();
+    }
+    //-----------------------------------------------------------------------
+    StereoModeType StringConverter::parseStereoMode(const String& val, StereoModeType defaultValue)
+    {
+		StereoModeType result = defaultValue;
+		if (val.compare("None") == 0)
+		{
+			result = SMT_NONE;
+		}
+		else if (val.compare("Frame Sequential") == 0)
+		{
+			result = SMT_FRAME_SEQUENTIAL;
+		}
+		
+		return result;
+    }
+	//-----------------------------------------------------------------------
 }
 
 

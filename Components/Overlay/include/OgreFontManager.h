@@ -54,12 +54,14 @@ namespace Ogre
                             bool isManual = false, ManualResourceLoader* loader = 0,
                             const NameValuePairList* createParams = 0);
 
-        /// Get a font by name. For example, one defined in some .fontdef file.
+        /// Get a resource by name
         /// @see ResourceManager::getResourceByName
-        FontPtr getByName(const String& name, const String& groupName OGRE_RESOURCE_GROUP_INIT) const;
+        FontPtr getByName(const String& name, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
+        /** @copydoc ScriptLoader::parseScript */
+        void parseScript(DataStreamPtr& stream, const String& groupName);
         /** Override standard Singleton retrieval.
-
+        @remarks
         Why do we do this? Well, it's because the Singleton
         implementation is in a .h file, which means it gets compiled
         into anybody who includes it. This is needed for the
@@ -77,12 +79,17 @@ namespace Ogre
         /// @copydoc Singleton::getSingleton()
         static FontManager* getSingletonPtr(void);
 
-    private:
+    protected:
 
         /// Internal methods
         Resource* createImpl(const String& name, ResourceHandle handle, 
             const String& group, bool isManual, ManualResourceLoader* loader, 
-            const NameValuePairList* params) override;
+            const NameValuePairList* params);
+        void parseAttribute(const String& line, FontPtr& pFont);
+
+        void logBadAttrib(const String& line, FontPtr& pFont);
+
+
     };
     /** @} */
     /** @} */

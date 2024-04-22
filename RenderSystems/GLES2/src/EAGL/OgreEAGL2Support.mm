@@ -29,7 +29,6 @@ THE SOFTWARE.
 #include "OgreRoot.h"
 
 #include "OgreRenderSystem.h"
-#include "OgreLogManager.h"
 #include "OgreEAGLES2Context.h"
 
 #include "OgreEAGL2Support.h"
@@ -57,6 +56,7 @@ namespace Ogre {
     ConfigOptionMap EAGL2Support::getConfigOptions(void)
     {
         ConfigOptionMap mOptions;
+        ConfigOption optDisplayFrequency;
         ConfigOption optContentScalingFactor;
         
         // Get the application frame size.  On all iPhones(including iPhone 4) this will be 320 x 480
@@ -81,9 +81,31 @@ namespace Ogre {
         mFSAALevels.push_back(8);
 
         mOptions[optContentScalingFactor.name] = optContentScalingFactor;
+        
+#if OGRE_NO_VIEWPORT_ORIENTATIONMODE == 0
+        ConfigOption optOrientation;
+        optOrientation.name = "Orientation";
+        optOrientation.possibleValues.push_back("Portrait");
+        optOrientation.possibleValues.push_back("Landscape Left");
+        optOrientation.possibleValues.push_back("Landscape Right");
+        optOrientation.currentValue = "Portrait";
+        optOrientation.immutable = false;
+        mOptions[optOrientation.name] = optOrientation;
+#endif
+
+        optDisplayFrequency.name = "Display Frequency";
+        optDisplayFrequency.possibleValues.push_back("0 Hz");
+        optDisplayFrequency.currentValue = "0 Hz";
+        optDisplayFrequency.immutable = false;
+        mOptions[optDisplayFrequency.name] = optDisplayFrequency;
 
         return mOptions;
     }
+
+    String EAGL2Support::getDisplayName(void)
+    {
+        return "todo";
+	}
 
     CFDictionaryRef EAGL2Support::chooseGLConfig(const GLint *attribList, GLint *nElements)
     {
@@ -102,6 +124,15 @@ namespace Ogre {
     }
 
     CFDictionaryRef EAGL2Support::getGLConfigFromContext(EAGLES2Context context)
+    {
+        // TODO: DJR - implement
+        CFDictionaryRef glConfig = 0;
+
+        return glConfig;
+    }
+
+    CFDictionaryRef EAGL2Support::getGLConfigFromDrawable(CAEAGLLayer *drawable,
+                                                    unsigned int *w, unsigned int *h)
     {
         // TODO: DJR - implement
         CFDictionaryRef glConfig = 0;

@@ -27,6 +27,7 @@ THE SOFTWARE.
 */
 #include "OgreGLRenderSystemCommon.h"
 #include "OgreGLContext.h"
+#include "OgreFrustum.h"
 #include "OgreGLNativeSupport.h"
 #include "OgreGLRenderTexture.h"
 
@@ -42,7 +43,7 @@ namespace Ogre {
         c.erase(p, c.end());
     }
 
-    String VideoMode::getDescription() const
+    String GLRenderSystemCommon::VideoMode::getDescription() const
     {
         return StringUtil::format("%4d x %4d", width, height);
     }
@@ -66,19 +67,15 @@ namespace Ogre {
             optVideoMode.possibleValues.push_back(mode.getDescription());
         }
         removeDuplicates(optVideoMode.possibleValues); // also sorts
-
-        if(!optVideoMode.possibleValues.empty()) // otherwise keep dummy defaults
-        {
-            optVideoMode.currentValue = optVideoMode.possibleValues[0];
-            mOptions[optVideoMode.name] = optVideoMode;
-        }
+        optVideoMode.currentValue = optVideoMode.possibleValues[0];
+        mOptions[optVideoMode.name] = optVideoMode;
 
         ConfigOption optFSAA;
         optFSAA.name = "FSAA";
         optFSAA.immutable = false;
         for (int sampleLevel : mGLSupport->getFSAALevels())
         {
-            optFSAA.possibleValues.push_back(StringUtil::format("%2d", sampleLevel));
+            optFSAA.possibleValues.push_back(StringConverter::toString(sampleLevel));
         }
         if (!optFSAA.possibleValues.empty())
         {
@@ -86,6 +83,14 @@ namespace Ogre {
             optFSAA.currentValue = optFSAA.possibleValues[0];
         }
         mOptions[optFSAA.name] = optFSAA;
+
+        // TODO remove this on next release
+        ConfigOption optRTTMode;
+        optRTTMode.name = "RTT Preferred Mode";
+        optRTTMode.possibleValues.push_back("FBO");
+        optRTTMode.currentValue = optRTTMode.possibleValues[0];
+        optRTTMode.immutable = true;
+        mOptions[optRTTMode.name] = optRTTMode;
 
         refreshConfig();
     }
@@ -122,7 +127,11 @@ namespace Ogre {
             return;
 
         optDisplayFrequency->second.possibleValues.clear();
-        if (isFullscreen)
+        if( !isFullscreen )
+        {
+            optDisplayFrequency->second.possibleValues.push_back( "N/A" );
+        }
+        else
         {
             for (const auto& mode : mGLSupport->getVideoModes())
             {
@@ -140,13 +149,15 @@ namespace Ogre {
             removeDuplicates(optDisplayFrequency->second.possibleValues);
         }
 
-        if (optDisplayFrequency->second.possibleValues.empty())
+        if (!optDisplayFrequency->second.possibleValues.empty())
         {
-            optDisplayFrequency->second.possibleValues.push_back("N/A");
-            optDisplayFrequency->second.immutable = true;
+            optDisplayFrequency->second.currentValue = optDisplayFrequency->second.possibleValues[0];
         }
-
-        optDisplayFrequency->second.currentValue = optDisplayFrequency->second.possibleValues.front();
+        else
+        {
+            optVideoMode->second.currentValue = mGLSupport->getVideoModes()[0].getDescription();
+            optDisplayFrequency->second.currentValue = StringConverter::toString(mGLSupport->getVideoModes()[0].refreshRate) + " Hz";
+        }
     }
 
     //-------------------------------------------------------------------------------------------------//
@@ -154,7 +165,9 @@ namespace Ogre {
     {
         ConfigOptionMap::iterator option = mOptions.find(name);
         if (option == mOptions.end()) {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Option named '" + name + "' does not exist.");
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "Option named " + name + " does not exist.",
+                        "GLNativeSupport::setConfigOption");
         }
         option->second.currentValue = value;
 
@@ -196,71 +209,9 @@ namespace Ogre {
         }
     }
 
-    void GLRenderSystemCommon::_convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest, bool)
-    {
-        // no conversion required for OpenGL
-        dest = matrix;
-
-        if (mIsReverseDepthBufferEnabled)
-        {
-            // Convert depth range from [-1,+1] to [1,0]
-            dest[2][0] = (dest[2][0] - dest[3][0]) * -0.5f;
-            dest[2][1] = (dest[2][1] - dest[3][1]) * -0.5f;
-            dest[2][2] = (dest[2][2] - dest[3][2]) * -0.5f;
-            dest[2][3] = (dest[2][3] - dest[3][3]) * -0.5f;
-        }
-    }
-
     void GLRenderSystemCommon::_getDepthStencilFormatFor(PixelFormat internalColourFormat,
                                                          uint32* depthFormat, uint32* stencilFormat)
     {
         mRTTManager->getBestDepthStencil( internalColourFormat, depthFormat, stencilFormat );
-    }
-
-    void GLRenderSystemCommon::registerThread()
-    {
-        OGRE_LOCK_MUTEX(mThreadInitMutex);
-        // This is only valid once we've created the main context
-        if (!mMainContext)
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "Cannot register a background thread before the main context has been created");
-        }
-
-        // Create a new context for this thread. Cloning from the main context
-        // will ensure that resources are shared with the main context
-        // We want a separate context so that we can safely create GL
-        // objects in parallel with the main thread
-        GLContext* newContext = mMainContext->clone();
-        mBackgroundContextList.push_back(newContext);
-
-        // Bind this new context to this thread.
-        newContext->setCurrent();
-
-        _oneTimeContextInitialization();
-        newContext->setInitialized();
-    }
-
-    void GLRenderSystemCommon::unregisterThread()
-    {
-        // nothing to do here?
-        // Don't need to worry about active context, just make sure we delete
-        // on shutdown.
-    }
-
-    void GLRenderSystemCommon::preExtraThreadsStarted()
-    {
-        OGRE_LOCK_MUTEX(mThreadInitMutex);
-        // free context, we'll need this to share lists
-        if (mCurrentContext)
-            mCurrentContext->endCurrent();
-    }
-
-    void GLRenderSystemCommon::postExtraThreadsStarted()
-    {
-        OGRE_LOCK_MUTEX(mThreadInitMutex);
-        // reacquire context
-        if (mCurrentContext)
-            mCurrentContext->setCurrent();
     }
 }

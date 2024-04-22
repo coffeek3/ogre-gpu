@@ -43,31 +43,53 @@ namespace RTShader {
 *  @{
 */
 
+/** Interface definition for factories of ShaderProgramWriter. */
+class _OgreRTSSExport ProgramWriterFactory : public RTShaderSystemAlloc
+{
+public:
+    ProgramWriterFactory() {}
+    virtual ~ProgramWriterFactory() {}
+    
+    /// Get the name of the language this factory creates programs for
+    virtual const String& getTargetLanguage(void) const = 0;
+    
+    /// Create writer instance
+    virtual ProgramWriter* create(void) OGRE_NODISCARD = 0;
+};
+
 class _OgreRTSSExport ProgramWriterManager 
     : public Singleton<ProgramWriterManager>, public RTShaderSystemAlloc
 {
-    std::map<String, ProgramWriter*> mProgramWriters;
+public:
+    typedef std::map<String, ProgramWriterFactory*> FactoryMap;
+protected:
+    /// Factories capable of creating ShaderProgramWriterFactory instances
+    FactoryMap mFactories;
+
 public:
     ProgramWriterManager();
     ~ProgramWriterManager();
 
-    /// register and transfer ownership of writer
-    void addProgramWriter(const String& lang, ProgramWriter* writer);
+    /** Add a new factory object for high-level programs of a given language. */
+    void addFactory(ProgramWriterFactory* factory);
+    
+    /** Remove a factory object for high-level programs of a given language. */
+    void removeFactory(ProgramWriterFactory* factory);
 
     /** Returns whether a given high-level language is supported. */
     bool isLanguageSupported(const String& lang);
 
-    ProgramWriter* getProgramWriter(const String& language) const
-    {
-        auto it = mProgramWriters.find(language);
-        if (it != mProgramWriters.end())
-            return it->second;
-        OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, "No program writer for language " + language);
-        return nullptr;
-    }
+    /** Create a new, unloaded HighLevelGpuProgram. 
+    @par
+    This method creates a new program of the type specified as the second and third parameters.
+    You will have to call further methods on the returned program in order to 
+    define the program fully before you can load it.
+    @param language Code of the language to use (e.g. "cg")
+    */
+    ProgramWriter* createProgramWriter( const String& language);
 
     /** Override standard Singleton retrieval.
-
+    @remarks
     Why do we do this? Well, it's because the Singleton
     implementation is in a .h file, which means it gets compiled
     into anybody who includes it. This is needed for the

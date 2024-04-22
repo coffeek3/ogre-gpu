@@ -27,20 +27,45 @@ namespace Ogre
         ProceduralManualObject() {}
         virtual ~ProceduralManualObject() {}
 
-        void setRenderToVertexBuffer(const RenderToVertexBufferSharedPtr& r2vbObject)
+        void setRenderToVertexBuffer(RenderToVertexBufferSharedPtr r2vbObject)
         { mR2vbObject = r2vbObject; }
         const RenderToVertexBufferSharedPtr& getRenderToVertexBuffer()
         { return mR2vbObject; }
 
-        void _updateRenderQueue(RenderQueue* queue) override;
-        void getRenderOperation(RenderOperation& op) override { mR2vbObject->getRenderOperation(op); }
+        void setManualObject(ManualObject* manualObject);
+        ManualObject* getManualObject() const { return mManualObject; }
+
+        /** @copydoc SimpleRenderable::_updateRenderQueue. */
+        void _updateRenderQueue(RenderQueue* queue);
+        /** @copydoc SimpleRenderable::getMovableType. */
+        const String& getMovableType(void) const;
+        /** @copydoc SimpleRenderable::getRenderOperation. */
+        void getRenderOperation(RenderOperation& op);
 
         // Delegate to the manual object.
-        Real getBoundingRadius(void) const override { return 0; }
-        Real getSquaredViewDepth(const Camera* cam) const override { return 0; }
+        Real getBoundingRadius(void) const
+        { return mManualObject->getBoundingRadius(); }
+        Real getSquaredViewDepth(const Ogre::Camera* cam) const
+        { return mManualObject->getSection(0)->getSquaredViewDepth(cam); }
 
     protected:
+        ManualObject* mManualObject;
         RenderToVertexBufferSharedPtr mR2vbObject;
+    };
+
+    class ProceduralManualObjectFactory : public MovableObjectFactory
+    {
+    public:
+        ProceduralManualObjectFactory() {}
+        ~ProceduralManualObjectFactory() {}
+
+        static String FACTORY_TYPE_NAME;
+
+        const String& getType(void) const;
+        void destroyInstance( MovableObject* obj);
+
+    protected:
+        MovableObject* createInstanceImpl(const String& name, const NameValuePairList* params);
     };
 
 }

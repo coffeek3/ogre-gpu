@@ -68,6 +68,21 @@ namespace Ogre {
         // The remaining functions are internal to the GLX Rendersystem:
 
         /**
+         * Get the name of the display and screen used for rendering
+         *
+         * Ogre normally opens its own connection to the X server
+         * and renders onto the screen where the user logged in
+         *
+         * However, if Ogre is passed a current GL context when the first
+         * RenderTarget is created, then it will connect to the X server
+         * using the same connection as that GL context and direct all
+         * subsequent rendering to the screen targeted by that GL context.
+         *
+         * @returns              Display name.
+         */
+        String getDisplayName (void);
+
+        /**
          * Get the Display connection used for rendering
          *
          * This function establishes the initial connection when necessary.
@@ -161,6 +176,23 @@ namespace Ogre {
         Display* mGLDisplay; // used for GL/GLX commands
         Display* mXDisplay;  // used for other X commands and events
         bool mIsExternalDisplay;
+
+        struct GLXVideoMode
+        {
+            typedef std::pair<uint, uint>      ScreenSize;
+            typedef short                      Rate;
+            ScreenSize first;
+            Rate second;
+
+            GLXVideoMode() {}
+            GLXVideoMode(const VideoMode& m) : first(m.width, m.height), second(m.refreshRate) {}
+
+            bool operator!=(const GLXVideoMode& o) const
+            {
+                return first != o.first || second != o.second;
+            }
+        };
+        typedef std::vector<GLXVideoMode>    GLXVideoModes;
 
         VideoMode  mOriginalMode;
         VideoMode  mCurrentMode;

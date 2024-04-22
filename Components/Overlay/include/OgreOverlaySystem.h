@@ -46,7 +46,7 @@ namespace Ogre {
     */
     /** This class simplify initialization / finalization of the overlay system. 
         OGRE root did this steps before the overlay system transformed into a component.
-
+    @remarks
         Before you create a concrete instance of the OverlaySystem the OGRE::Root must be created
         but not initialized. In the ctor all relevant systems are created and registered. The dtor
         must be called before you delete OGRE::Root.
@@ -54,7 +54,7 @@ namespace Ogre {
         instance as a RenderQueueListener in your scenemanager(s).
     */
     class _OgreOverlayExport OverlaySystem
-        : public Singleton<OverlaySystem>
+        : public OverlayAlloc
         , public Ogre::RenderQueueListener
         , public Ogre::RenderSystem::Listener
     {
@@ -62,12 +62,13 @@ namespace Ogre {
         OverlaySystem();
         virtual ~OverlaySystem();
 
-        void renderQueueStarted(uint8 queueGroupId, const String& cameraName, bool& skipThisInvocation) override;
+        /// @see RenderQueueListener
+        virtual void renderQueueStarted(uint8 queueGroupId, const String& invocation, 
+            bool& skipThisInvocation);
 
-        void eventOccurred(const String& eventName, const NameValuePairList* parameters) override;
+        /// @see RenderSystem::Listener
+        virtual void eventOccurred(const String& eventName, const NameValuePairList* parameters);
 
-        static OverlaySystem& getSingleton();
-        static OverlaySystem* getSingletonPtr();
     private:
         OverlayManager* mOverlayManager;
         FontManager* mFontManager;

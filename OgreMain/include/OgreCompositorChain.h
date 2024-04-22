@@ -73,7 +73,7 @@ namespace Ogre {
         @param scheme
             Scheme to use (blank means default).
         */
-        CompositorInstance* addCompositor(const CompositorPtr& filter, size_t addPosition=LAST, const String& scheme = BLANKSTRING);
+        CompositorInstance* addCompositor(CompositorPtr filter, size_t addPosition=LAST, const String& scheme = BLANKSTRING);
 
         /** Remove a compositor.
         @param position
@@ -88,15 +88,15 @@ namespace Ogre {
         */
         void removeAllCompositors();
         
+        /// @deprecated use getCompositorInstances
+        OGRE_DEPRECATED CompositorInstance *getCompositor(size_t index);
+
         /** Get compositor instance by name. Returns null if not found.
         */
-        CompositorInstance* getCompositor(const String& name) const;
-
-        /// @overload
-        CompositorInstance *getCompositor(size_t index) const { return mInstances.at(index); }
+        CompositorInstance* getCompositor(const String& name);
 
         /// Get compositor position by name. Returns #NPOS if not found.
-        size_t getCompositorPosition(const String& name) const;
+        size_t getCompositorPosition(const String& name);
 
         /** Get the original scene compositor instance for this chain (internal use). 
         */
@@ -114,17 +114,16 @@ namespace Ogre {
             addCompositor in cases the filter is switched on and off a lot.
         @param position
             Position in filter chain of filter
-        @param state enabled flag
         */
         void setCompositorEnabled(size_t position, bool state);
 
-        void preRenderTargetUpdate(const RenderTargetEvent& evt) override;
-        void postRenderTargetUpdate(const RenderTargetEvent& evt) override;
-        void preViewportUpdate(const RenderTargetViewportEvent& evt) override;
-        void postViewportUpdate(const RenderTargetViewportEvent& evt) override;
-        void viewportCameraChanged(Viewport* viewport) override;
-        void viewportDimensionsChanged(Viewport* viewport) override;
-        void viewportDestroyed(Viewport* viewport) override;
+        void preRenderTargetUpdate(const RenderTargetEvent& evt);
+        void postRenderTargetUpdate(const RenderTargetEvent& evt);
+        void preViewportUpdate(const RenderTargetViewportEvent& evt);
+        void postViewportUpdate(const RenderTargetViewportEvent& evt);
+        void viewportCameraChanged(Viewport* viewport);
+        void viewportDimensionsChanged(Viewport* viewport);
+        void viewportDestroyed(Viewport* viewport);
 
         /** Mark state as dirty, and to be recompiled next frame.
         */
@@ -156,7 +155,7 @@ namespace Ogre {
         */
         CompositorInstance* getNextInstance(CompositorInstance* curr, bool activeOnly = true);
 
-    private:
+    protected:
         /// Viewport affected by this CompositorChain
         Viewport *mViewport;
         
@@ -210,7 +209,8 @@ namespace Ogre {
         public:
             RQListener() : mOperation(0), mSceneManager(0), mRenderSystem(0), mViewport(0) {}
 
-            void renderQueueStarted(uint8 queueGroupId, const String& cameraName, bool& skipThisInvocation) override;
+            void renderQueueStarted(uint8 queueGroupId, const String& invocation, bool& skipThisInvocation);
+            void renderQueueEnded(uint8 queueGroupId, const String& invocation, bool& repeatThisInvocation);
 
             /** Set current operation and target. */
             void setOperation(CompositorInstance::TargetOperation *op,SceneManager *sm,RenderSystem *rs);

@@ -82,32 +82,38 @@ public:
     ~OctreeSceneManager();
 
     /// @copydoc SceneManager::getTypeName
-    const String& getTypeName(void) const override;
+    const String& getTypeName(void) const;
 
     /** Initializes the manager to the given box and depth.
     */
     void init( AxisAlignedBox &box, int d );
 
     /** Creates a specialized OctreeNode */
-    SceneNode * createSceneNodeImpl ( void ) override;
+    virtual SceneNode * createSceneNodeImpl ( void );
     /** Creates a specialized OctreeNode */
-    SceneNode * createSceneNodeImpl ( const String &name ) override;
+    virtual SceneNode * createSceneNodeImpl ( const String &name );
     /** Creates a specialized OctreeCamera */
-    Camera * createCamera( const String &name ) override;
+    virtual Camera * createCamera( const String &name );
 
     /** Deletes a scene node */
-    void destroySceneNode( const String &name ) override;
+    virtual void destroySceneNode( const String &name );
 
 
 
     /** Does nothing more */
-    void _updateSceneGraph( Camera * cam ) override;
+    virtual void _updateSceneGraph( Camera * cam );
     /** Recurses through the octree determining which nodes are visible. */
-    void _findVisibleObjects ( Camera * cam,
-        VisibleObjectsBoundsInfo* visibleBounds, bool onlyShadowCasters ) override;
+    virtual void _findVisibleObjects ( Camera * cam, 
+        VisibleObjectsBoundsInfo* visibleBounds, bool onlyShadowCasters );
+
+    /** Alerts each unculled object, notifying it that it will be drawn.
+     * Useful for doing calculations only on nodes that will be drawn, prior
+     * to drawing them...
+     */
+    virtual void _alertVisibleObjects( void );
 
     /** Walks through the octree, adding any visible objects to the render queue.
-
+    @remarks
     If any octant in the octree if completely within the view frustum,
     all subchildren are automatically added with no visibility tests.
     */
@@ -155,30 +161,30 @@ public:
     void resize( const AxisAlignedBox &box );
 
     /** Sets the given option for the SceneManager
-
+               @remarks
         Options are:
         "Size", AxisAlignedBox *;
         "Depth", int *;
         "ShowOctree", bool *;
     */
 
-    bool setOption( const String &, const void * ) override;
+    virtual bool setOption( const String &, const void * );
     /** Gets the given option for the Scene Manager.
-
+        @remarks
         See setOption
     */
-    bool getOption( const String &, void * ) override;
+    virtual bool getOption( const String &, void * );
 
-    bool getOptionValues( const String & key, StringVector &refValueList ) override;
-    bool getOptionKeys( StringVector &refKeys ) override;
+    bool getOptionValues( const String & key, StringVector &refValueList );
+    bool getOptionKeys( StringVector &refKeys );
     /** Overridden from SceneManager */
-    void clearScene(void) override;
+    void clearScene(void);
 
-    AxisAlignedBoxSceneQuery* createAABBQuery(const AxisAlignedBox& box, uint32 mask) override;
-    SphereSceneQuery* createSphereQuery(const Sphere& sphere, uint32 mask) override;
-    PlaneBoundedVolumeListSceneQuery* createPlaneBoundedVolumeQuery(const PlaneBoundedVolumeList& volumes, uint32 mask) override;
-    RaySceneQuery* createRayQuery(const Ray& ray, uint32 mask) override;
-    IntersectionSceneQuery* createIntersectionQuery(uint32 mask) override;
+    AxisAlignedBoxSceneQuery* createAABBQuery(const AxisAlignedBox& box, uint32 mask);
+    SphereSceneQuery* createSphereQuery(const Sphere& sphere, uint32 mask);
+    PlaneBoundedVolumeListSceneQuery* createPlaneBoundedVolumeQuery(const PlaneBoundedVolumeList& volumes, uint32 mask);
+    RaySceneQuery* createRayQuery(const Ray& ray, uint32 mask);
+    IntersectionSceneQuery* createIntersectionQuery(uint32 mask);
 
 protected:
 
@@ -213,11 +219,15 @@ protected:
 /// Factory for OctreeSceneManager
 class OctreeSceneManagerFactory : public SceneManagerFactory
 {
+protected:
+    void initMetaData(void) const;
 public:
+    OctreeSceneManagerFactory() {}
+    ~OctreeSceneManagerFactory() {}
     /// Factory type name
     static const String FACTORY_TYPE_NAME;
-    SceneManager* createInstance(const String& instanceName) override;
-    const String& getTypeName(void) const override { return FACTORY_TYPE_NAME; }
+    SceneManager* createInstance(const String& instanceName);
+    void destroyInstance(SceneManager* instance);
 };
 
 

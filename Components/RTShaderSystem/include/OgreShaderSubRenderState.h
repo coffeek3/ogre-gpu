@@ -42,40 +42,6 @@ namespace RTShader {
 
 typedef SharedPtr<SubRenderStateAccessor>   SubRenderStateAccessorPtr; 
 
-/// Computes the position of the vertex in projection space, allows using instancing
-_OgreRTSSExport extern const String SRS_TRANSFORM;
-/// Enables vertex-colors, always required.
-_OgreRTSSExport extern const String SRS_VERTEX_COLOUR;
-/// Computes FFP texture transform and blending based on the assigned textures
-_OgreRTSSExport extern const String SRS_TEXTURING;
-/// Adds per-vertex (FFP) lighting calulations (Gouraud Shading)
-_OgreRTSSExport extern const String SRS_PER_VERTEX_LIGHTING;
-/// Modulates the color of a pixel based on the scene or object fog parameters
-_OgreRTSSExport extern const String SRS_FOG;
-/// Enables alpha-testing
-_OgreRTSSExport extern const String SRS_ALPHA_TEST;
-/// @deprecated use #SRS_SHADOW_MAPPING
-_OgreRTSSExport extern const String SRS_INTEGRATED_PSSM3;
-/// shadow mapping receiver with multiple lights or single PSSM light with up to 3 custom splits.
-_OgreRTSSExport extern const String SRS_SHADOW_MAPPING;
-/// Adds per-pixel lighting calulations (Phong Shading)
-_OgreRTSSExport extern const String SRS_PER_PIXEL_LIGHTING;
-/// Use metal roughness parametrisation for lighting calulations
-_OgreRTSSExport extern const String SRS_COOK_TORRANCE_LIGHTING;
-/// Adds calculations for indirect image based lighting (IBL)
-_OgreRTSSExport extern const String SRS_IMAGE_BASED_LIGHTING;
-/// Use a normal map to derive normals
-_OgreRTSSExport extern const String SRS_NORMALMAP;
-/// Redirects rendering results into intermediate buffers for the WBOIT algorithm
-_OgreRTSSExport extern const String SRS_WBOIT;
-/// Redirects rendering results into gbuffers for e.g. deferred shading.
-_OgreRTSSExport extern const String SRS_GBUFFER;
-/// enable [triplanar texture mapping](https://www.volume-gfx.com/volume-rendering/triplanar-texturing/)
-_OgreRTSSExport extern const String SRS_TRIPLANAR_TEXTURING;
-/// Apply photoshop-like blend effects to texture layers
-_OgreRTSSExport extern const String SRS_LAYERED_BLENDING;
-/// Include skinning calculations for Skeletal Animation in the shader to move computations to the GPU
-_OgreRTSSExport extern const String SRS_HARDWARE_SKINNING;
 
 /** This class is the base interface of sub part from a shader based rendering pipeline.
 * All sub parts implementations should derive from it and implement the needed methods.
@@ -96,14 +62,14 @@ public:
 
 
     /** Get the type of this sub render state.
-
+    @remarks
     The type string should be unique among all registered sub render states.    
     */
     virtual const String& getType() const = 0;
 
 
     /** Get the execution order of this sub render state.
-
+    @remarks
     The return value should be synchronized with the predefined values
     of the FFPShaderStage enum.
     */
@@ -157,18 +123,6 @@ public:
     @see SubRenderStateAccessor.
     */
     SubRenderStateAccessorPtr getAccessor() const;
-
-    /// generic set method for parameters that connot be derived in @ref preAddToRenderState
-    virtual bool setParameter(const String& name, const String& value) { return false; }
-
-    /// @overload
-    bool setParameter(const String& name, const char* value) { return setParameter(name, String(value)); }
-
-    /// @overload
-    virtual void setParameter(const String& name, const Any& value)
-    {
-        OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, name+": unsupported any type");
-    }
 
 // Protected methods
 protected:
@@ -260,7 +214,7 @@ private:
 
 
 /** Abstract factory interface for creating SubRenderState implementation instances.
-
+@remarks
 Plugins or 3rd party applications can add new types of sub render states to the 
 RTShader System by creating subclasses of the SubRenderState class. 
 Because multiple instances of these sub class may be required, 
@@ -278,7 +232,7 @@ public:
     virtual ~SubRenderStateFactory();
 
     /** Get the type of this sub render state factory.
-
+    @remarks
     The type string should be the same as the type of the SubRenderState sub class it is going to create.   
     @see SubRenderState::getType.
     */

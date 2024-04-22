@@ -47,10 +47,17 @@ namespace Ogre {
         return sLanguageName;
     }
     //-----------------------------------------------------------------------
-    GpuProgram* D3D11HLSLProgramFactory::create(ResourceManager* creator,
+    HighLevelGpuProgram* D3D11HLSLProgramFactory::create(ResourceManager* creator, 
         const String& name, ResourceHandle handle,
         const String& group, bool isManual, ManualResourceLoader* loader)
     {
         return new D3D11HLSLProgram(creator, name, handle, group, isManual, loader, mDevice);
     }
+    //-----------------------------------------------------------------------
+    void D3D11HLSLProgramFactory::destroy(HighLevelGpuProgram* prog)
+    {
+        delete prog;
+    }
+    //-----------------------------------------------------------------------
+
 }

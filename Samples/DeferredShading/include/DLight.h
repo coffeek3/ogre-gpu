@@ -41,13 +41,13 @@ public:
     virtual bool getCastChadows() const;
 
     /** @copydoc MovableObject::getBoundingRadius */
-    Ogre::Real getBoundingRadius(void) const override;
+    virtual Ogre::Real getBoundingRadius(void) const;
     /** @copydoc Renderable::getSquaredViewDepth */
-    Ogre::Real getSquaredViewDepth(const Ogre::Camera*) const override;
+    virtual Ogre::Real getSquaredViewDepth(const Ogre::Camera*) const;
     /** @copydoc Renderable::getMaterial */
-    const Ogre::MaterialPtr& getMaterial(void) const override;
+    virtual const Ogre::MaterialPtr& getMaterial(void) const;
     /** @copydoc Renderable::getBoundingRadius */
-    void getWorldTransforms(Ogre::Matrix4* xform) const override;
+    virtual void getWorldTransforms(Ogre::Matrix4* xform) const;
 protected:
 
     /** Check if the camera is inside a light

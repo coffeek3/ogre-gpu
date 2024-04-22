@@ -24,6 +24,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
+PCZSceneManager.h  -  Portal Connected Zone Scene Manager
+
+-----------------------------------------------------------------------------
+begin                : Mon Feb 19 2007
+author               : Eric Cha
+email                : ericc@xenopi.com
+Code Style Update    :
+-----------------------------------------------------------------------------
 */
 
 #ifndef PCZ_SCENEMANAGER_H
@@ -51,7 +59,7 @@ namespace Ogre
     /** Specialized SceneManager that uses Portal-Connected-Zones to divide the scene spatially.
     */
 
-    class _OgrePCZPluginExport PCZSceneManager : public SceneManager, public ShadowTextureListener
+    class _OgrePCZPluginExport PCZSceneManager : public SceneManager
     {
         friend class PCZIntersectionSceneQuery;
         friend class PCZRaySceneQuery;
@@ -66,7 +74,7 @@ namespace Ogre
         ~PCZSceneManager();
 
         /// @copydoc SceneManager::getTypeName
-        const String& getTypeName(void) const override;
+        const String& getTypeName(void) const;
 
         /** Initializes the manager 
         */
@@ -107,26 +115,32 @@ namespace Ogre
                                      PCZSceneNode * parentNode,
                                      const String &filename);
 
-        SceneNode* createSceneNodeImpl(void) override;
-        SceneNode* createSceneNodeImpl(const String& name) override;
+        /// override this to ensure specialised PCZSceneNode is used.
+        virtual SceneNode* createSceneNodeImpl(void);
+        /// override this to ensure their specialised PCZSceneNode is used.
+        virtual SceneNode* createSceneNodeImpl(const String& name);
+        /** Creates a PCZSceneNode  */
+        virtual SceneNode * createSceneNode ( void );
+        /** Creates a PCZSceneNode */
+        virtual SceneNode * createSceneNode ( const String &name );
         /** Creates a specialized PCZCamera */
-        Camera * createCamera( const String &name ) override;
+        virtual Camera * createCamera( const String &name );
 
         /** Deletes a scene node by name & corresponding PCZSceneNode */
-        void destroySceneNode( const String &name ) override;
+        virtual void destroySceneNode( const String &name );
 
         /** Deletes a scene node & corresponding PCZSceneNode */
-        void destroySceneNode(SceneNode* sn) override;
+        virtual void destroySceneNode(SceneNode* sn);
 
         /** Overridden to clean up zones
         */
-        void clearScene(void) override;
+        virtual void clearScene(void);
 
         /** Overridden from SceneManager */
         void setWorldGeometryRenderQueue(uint8 qid);
 
         /// Overridden from basic scene manager
-        void _renderScene(Camera *cam, Viewport *vp, bool includeOverlays) override;
+        void _renderScene(Camera *cam, Viewport *vp, bool includeOverlays);
 
         /** Enable/disable sky rendering */
         void enableSky(bool);
@@ -135,14 +149,20 @@ namespace Ogre
         void setSkyZone(PCZone * zone);
 
         /** Update Scene Graph (does several things now) */
-        void _updateSceneGraph( Camera * cam ) override;
+        virtual void _updateSceneGraph( Camera * cam );
 
         /** Recurses through the PCZTree determining which nodes are visible. */
-        void _findVisibleObjects ( Camera * cam,
-            VisibleObjectsBoundsInfo* visibleBounds, bool onlyShadowCasters ) override;
+        virtual void _findVisibleObjects ( Camera * cam, 
+            VisibleObjectsBoundsInfo* visibleBounds, bool onlyShadowCasters );
+
+        /** Alerts each unculled object, notifying it that it will be drawn.
+        * Useful for doing calculations only on nodes that will be drawn, prior
+        * to drawing them...
+        */
+        virtual void _alertVisibleObjects( void );
 
         /** Creates a light for use in the scene.
-
+            @remarks
                 Lights can either be in a fixed position and independent of the
                 scene graph, or they can be attached to SceneNodes so they derive
                 their position from the parent node. Either way, they are created
@@ -151,26 +171,26 @@ namespace Ogre
             @param
                 name The name of the new light, to identify it later.
         */
-        Light* createLight(const String& name) override;
+        virtual Light* createLight(const String& name);
 
         /** Returns a pointer to the named Light which has previously been added to the scene.
         @note Throws an exception if the named instance does not exist
         */
-        Light* getLight(const String& name) const override;
+        virtual Light* getLight(const String& name) const;
 
         /** Returns whether a light with the given name exists.
         */
-        bool hasLight(const String& name) const override;
+        virtual bool hasLight(const String& name) const;
 
         /** Removes the named light from the scene and destroys it.
-
+            @remarks
                 Any pointers held to this light after calling this method will be invalid.
         */
-        void destroyLight(const String& name) override;
+        virtual void destroyLight(const String& name);
 
         /** Removes and destroys all lights in the scene.
         */
-        void destroyAllLights(void) override;
+        virtual void destroyAllLights(void);
 
         /** Check/Update the zone data for every portal in the scene.
          *  Essentially, this routine checks each portal for intersections
@@ -278,27 +298,27 @@ namespace Ogre
         };
 
         /** Sets the given option for the SceneManager
-
+                @remarks
             Options are:
             "ShowPortals", bool *;
             "ShowBoundingBoxes", bool *;
         */
-        bool setOption( const String &, const void * ) override;
+        virtual bool setOption( const String &, const void * );
         /** Gets the given option for the Scene Manager.
-
+            @remarks
             See setOption
         */
-        bool getOption( const String &, void * ) override;
+        virtual bool getOption( const String &, void * );
 
-        bool getOptionValues( const String & key, StringVector &refValueList ) override;
-        bool getOptionKeys( StringVector &refKeys ) override;
+        bool getOptionValues( const String & key, StringVector &refValueList );
+        bool getOptionKeys( StringVector &refKeys );
 
         /** Overridden from SceneManager */
-        AxisAlignedBoxSceneQuery* createAABBQuery(const AxisAlignedBox& box, uint32 mask = 0xFFFFFFFF) override;
-        SphereSceneQuery* createSphereQuery(const Sphere& sphere, uint32 mask = 0xFFFFFFFF) override;
-        PlaneBoundedVolumeListSceneQuery* createPlaneBoundedVolumeQuery(const PlaneBoundedVolumeList& volumes, uint32 mask = 0xFFFFFFFF) override;
-        RaySceneQuery* createRayQuery(const Ray& ray, uint32 mask = 0xFFFFFFFF) override;
-        IntersectionSceneQuery* createIntersectionQuery(uint32 mask = 0xFFFFFFFF) override;
+        AxisAlignedBoxSceneQuery* createAABBQuery(const AxisAlignedBox& box, uint32 mask = 0xFFFFFFFF);
+        SphereSceneQuery* createSphereQuery(const Sphere& sphere, uint32 mask = 0xFFFFFFFF);
+        PlaneBoundedVolumeListSceneQuery* createPlaneBoundedVolumeQuery(const PlaneBoundedVolumeList& volumes, uint32 mask = 0xFFFFFFFF);
+        RaySceneQuery* createRayQuery(const Ray& ray, uint32 mask = 0xFFFFFFFF);
+        IntersectionSceneQuery* createIntersectionQuery(uint32 mask = 0xFFFFFFFF);
         
         /// ZoneMap iterator for read-only access to the zonemap 
         typedef MapIterator<ZoneMap> ZoneIterator;
@@ -308,7 +328,7 @@ namespace Ogre
         void _clearAllZonesPortalUpdateFlag(void);
 
         /// @see SceneManager::prepareShadowTextures.
-        void prepareShadowTextures(Camera* cam, Viewport* vp, const LightList* lightList = 0) override;
+        virtual void prepareShadowTextures(Camera* cam, Viewport* vp, const LightList* lightList = 0);
 
     protected:
         /// Type of default zone to be used
@@ -348,26 +368,32 @@ namespace Ogre
         PCZone* mActiveCameraZone;
 
         /** Internal method for locating a list of lights which could be affecting the frustum. 
-
+        @remarks
             Custom scene managers are encouraged to override this method to make use of their
             scene partitioning scheme to more efficiently locate lights, and to eliminate lights
             which may be occluded by word geometry.
         */
-        void findLightsAffectingFrustum(const Camera* camera) override;
+        virtual void findLightsAffectingFrustum(const Camera* camera);
         /// Internal method for creating shadow textures (texture-based shadows)
-        void ensureShadowTexturesCreated() override;
+        virtual void ensureShadowTexturesCreated();
+        /// Internal method for destroying shadow textures (texture-based shadows)
+        virtual void destroyShadowTextures(void);
         /// Internal method for firing the pre caster texture shadows event
-        void shadowTextureCasterPreViewProj(Light* light, Camera* camera, size_t iteration) override;
+        virtual void fireShadowTexturesPreCaster(Light* light, Camera* camera, size_t iteration);
     };
 
     /// Factory for PCZSceneManager
     class PCZSceneManagerFactory : public SceneManagerFactory
     {
+    protected:
+        void initMetaData(void) const;
     public:
+        PCZSceneManagerFactory() {}
+        ~PCZSceneManagerFactory() {}
         /// Factory type name
         static const String FACTORY_TYPE_NAME;
-        SceneManager* createInstance(const String& instanceName) override;
-        const String& getTypeName(void) const override { return FACTORY_TYPE_NAME; }
+        SceneManager* createInstance(const String& instanceName);
+        void destroyInstance(SceneManager* instance);
     };
 
 

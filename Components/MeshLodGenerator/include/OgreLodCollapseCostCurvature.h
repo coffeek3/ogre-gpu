@@ -41,7 +41,7 @@ class _OgreLodExport LodCollapseCostCurvature :
     public LodCollapseCost
 {
 public:
-    Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge) override;
+    virtual Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge);
 };
 
 }

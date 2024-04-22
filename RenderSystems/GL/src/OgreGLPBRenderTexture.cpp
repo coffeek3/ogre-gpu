@@ -55,7 +55,7 @@ namespace Ogre {
         if( name == GLRenderTexture::CustomAttributeString_TARGET )
         {
             GLSurfaceDesc &target = *static_cast<GLSurfaceDesc*>(pData);
-            target.buffer = static_cast<GLHardwarePixelBufferCommon*>(mBuffer);
+            target.buffer = static_cast<GLHardwarePixelBuffer*>(mBuffer);
             target.zoffset = mZOffset;
         }
         else if (name == GLRenderTexture::CustomAttributeString_GLCONTEXT )
@@ -81,9 +81,9 @@ namespace Ogre {
     GLPBRTTManager::~GLPBRTTManager()
     {
         // Delete remaining PBuffers
-        for(auto & mPBuffer : mPBuffers)
+        for(size_t x=0; x<PCT_COUNT; ++x)
         {
-            delete mPBuffer.pb;
+            delete mPBuffers[x].pb;
         }
     }
 

@@ -29,10 +29,10 @@ THE SOFTWARE.
 #define __Compositor_H__
 
 #include "OgrePrerequisites.h"
+#include "OgreIteratorWrappers.h"
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre {
-    template <typename T> class VectorIterator;
 
     /** \addtogroup Core
     *  @{
@@ -46,7 +46,7 @@ namespace Ogre {
         it possible to apply postfilter effects, HDRI postprocessing, and shadow 
         effects to a Viewport.
      */
-    class _OgreExport Compositor final : public Resource
+    class _OgreExport Compositor: public Resource
     {
     public:
         Compositor(ResourceManager* creator, const String& name, ResourceHandle handle,
@@ -67,11 +67,11 @@ namespace Ogre {
         
         /** Get a technique.
         */
-        CompositionTechnique *getTechnique(size_t idx) const { return mTechniques.at(idx); }
+        CompositionTechnique *getTechnique(size_t idx);
         
         /** Get the number of techniques.
         */
-        size_t getNumTechniques() const { return mTechniques.size(); }
+        size_t getNumTechniques();
         
         /** Remove all techniques
         */
@@ -81,23 +81,23 @@ namespace Ogre {
         TechniqueIterator getTechniqueIterator(void);
         
         /** Get a supported technique.
-
+        @remarks
             The supported technique list is only available after this compositor has been compiled,
             which typically happens on loading it. Therefore, if this method returns
             an empty list, try calling Compositor::load.
         */
-        CompositionTechnique *getSupportedTechnique(size_t idx) const { return mSupportedTechniques.at(idx); }
+        CompositionTechnique *getSupportedTechnique(size_t idx);
         
         /** Get the number of supported techniques.
-
+        @remarks
             The supported technique list is only available after this compositor has been compiled,
             which typically happens on loading it. Therefore, if this method returns
             an empty list, try calling Compositor::load.
         */
-        size_t getNumSupportedTechniques() const { return mSupportedTechniques.size(); }
+        size_t getNumSupportedTechniques();
         
         /** Gets an iterator over all the Techniques which are supported by the current card. 
-
+        @remarks
             The supported technique list is only available after this compositor has been compiled,
             which typically happens on loading it. Therefore, if this method returns
             an empty list, try calling Compositor::load.
@@ -105,7 +105,7 @@ namespace Ogre {
         TechniqueIterator getSupportedTechniqueIterator(void);
 
         /** Get a pointer to a supported technique for a given scheme. 
-
+        @remarks
             If there is no specific supported technique with this scheme name, 
             then the first supported technique with no specific scheme will be returned.
         @param schemeName The scheme name you are looking for. Blank means to 
@@ -125,24 +125,24 @@ namespace Ogre {
         @param mrtIndex If name identifies a MRT, which texture attachment to retrieve
         @return The texture pointer, corresponds to a real texture
         */
-        const TexturePtr& getTextureInstance(const String& name, size_t mrtIndex);
+        TexturePtr getTextureInstance(const String& name, size_t mrtIndex);
 
         /** Get the render target for a given render texture name. 
-
+        @remarks
             You can use this to add listeners etc, but do not use it to update the
             targets manually or any other modifications, the compositor instance 
             is in charge of this.
         */
-        RenderTarget* getRenderTarget(const String& name, int slice = 0);
+        RenderTarget* getRenderTarget(const String& name);
 
     protected:
         /// @copydoc Resource::loadImpl
-        void loadImpl(void) override;
+        void loadImpl(void);
 
         /// @copydoc Resource::unloadImpl
-        void unloadImpl(void) override;
+        void unloadImpl(void);
         /// @copydoc Resource::calculateSize
-        size_t calculateSize(void) const override;
+        size_t calculateSize(void) const;
         
         /** Check supportedness of techniques.
          */

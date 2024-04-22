@@ -33,14 +33,12 @@ Copyright (c) 2000-2014 Torus Knot Software Ltd
 #include "SampleContext.h"
 #include "SamplePlugin.h"
 
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS && defined(__OBJC__)
-#include <iostream>
-#import <UIKit/UIKit.h>
-#import <QuartzCore/QuartzCore.h>
-#endif
+#include <iostream> // for Apple
 
 class TestBatch;
 using namespace Ogre;
+
+typedef std::map<String, OgreBites::SamplePlugin *> PluginMap;
 
 /** The common environment that all of the tests run in */
 class TestContext : public OgreBites::SampleContext
@@ -51,33 +49,35 @@ class TestContext : public OgreBites::SampleContext
     virtual ~TestContext();
 
     /** Does basic setup for the context */
-    void setup() override;
-
-    bool frameRenderingQueued(const Ogre::FrameEvent& evt) override;
+    virtual void setup();
 
     /** Frame listener callback, handles updating of the tests at the start of frames
      *        @param evt The frame event (passed in for the framelistener) */
-    bool frameStarted(const FrameEvent& evt) override;
+    virtual bool frameStarted(const FrameEvent& evt);
 
     /** Frame listener callback, handles updating of the tests at the end of frames
      *        @param evt The frame event (passed in for the framelistener) */
-    bool frameEnded(const FrameEvent& evt) override;
+    virtual bool frameEnded(const FrameEvent& evt);
 
     /** Runs a given test or sample
      *        @param s The OgreBites::Sample to run
      *        @remarks If s is a VisualTest, then timing and rand will be setup for
      *            determinism. */
-    void runSample(OgreBites::Sample* s) override;
+    virtual void runSample(OgreBites::Sample* s);
 
     /** Loads test plugins
+     *        @param set The name of the test set to load
      *        @return The initial tets or sample to run */
-    OgreBites::Sample* loadTests();
+    OgreBites::Sample* loadTests(String set);
+
+    /** Setup the Root */
+    virtual void createRoot();
 
     /** Start it up */
-    void go(OgreBites::Sample* initialSample = 0) override;
+    virtual void go(OgreBites::Sample* initialSample = 0);
 
     /** Handles the config dialog */
-    bool oneTimeConfig() override;
+    virtual bool oneTimeConfig();
 
     /** Set up directories for the tests to output to */
     virtual void setupDirectories(String batchName);
@@ -94,17 +94,24 @@ class TestContext : public OgreBites::SampleContext
     /** Gets the current timestep value */
     Real getTimestep();
 
+    VisualTest* getCurrentTest() { return mCurrentTest; }
+
     /// Returns whether the entire test was successful or not.
     bool wasSuccessful() const {
         return mSuccess;
     }
 
- private:
-    typedef std::map<String, OgreBites::SamplePlugin *> PluginMap;
+ protected:
     bool mSuccess;
 
     /// The timestep
     Real mTimestep;
+
+    /// Path to the test plugin directory
+    String mPluginDirectory;
+
+    /// List of available test sets
+    std::map<String, StringVector> mTestSets;
 
     /// The tests to be run
     std::deque<OgreBites::Sample*> mTests;
@@ -115,8 +122,11 @@ class TestContext : public OgreBites::SampleContext
     /// Path to the reference set location
     String mReferenceSetPath;
 
+    /// The active test (0 if none is active)
+    VisualTest* mCurrentTest;
+
     /// The current frame of a running test
-    int mCurrentFrame;
+    unsigned int mCurrentFrame;
 
     /// Info about the running batch of tests
     TestBatch* mBatch;
@@ -150,6 +160,9 @@ class TestContext : public OgreBites::SampleContext
 };
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS && defined(__OBJC__)
+#import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
+
 @interface AppDelegate : NSObject <UIApplicationDelegate>
 {
     TestContext *tc;
@@ -204,6 +217,11 @@ class TestContext : public OgreBites::SampleContext
     try {
         tc = new TestContext([arguments count], &argv[0]);
         tc->go();
+
+        Root::getSingleton().getRenderSystem()->_initRenderTargets();
+
+        // Clear event times
+        Root::getSingleton().clearEventTimes();
     } catch( Exception& e ) {
         std::cerr << "An exception has occurred: " <<
             e.getFullDescription().c_str() << std::endl;
@@ -264,7 +282,7 @@ class TestContext : public OgreBites::SampleContext
                        Root::getSingleton().renderOneFrame((Real)differenceInSeconds);
                    });
 
-    if(Root::getSingletonPtr() && Root::getSingleton().isInitialised() && !tc->getCurrentSample())
+    if(Root::getSingletonPtr() && Root::getSingleton().isInitialised() && !tc->getCurrentTest())
     {
         tc->finishedTests();
 

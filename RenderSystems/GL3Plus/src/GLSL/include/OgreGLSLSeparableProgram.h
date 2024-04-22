@@ -47,7 +47,7 @@ namespace Ogre
         change only a few of the shaders in the pipeline while leaving
         the rest the same.
 
-
+        @remarks
         GLSL has no target assembler or entry point specification like
         DirectX 9 HLSL.  Vertex and Fragment shaders only have one
         entry point called "main".  When a shader is compiled,
@@ -74,8 +74,16 @@ namespace Ogre
     {
     public:
         /// Constructor should only be used by GLSLSeparableProgramManager.
-        explicit GLSLSeparableProgram(const GLShaderList& shaders);
+        GLSLSeparableProgram(GLSLShader* vertexShader,
+                             GLSLShader* hullShader,
+                             GLSLShader* domainShader,
+                             GLSLShader* geometryShader,
+                             GLSLShader* fragmentShader,
+                             GLSLShader* computeShader);
         ~GLSLSeparableProgram();
+
+        /// GL Program Pipeline Handle
+        GLuint getGLProgramPipelineHandle() const { return mGLProgramPipelineHandle; }
 
         /** Updates program pipeline object uniforms using named and
             indexed parameter data from GpuProgramParameters.
@@ -83,19 +91,42 @@ namespace Ogre
             just before rendering occurs.
         */
         void updateUniforms(GpuProgramParametersSharedPtr params,
-                            uint16 mask, GpuProgramType fromProgType) override;
+                            uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object atomic counter buffers using data
+            from GpuProgramParameters.  Normally called by
+            GLSLShader::bindProgramAtomicCounterParameters() just
+            before rendering occurs.
+        */
+        void updateAtomicCounters(GpuProgramParametersSharedPtr params,
+                                  uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object uniform blocks using shared
+            parameter data from GpuProgramParameters.  Normally called
+            by GLSLShader::bindProgramSharedParameters() just before
+            rendering occurs.
+        */
+        void updateUniformBlocks(GpuProgramParametersSharedPtr params,
+                                 uint16 mask, GpuProgramType fromProgType);
+        /** Updates program pipeline object uniforms using data from
+            pass iteration GpuProgramParameters.  Normally called by
+            GLSLShader::bindProgramPassIterationParameters() just
+            before multi pass rendering occurs.
+        */
+        void updatePassIterationUniforms(GpuProgramParametersSharedPtr params);
 
         /** Makes a program pipeline object active by making sure it
             is linked and then putting it in use.
         */
-        void activate(void) override;
+        void activate(void);
 
     protected:
         /// GL handle for pipeline object.
         GLuint mGLProgramPipelineHandle;
 
         /// Compiles and links the separate programs.
-        void compileAndLink(void) override;
+        void compileAndLink(void);
+        void loadIndividualProgram(GLSLShader *program);
+        /// Build uniform references from active named uniforms.
+        void buildGLUniformReferences(void);
 
         void getMicrocodeFromCache(void);
         void getIndividualProgramMicrocodeFromCache(GLSLShader* program);

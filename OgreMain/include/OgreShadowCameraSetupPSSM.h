@@ -43,7 +43,7 @@ namespace Ogre
     *  @{
     */
     /** Parallel Split Shadow Map (PSSM) shadow camera setup. 
-
+    @remarks
         A PSSM shadow system uses multiple shadow maps per light and maps each
         texture into a region of space, progressing away from the camera. As such
         it is most appropriate for directional light setups. This particular version
@@ -60,7 +60,7 @@ namespace Ogre
         typedef std::vector<Real> SplitPointList;
         typedef std::vector<Real> OptimalAdjustFactorList;
 
-    private:
+    protected:
         uint mSplitCount;
         SplitPointList mSplitPoints;
         OptimalAdjustFactorList mOptimalAdjustFactors;
@@ -113,8 +113,8 @@ namespace Ogre
         uint getSplitCount() const { return mSplitCount; }
 
         /// Returns a LiSPSM shadow camera with PSSM splits base on iteration.
-        void getShadowCamera(const Ogre::SceneManager *sm, const Ogre::Camera *cam,
-            const Ogre::Viewport *vp, const Ogre::Light *light, Ogre::Camera *texCam, size_t iteration) const override;
+        virtual void getShadowCamera(const Ogre::SceneManager *sm, const Ogre::Camera *cam,
+            const Ogre::Viewport *vp, const Ogre::Light *light, Ogre::Camera *texCam, size_t iteration) const;
 
         /// Returns the calculated split points.
         inline const SplitPointList& getSplitPoints() const
@@ -125,7 +125,7 @@ namespace Ogre
         { return mOptimalAdjustFactors[splitIndex]; }
 
         /// Overridden, recommended internal use only since depends on current iteration
-        Real getOptimalAdjustFactor() const override;
+        Real getOptimalAdjustFactor() const;
 
     };
     /** @} */

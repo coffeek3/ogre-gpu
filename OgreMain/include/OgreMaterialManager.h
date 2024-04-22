@@ -46,12 +46,6 @@ namespace Ogre {
     /** \addtogroup Materials
     *  @{
     */
-
-    /// Default material scheme name
-    _OgreExport extern const String MSN_DEFAULT;
-    /// Material scheme of the shader generator
-    _OgreExport extern const String MSN_SHADERGEN;
-
     /** Class for managing Material settings for %Ogre.
 
         Materials control the eventual surface rendering properties of geometry. This class
@@ -86,7 +80,7 @@ namespace Ogre {
             virtual ~Listener() { }
             /** Called if a technique for a given scheme is not found within a material,
                 allows the application to specify a Technique instance manually.
-
+            @remarks
                 Material schemes allow you to switch wholesale between families of 
                 techniques on a material. However they require you to define those
                 schemes on the materials up-front, which might not be possible or
@@ -130,7 +124,7 @@ namespace Ogre {
 			virtual bool beforeIlluminationPassesCleared(Technique* technique) { return false; }
         };
 
-    private:
+    protected:
         /// Default settings
         MaterialPtr mDefaultSettings;
 
@@ -153,7 +147,7 @@ namespace Ogre {
         ListenerMap mListenerMap;
 
     public:
-        /// same as @ref MSN_DEFAULT
+        /// Default material scheme
         static String DEFAULT_SCHEME_NAME;
 
         /// Create a new material
@@ -162,9 +156,9 @@ namespace Ogre {
                             bool isManual = false, ManualResourceLoader* loader = 0,
                             const NameValuePairList* createParams = 0);
         
-        /// Get a material by name. For example, to get a MaterialPtr to a material defined in .material script.
+        /// Get a resource by name
         /// @see ResourceManager::getResourceByName
-        MaterialPtr getByName(const String& name, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME) const;
+        MaterialPtr getByName(const String& name, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
 
         /// Get a default material that is always available even when no resources were loaded
         /// @param useLighting whether the material should be lit
@@ -181,6 +175,11 @@ namespace Ogre {
         /** Initialises the material manager, which also triggers it to 
          * parse all available .program and .material scripts. */
         void initialise(void);
+        
+        /** @see ScriptLoader::parseScript
+        */
+        void parseScript(DataStreamPtr& stream, const String& groupName);
+
 
         /** Sets the default texture filtering to be used for loaded textures, for when textures are
             loaded automatically (e.g. by Material class) or when 'load' is called with the default
@@ -248,12 +247,12 @@ namespace Ogre {
         /** Internal method - returns the active scheme index.
         @see Technique::setSchemeName
         */
-        unsigned short _getActiveSchemeIndex(void) const { return mActiveSchemeIndex; }
+        virtual unsigned short _getActiveSchemeIndex(void) const;
 
         /** Returns the name of the active material scheme. 
         @see Technique::setSchemeName
         */
-        const String& getActiveScheme(void) const { return mActiveSchemeName; }
+        virtual const String& getActiveScheme(void) const;
         
         /** Sets the name of the active material scheme. 
         @see Technique::setSchemeName

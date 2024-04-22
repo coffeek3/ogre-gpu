@@ -34,9 +34,26 @@ namespace OgreBites {
         mInfo["Category"] = "Geometry";
     }
 
+    StringVector Sample_Isosurf::getRequiredPlugins()
+    {
+        StringVector names;
+		if(!GpuProgramManager::getSingleton().isSyntaxSupported("glsl150")
+		&& !GpuProgramManager::getSingleton().isSyntaxSupported("hlsl"))
+            names.push_back("Cg Program Manager");
+        return names;
+    }
+
     void Sample_Isosurf::testCapabilities(const RenderSystemCapabilities* caps)
     {
-        requireMaterial("Ogre/Isosurf/TessellateTetrahedra");
+        if (!caps->hasCapability(RSC_GEOMETRY_PROGRAM))
+        {
+            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Your render system / hardware does not support geometry programs, "
+                        "so you cannot run this sample. Sorry!", 
+                        "Sample_Isosurf::testCapabilities");
+        }
+
+        Ogre::LogManager::getSingleton().getDefaultLog()->stream() << 
+            "Num output vertices per geometry shader run : " << caps->getGeometryProgramNumOutputVertices();
     }
 
     // Just override the mandatory create scene method
@@ -49,7 +66,7 @@ namespace OgreBites {
         
         mTetrahedraMesh = ProceduralTools::generateTetrahedra();
         // Create tetrahedra and add it to the root scene node
-        tetrahedra = mSceneMgr->createEntity("TetrahedraEntity", mTetrahedraMesh);
+        tetrahedra = mSceneMgr->createEntity("TetrahedraEntity", mTetrahedraMesh->getName());
         //tetrahedra->setDebugDisplayEnabled(true);
         Ogre::SceneNode* parentNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
         parentNode->attachObject(tetrahedra);
@@ -58,7 +75,7 @@ namespace OgreBites {
 
     void Sample_Isosurf::cleanupContent()
     {
-        MeshManager::getSingleton().remove(mTetrahedraMesh);
+        MeshManager::getSingleton().remove(mTetrahedraMesh->getName(), ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     }
 
     bool Sample_Isosurf::frameRenderingQueued(const FrameEvent& evt)

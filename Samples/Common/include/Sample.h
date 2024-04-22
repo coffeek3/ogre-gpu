@@ -28,7 +28,6 @@
 #ifndef __Sample_H__
 #define __Sample_H__
 
-#include "OgreApplicationContextBase.h"
 #include "OgreRoot.h"
 #include "OgreOverlaySystem.h"
 #include "OgreResourceManager.h"
@@ -36,24 +35,19 @@
 
 #include "OgreFileSystemLayer.h"
 
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
+#ifdef INCLUDE_RTSHADER_SYSTEM
 #   include "OgreRTShaderSystem.h"
 #endif //INCLUDE_RTSHADER_SYSTEM
 
 #include "OgreInput.h"
-#include "OgreTrays.h"
-#include "OgreCameraMan.h"
-#include "OgreMaterialManager.h"
 
 namespace OgreBites
 {
-
-
     /*=============================================================================
     | Base class responsible for everything specific to one sample.
     | Designed to be subclassed for each sample.
     =============================================================================*/
-    class Sample : public InputListener, public TrayListener, public Ogre::FrameListener
+    class Sample : public Ogre::GeneralAllocatedObject
     {
     public:
         /*=============================================================================
@@ -61,13 +55,18 @@ namespace OgreBites
         =============================================================================*/
         struct Comparer
         {
-            bool operator()(const Sample* a, const Sample* b) const
+            bool operator() (const Sample* a, const Sample* b) const
             {
-                return a->getInfo().at("Title") < b->getInfo().at("Title");
+                auto aTitle = a->getInfo().find("Title");
+                auto bTitle = b->getInfo().find("Title");
+                
+                if (aTitle != a->getInfo().end() && bTitle != b->getInfo().end())
+                    return aTitle->second.compare(bTitle->second) < 0;
+                else return false;
             }
         };
 
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
+#ifdef INCLUDE_RTSHADER_SYSTEM
         Sample() : mShaderGenerator(0)
 #else
         Sample()
@@ -77,20 +76,11 @@ namespace OgreBites
             mWindow = 0;
             mSceneMgr = 0;
             mDone = true;
+            mResourcesLoaded = false;
             mContentSetup = false;
 
-            mCamera = 0;
-            mCameraNode = 0;
-            mViewport = 0;
-
-            mContext = 0;
-
-            // so we don't have to worry about checking if these keys exist later
-            mInfo["Title"] = "Untitled";
-            mInfo["Description"] = "";
-            mInfo["Category"] = "Unsorted";
-            mInfo["Thumbnail"] = "thumb_error.png";
-            mInfo["Help"] = "";
+            mFSLayer = 0;
+            mOverlaySystem = 0;
         }
 
         virtual ~Sample() {}
@@ -107,67 +97,52 @@ namespace OgreBites
         -----------------------------------------------------------------------------*/
         virtual void testCapabilities(const Ogre::RenderSystemCapabilities* caps) {}
 
-        void requireMaterial(const Ogre::String& name)
+        /*-----------------------------------------------------------------------------
+        | If this sample requires a specific render system to run, this method
+        | will be used to return its name.
+        -----------------------------------------------------------------------------*/
+        virtual Ogre::String getRequiredRenderSystem()
         {
-            Ogre::StringStream err;
-            err << "Material: " << name << " ";
-            auto mat = Ogre::MaterialManager::getSingleton().getByName(name);
-            if(!mat)
-            {
-                err << "not found";
-                OGRE_EXCEPT(Ogre::Exception::ERR_NOT_IMPLEMENTED, err.str());
-            }
-            mat->load();
-            if (mat->getSupportedTechniques().empty())
-            {
-                err << mat->getUnsupportedTechniquesExplanation();
-                OGRE_EXCEPT(Ogre::Exception::ERR_NOT_IMPLEMENTED, err.str());
-            }
+            return "";
         }
 
         /*-----------------------------------------------------------------------------
         | If this sample requires specific plugins to run, this method will be
         | used to return their names.
         -----------------------------------------------------------------------------*/
-        virtual Ogre::StringVector getRequiredPlugins() { return Ogre::StringVector(); }
-
-        Ogre::SceneManager* getSceneManager() { return mSceneMgr; }
-        bool isDone() { return mDone; }
-
-        /** Adds a screenshot frame to the list - this should
-         *    be done during setup of the test. */
-        void addScreenshotFrame(int frame)
+        virtual Ogre::StringVector getRequiredPlugins()
         {
-            mScreenshotFrames.insert(frame);
+            return Ogre::StringVector();
         }
 
-        /** Returns whether or not a screenshot should be taken at the given frame */
-        virtual bool isScreenshotFrame(int frame)
+        Ogre::SceneManager* getSceneManager()
         {
-            if (mScreenshotFrames.empty())
-            {
-                mDone = true;
-            }
-            else if (frame == *(mScreenshotFrames.begin()))
-            {
-                mScreenshotFrames.erase(mScreenshotFrames.begin());
-                if (mScreenshotFrames.empty())
-                    mDone = true;
-                return true;
-            }
-            return false;
+            return mSceneMgr;
+        }
+
+        bool isDone()
+        {
+            return mDone;
         }
 
         /*-----------------------------------------------------------------------------
         | Sets up a sample. Used by the SampleContext class. Do not call directly.
         -----------------------------------------------------------------------------*/
-        virtual void _setup(ApplicationContextBase* context)
+        virtual void _setup(Ogre::RenderWindow* window, Ogre::FileSystemLayer* fsLayer, Ogre::OverlaySystem* overlaySys)
         {
-            mContext = context;
-            mWindow = context->getRenderWindow();
+            // assign mRoot here in case Root was initialised after the Sample's constructor ran.
+            mRoot = Ogre::Root::getSingletonPtr();
+            mOverlaySystem = overlaySys;
+            mWindow = window;
 
+            mFSLayer = fsLayer;
+
+            locateResources();
             createSceneManager();
             setupView();
+
+            loadResources();
+            mResourcesLoaded = true;
             setupContent();
             mContentSetup = true;
 
@@ -178,6 +153,7 @@ namespace OgreBites
         | Shuts down a sample. Used by the SampleContext class. Do not call directly.
         -----------------------------------------------------------------------------*/
         virtual void _shutdown()
+
         {
             Ogre::ControllerManager::getSingleton().clearControllers();
 
@@ -187,13 +163,15 @@ namespace OgreBites
                 mSceneMgr->clearScene();
             mContentSetup = false;
 
-            unloadResources();
+            if (mResourcesLoaded)
+                unloadResources();
+            mResourcesLoaded = false;
             if (mSceneMgr) 
             {
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
+#ifdef INCLUDE_RTSHADER_SYSTEM
                 mShaderGenerator->removeSceneManager(mSceneMgr);
 #endif
-                mSceneMgr->removeRenderQueueListener(mContext->getOverlaySystem());
+                mSceneMgr->removeRenderQueueListener(mOverlaySystem);
                 mRoot->destroySceneManager(mSceneMgr);              
             }
             mSceneMgr = 0;
@@ -202,7 +180,8 @@ namespace OgreBites
         }
 
         /*-----------------------------------------------------------------------------
-        | Actions to perform when the context stops
+        | Actions to perform when the context stops sending frame listener events
+        | and input device events to this sample.
         -----------------------------------------------------------------------------*/
         virtual void paused() {}
 
@@ -221,7 +200,39 @@ namespace OgreBites
         | Restores the sample state. Optional. Used during reconfiguration.
         -----------------------------------------------------------------------------*/
         virtual void restoreState(Ogre::NameValuePairList& state) {}
+
+        // callback interface copied from various listeners to be used by SampleContext
+
+        virtual bool frameStarted(const Ogre::FrameEvent& evt) { return true; }
+        virtual bool frameRenderingQueued(const Ogre::FrameEvent& evt) { return true; }
+        virtual bool frameEnded(const Ogre::FrameEvent& evt) { return true; }
+        virtual void windowMoved(Ogre::RenderWindow* rw) {}
+        virtual void windowResized(Ogre::RenderWindow* rw) {}
+        virtual bool windowClosing(Ogre::RenderWindow* rw) { return true; }
+        virtual void windowClosed(Ogre::RenderWindow* rw) {}
+        virtual void windowFocusChange(Ogre::RenderWindow* rw) {}
+        virtual bool keyPressed(const KeyboardEvent& evt) { return true; }
+        virtual bool keyReleased(const KeyboardEvent& evt) { return true; }
+        virtual bool touchMoved(const TouchFingerEvent& evt) { return true; }
+        virtual bool touchPressed(const TouchFingerEvent& evt) { return true; }
+        virtual bool touchReleased(const TouchFingerEvent& evt) { return true; }
+        virtual bool mouseMoved(const MouseMotionEvent& evt) { return true; }
+        virtual bool mouseWheelRolled(const MouseWheelEvent& evt) { return true; }
+        virtual bool mousePressed(const MouseButtonEvent& evt) { return true; }
+        virtual bool mouseReleased(const MouseButtonEvent& evt) { return true; }
     protected:
+
+        /*-----------------------------------------------------------------------------
+        | Finds sample-specific resources. No such effort is made for most samples,
+        | but this is useful for special samples with large, exclusive resources.
+        -----------------------------------------------------------------------------*/
+        virtual void locateResources() {}
+
+        /*-----------------------------------------------------------------------------
+        | Loads sample-specific resources. No such effort is made for most samples,
+        | but this is useful for special samples with large, exclusive resources.
+        -----------------------------------------------------------------------------*/
+        virtual void loadResources() {}
 
         /*-----------------------------------------------------------------------------
         | Creates a scene manager for the sample. A generic one is the default,
@@ -230,16 +241,11 @@ namespace OgreBites
         virtual void createSceneManager()
         {
             mSceneMgr = Ogre::Root::getSingleton().createSceneManager();
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
+#ifdef INCLUDE_RTSHADER_SYSTEM
             mShaderGenerator->addSceneManager(mSceneMgr);
-            auto mainRenderState = mShaderGenerator->getRenderState(Ogre::MSN_SHADERGEN);
-            // reset global light state
-            mainRenderState->setLightCount(0);
-            mainRenderState->setLightCountAutoUpdate(true);
-            mainRenderState->resetToBuiltinSubRenderStates();
 #endif
-            if(auto overlaySystem = mContext->getOverlaySystem())
-                mSceneMgr->addRenderQueueListener(overlaySystem);
+            if(mOverlaySystem)
+                mSceneMgr->addRenderQueueListener(mOverlaySystem);
         }
 
         /*-----------------------------------------------------------------------------
@@ -263,35 +269,32 @@ namespace OgreBites
         -----------------------------------------------------------------------------*/
         virtual void unloadResources()
         {
-            for (auto& it : Ogre::ResourceGroupManager::getSingleton().getResourceManagers())
+            Ogre::ResourceGroupManager::ResourceManagerIterator resMgrs =
+            Ogre::ResourceGroupManager::getSingleton().getResourceManagerIterator();
+
+            while (resMgrs.hasMoreElements())
             {
-                it.second->unloadUnreferencedResources();
+                resMgrs.getNext()->unloadUnreferencedResources();
             }
         }   
 
-        ApplicationContextBase* mContext;
         Ogre::Root* mRoot;                // OGRE root object
+        Ogre::OverlaySystem* mOverlaySystem; // OverlaySystem
         Ogre::RenderWindow* mWindow;      // context render window
+        Ogre::FileSystemLayer* mFSLayer;          // file system abstraction layer
         Ogre::SceneManager* mSceneMgr;    // scene manager for this sample
         Ogre::NameValuePairList mInfo;    // custom sample info
-
-        Ogre::Viewport* mViewport;          // main viewport
-        Ogre::Camera* mCamera;              // main camera
-        Ogre::SceneNode* mCameraNode;       // camera node
-
-        bool mDone;               // flag to mark the end of the sample
+        bool mDone;                       // flag to mark the end of the sample
+        bool mResourcesLoaded;    // whether or not resources have been loaded
         bool mContentSetup;       // whether or not scene was created
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
+#ifdef INCLUDE_RTSHADER_SYSTEM
         Ogre::RTShader::ShaderGenerator*            mShaderGenerator;           // The Shader generator instance.
     public:
         void setShaderGenerator(Ogre::RTShader::ShaderGenerator* shaderGenerator) 
         { 
             mShaderGenerator = shaderGenerator;
-        }
+        };
 #endif
-    private:
-        // VisualTest fields
-        std::set<int> mScreenshotFrames;
     };
 
     typedef std::set<Sample*, Sample::Comparer> SampleSet;

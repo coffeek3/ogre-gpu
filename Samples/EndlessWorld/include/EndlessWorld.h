@@ -56,6 +56,7 @@ public:
 		, mTerrainPagedWorldSection(0)
 		, mPerlinNoiseTerrainGenerator(0)
         , mLodStatus(false)
+		, mAutoLod(true)
 		, mFly(true)
 		, mFallVelocity(0)
         , mTerrainPos(0,0,0)
@@ -72,7 +73,26 @@ public:
 			"Use C to generate another random terrain";
 	}
 
-    bool frameRenderingQueued(const FrameEvent& evt) override
+    void testCapabilities(const RenderSystemCapabilities* caps)
+	{
+        if (!caps->hasCapability(RSC_VERTEX_PROGRAM) || !caps->hasCapability(RSC_FRAGMENT_PROGRAM))
+        {
+			OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Your graphics card does not support vertex or fragment shaders, "
+                        "so you cannot run this sample. Sorry!", "Sample_EndlessWorld::testCapabilities");
+        }
+	}
+    
+	StringVector getRequiredPlugins()
+	{
+		StringVector names;
+		if(!GpuProgramManager::getSingleton().isSyntaxSupported("glsles")
+		&& !GpuProgramManager::getSingleton().isSyntaxSupported("glsl")
+		&& !GpuProgramManager::getSingleton().isSyntaxSupported("hlsl"))
+            names.push_back("Cg Program Manager");
+		return names;
+	}
+
+    bool frameRenderingQueued(const FrameEvent& evt)
     {
 		if (!mFly)
 		{
@@ -109,9 +129,10 @@ public:
 			}
 			mLodStatusLabelList.clear();
 
-			for (const auto& ti : mTerrainGroup->getTerrainSlots())
+			TerrainGroup::TerrainIterator ti = mTerrainGroup->getTerrainIterator();
+			while(ti.hasMoreElements())
 			{
-				Terrain* t = ti.second->instance;
+				Terrain* t = ti.getNext()->instance;
 				if (!t)
 					continue;
 
@@ -137,11 +158,11 @@ public:
 			}
 		}
 
-		mTerrainGroup->autoUpdateLodAll(false, Real(HOLD_LOD_DISTANCE));
+		mTerrainGroup->autoUpdateLodAll(false, Any( Real(HOLD_LOD_DISTANCE) ));
 		return SdkSample::frameRenderingQueued(evt);  // don't forget the parent updates!
     }
 
-	bool keyPressed (const KeyboardEvent &e) override
+	bool keyPressed (const KeyboardEvent &e)
 	{
 #if OGRE_PLATFORM != OGRE_PLATFORM_APPLE_IOS
 		switch (e.keysym.sym)
@@ -149,9 +170,11 @@ public:
 		case SDLK_PAGEUP:
 			{
 				mAutoBox->setChecked(false);
-				for (const auto& ti : mTerrainGroup->getTerrainSlots())
+				TerrainGroup::TerrainIterator ti = mTerrainGroup->getTerrainIterator();
+				while(ti.hasMoreElements())
 				{
-					if(Terrain* t = ti.second->instance)
+					Terrain* t = ti.getNext()->instance;
+					if (t)
 						t->increaseLodLevel();
 				}
 			}
@@ -159,9 +182,11 @@ public:
 		case SDLK_PAGEDOWN:
 			{
 				mAutoBox->setChecked(false);
-				for (const auto& ti : mTerrainGroup->getTerrainSlots())
+				TerrainGroup::TerrainIterator ti = mTerrainGroup->getTerrainIterator();
+				while(ti.hasMoreElements())
 				{
-					if(Terrain* t = ti.second->instance)
+					Terrain* t = ti.getNext()->instance;
+					if (t)
 						t->decreaseLodLevel();
 				}
 			}
@@ -174,10 +199,13 @@ public:
 				mPerlinNoiseTerrainGenerator->randomize();
 
 				// reload all terrains
-				for (const auto& ti : mTerrainGroup->getTerrainSlots())
+				TerrainGroup::TerrainIterator ti = mTerrainGroup->getTerrainIterator();
+				while(ti.hasMoreElements())
 				{
-					mTerrainPagedWorldSection->unloadPage(ti.first);
-					mTerrainPagedWorldSection->loadPage(ti.first);
+					TerrainGroup::TerrainSlot* slot = ti.getNext();
+					PageID pageID = mTerrainGroup->packIndex( slot->x, slot->y );
+					mTerrainPagedWorldSection->unloadPage(pageID);
+					mTerrainPagedWorldSection->loadPage(pageID);
 				}
 			}
 			break;
@@ -189,7 +217,7 @@ public:
 		return true;
 	}
 
-	void checkBoxToggled(CheckBox* box) override
+	void checkBoxToggled(CheckBox* box)
 	{
 		if (box == mFlyBox)
 		{
@@ -212,8 +240,16 @@ public:
 		{
 			if(mTerrainGroup)
 			{
-				auto strategy = mAutoBox->isChecked() ? BY_DISTANCE : NONE;
-				mTerrainGroup->setAutoUpdateLod(TerrainAutoUpdateLodFactory::getAutoUpdateLod(strategy));
+				if(!mAutoLod && mAutoBox->isChecked())
+				{
+					mTerrainGroup->setAutoUpdateLod( TerrainAutoUpdateLodFactory::getAutoUpdateLod(BY_DISTANCE) );
+					mAutoLod = true;
+				}
+				else if(mAutoLod && !mAutoBox->isChecked())
+				{
+					mTerrainGroup->setAutoUpdateLod( TerrainAutoUpdateLodFactory::getAutoUpdateLod(BY_DISTANCE) );
+					mAutoLod = false;
+				}
 			}
 		}
 	}
@@ -228,15 +264,16 @@ protected:
 	TerrainPagedWorldSection* mTerrainPagedWorldSection;
 	PerlinNoiseTerrainGenerator* mPerlinNoiseTerrainGenerator;
 	bool mLodStatus;
+	bool mAutoLod;
 
 	/// This class just pretends to provide procedural page content to avoid page loading
 	class DummyPageProvider : public PageProvider
 	{
 	public:
-		bool prepareProceduralPage(Page* page, PagedWorldSection* section) override { return true; }
-		bool loadProceduralPage(Page* page, PagedWorldSection* section) override { return true; }
-		bool unloadProceduralPage(Page* page, PagedWorldSection* section) override { return true; }
-		bool unprepareProceduralPage(Page* page, PagedWorldSection* section) override { return true; }
+		bool prepareProceduralPage(Page* page, PagedWorldSection* section) { return true; }
+		bool loadProceduralPage(Page* page, PagedWorldSection* section) { return true; }
+		bool unloadProceduralPage(Page* page, PagedWorldSection* section) { return true; }
+		bool unprepareProceduralPage(Page* page, PagedWorldSection* section) { return true; }
 	};
 	DummyPageProvider mDummyPageProvider;
 
@@ -276,16 +313,22 @@ protected:
 		defaultimp.minBatchSize = 33;
 		defaultimp.maxBatchSize = 65;
 		// textures
-		defaultimp.layerList.resize(1);
-		defaultimp.layerList[0].worldSize = 200;
-		defaultimp.layerList[0].textureNames.push_back("Ground37_diffspec.dds");
-		defaultimp.layerList[0].textureNames.push_back("Ground37_normheight.dds");
+		defaultimp.layerList.resize(3);
+		defaultimp.layerList[0].worldSize = 100;
+		defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_diffusespecular.dds");
+		defaultimp.layerList[0].textureNames.push_back("dirt_grayrocky_normalheight.dds");
+		defaultimp.layerList[1].worldSize = 30;
+		defaultimp.layerList[1].textureNames.push_back("grass_green-01_diffusespecular.dds");
+		defaultimp.layerList[1].textureNames.push_back("grass_green-01_normalheight.dds");
+		defaultimp.layerList[2].worldSize = 200;
+		defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_diffusespecular.dds");
+		defaultimp.layerList[2].textureNames.push_back("growth_weirdfungus-03_normalheight.dds");
 	}
 
 	/*-----------------------------------------------------------------------------
 	| Extends setupView to change some initial camera settings for this sample.
 	-----------------------------------------------------------------------------*/
-	void setupView() override
+	void setupView()
 	{
 		SdkSample::setupView();
 		// put camera at world center, so that it's difficult to reach the edge
@@ -296,8 +339,13 @@ protected:
 			);
 		mCameraNode->setPosition(mTerrainPos+worldCenter);
 		mCameraNode->lookAt(mTerrainPos, Node::TS_PARENT);
-		mCamera->setNearClipDistance(5);
-		mCamera->setFarClipDistance(0);   // enable infinite far clip distance
+		mCamera->setNearClipDistance(0.1);
+		mCamera->setFarClipDistance(50000);
+
+		if (mRoot->getRenderSystem()->getCapabilities()->hasCapability(RSC_INFINITE_FAR_PLANE))
+        {
+            mCamera->setFarClipDistance(0);   // enable infinite far clip distance if we can
+        }
 	}
 
 	void setupControls()
@@ -329,7 +377,7 @@ protected:
 	class SimpleTerrainDefiner : public TerrainPagedWorldSection::TerrainDefiner
 	{
 	public:
-		void define(TerrainGroup* terrainGroup, long x, long y) override
+		virtual void define(TerrainGroup* terrainGroup, long x, long y)
 		{
 			Image img;
 			img.load("terrain.png", ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
@@ -341,31 +389,30 @@ protected:
 		}
 	};
 
-	void setupContent() override
+	void setupContent()
 	{
 		mTerrainGlobals = OGRE_NEW TerrainGlobalOptions();
 
+		setupControls();
 		mCameraMan->setTopSpeed(100);
 
 		setDragLook(true);
 
-#if OGRE_PLATFORM != OGRE_PLATFORM_ANDROID
 		MaterialManager::getSingleton().setDefaultTextureFiltering(TFO_ANISOTROPIC);
-		MaterialManager::getSingleton().setDefaultAnisotropy(8);
-#endif
+		MaterialManager::getSingleton().setDefaultAnisotropy(7);
 
 		mSceneMgr->setFog(FOG_LINEAR, ColourValue(0.7, 0.7, 0.8), 0, 4000, 10000);
 
-		LogManager::getSingleton().setMinLogLevel(LML_TRIVIAL);
+		LogManager::getSingleton().setLogDetail(LL_BOREME);
+
+		Vector3 lightdir(0.55, -0.3, 0.75);
+		lightdir.normalise();
 
 		Light* l = mSceneMgr->createLight("tstLight");
 		l->setType(Light::LT_DIRECTIONAL);
+		l->setDirection(lightdir);
 		l->setDiffuseColour(ColourValue::White);
 		l->setSpecularColour(ColourValue(0.4, 0.4, 0.4));
-
-	    auto ln = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-	    ln->setDirection(Vector3(0.55, -0.3, 0.75).normalisedCopy());
-	    ln->attachObject(l);
 
 		mSceneMgr->setAmbientLight(ColourValue(0.2, 0.2, 0.2));
 
@@ -410,11 +457,9 @@ protected:
 
 		mLodInfoOverlay->add2D(mLodInfoOverlayContainer);
 		mLodInfoOverlay->show();
-
-		setupControls();
 	}
 
-	void _shutdown() override
+	void _shutdown()
 	{
 		if(mTerrainPaging)
 		{

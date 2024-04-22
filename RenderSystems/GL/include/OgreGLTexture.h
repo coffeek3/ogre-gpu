@@ -52,9 +52,9 @@ namespace Ogre {
 
     protected:
         /// @copydoc Texture::createInternalResourcesImpl
-        void createInternalResourcesImpl(void) override;
+        void createInternalResourcesImpl(void);
         /// @copydoc Texture::freeInternalResourcesImpl
-        void freeInternalResourcesImpl(void) override;
+        void freeInternalResourcesImpl(void);
 
         /** internal method, create GLHardwarePixelBuffers for every face and
              mipmap level. This method must be called after the GL texture object was created,

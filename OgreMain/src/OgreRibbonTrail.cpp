@@ -35,15 +35,15 @@ namespace Ogre
     {
         /** Controller value for pass frame time to RibbonTrail
         */
-        class _OgrePrivate TimeControllerValue : public ControllerValue<float>
+        class _OgrePrivate TimeControllerValue : public ControllerValue<Real>
         {
         protected:
             RibbonTrail* mTrail;
         public:
             TimeControllerValue(RibbonTrail* r) { mTrail = r; }
 
-            float getValue(void) const override { return 0; }// not a source
-            void setValue(float value) override { mTrail->_timeUpdate(value); }
+            Real getValue(void) const { return 0; }// not a source 
+            void setValue(Real value) { mTrail->_timeUpdate(value); }
         };
     }
     //-----------------------------------------------------------------------
@@ -66,9 +66,9 @@ namespace Ogre
     RibbonTrail::~RibbonTrail()
     {
         // Detach listeners
-        for (auto & i : mNodeList)
+        for (NodeList::iterator i = mNodeList.begin(); i != mNodeList.end(); ++i)
         {
-            i->setListener(0);
+            (*i)->setListener(0);
         }
 
         if (mFadeController)
@@ -148,7 +148,6 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void RibbonTrail::setTrailLength(Real len)
     {
-        OgreAssert(len > 0, "invalid value");
         mTrailLength = len;
         mElemLength = mTrailLength / mMaxElementsPerChain;
         mSquaredElemLength = mElemLength * mElemLength;
@@ -165,8 +164,13 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void RibbonTrail::setNumberOfChains(size_t numChains)
     {
-        OgreAssert(numChains >= mNodeList.size(),
-                   "Can't shrink the number of chains less than number of tracking nodes");
+        if (numChains < mNodeList.size())
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                "Can't shrink the number of chains less than number of tracking nodes",
+                "RibbonTrail::setNumberOfChains");
+        }
+
         size_t oldChains = getNumberOfChains();
 
         BillboardChain::setNumberOfChains(numChains);
@@ -216,12 +220,45 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void RibbonTrail::setInitialColour(size_t chainIndex, float r, float g, float b, float a)
     {
-        mInitialColour.at(chainIndex) = ColourValue(r, g, b, a);
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::setInitialColour");
+        }
+        mInitialColour[chainIndex].r = r;
+        mInitialColour[chainIndex].g = g;
+        mInitialColour[chainIndex].b = b;
+        mInitialColour[chainIndex].a = a;
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& RibbonTrail::getInitialColour(size_t chainIndex) const
+    {
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::getInitialColour");
+        }
+        return mInitialColour[chainIndex];
     }
     //-----------------------------------------------------------------------
     void RibbonTrail::setInitialWidth(size_t chainIndex, Real width)
     {
-        mInitialWidth.at(chainIndex) = width;
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::setInitialWidth");
+        }
+        mInitialWidth[chainIndex] = width;
+    }
+    //-----------------------------------------------------------------------
+    Real RibbonTrail::getInitialWidth(size_t chainIndex) const
+    {
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::getInitialWidth");
+        }
+        return mInitialWidth[chainIndex];
     }
     //-----------------------------------------------------------------------
     void RibbonTrail::setColourChange(size_t chainIndex, const ColourValue& valuePerSecond)
@@ -232,14 +269,50 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void RibbonTrail::setColourChange(size_t chainIndex, float r, float g, float b, float a)
     {
-        mDeltaColour.at(chainIndex) = ColourValue(r, g, b, a);
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::setColourChange");
+        }
+        mDeltaColour[chainIndex].r = r;
+        mDeltaColour[chainIndex].g = g;
+        mDeltaColour[chainIndex].b = b;
+        mDeltaColour[chainIndex].a = a;
+
         manageController();
+
+    }
+    //-----------------------------------------------------------------------
+    const ColourValue& RibbonTrail::getColourChange(size_t chainIndex) const
+    {
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::getColourChange");
+        }
+        return mDeltaColour[chainIndex];
     }
     //-----------------------------------------------------------------------
     void RibbonTrail::setWidthChange(size_t chainIndex, Real widthDeltaPerSecond)
     {
-        mDeltaWidth.at(chainIndex) = widthDeltaPerSecond;
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::setWidthChange");
+        }
+        mDeltaWidth[chainIndex] = widthDeltaPerSecond;
         manageController();
+    }
+    //-----------------------------------------------------------------------
+    Real RibbonTrail::getWidthChange(size_t chainIndex) const
+    {
+        if (chainIndex >= mChainCount)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
+                "chainIndex out of bounds", "RibbonTrail::getWidthChange");
+        }
+        return mDeltaWidth[chainIndex];
+
     }
     //-----------------------------------------------------------------------
     void RibbonTrail::manageController(void)
@@ -379,7 +452,7 @@ namespace Ogre
 
                     Element& elem = mChainElementList[seg.start + e];
                     elem.width = elem.width - (time * mDeltaWidth[s]);
-                    elem.width = std::max(0.0f, elem.width);
+                    elem.width = std::max(Real(0.0f), elem.width);
                     elem.colour = elem.colour - (mDeltaColour[s] * time);
                     elem.colour.saturate();
 
@@ -423,15 +496,15 @@ namespace Ogre
     //-----------------------------------------------------------------------
     const String& RibbonTrail::getMovableType(void) const
     {
-        return MOT_RIBBON_TRAIL;
+        return RibbonTrailFactory::FACTORY_TYPE_NAME;
     }
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
-    const String MOT_RIBBON_TRAIL = "RibbonTrail";
+    String RibbonTrailFactory::FACTORY_TYPE_NAME = "RibbonTrail";
     //-----------------------------------------------------------------------
     const String& RibbonTrailFactory::getType(void) const
     {
-        return MOT_RIBBON_TRAIL;
+        return FACTORY_TYPE_NAME;
     }
     //-----------------------------------------------------------------------
     MovableObject* RibbonTrailFactory::createInstanceImpl( const String& name,
@@ -470,6 +543,14 @@ namespace Ogre
         return OGRE_NEW RibbonTrail(name, maxElements, numberOfChains, useTex, useCol);
 
     }
+    //-----------------------------------------------------------------------
+    void RibbonTrailFactory::destroyInstance( MovableObject* obj)
+    {
+        OGRE_DELETE obj;
+    }
+
+
+
 
 }
 

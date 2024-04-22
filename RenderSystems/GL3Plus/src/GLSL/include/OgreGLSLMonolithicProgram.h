@@ -31,7 +31,7 @@
 #include "OgreGL3PlusPrerequisites.h"
 #include "OgreGpuProgram.h"
 #include "OgreHardwareVertexBuffer.h"
-#include "OgreGL3PlusHardwareBuffer.h"
+#include "OgreGL3PlusHardwareUniformBuffer.h"
 #include "OgreGLSLProgram.h"
 
 namespace Ogre {
@@ -50,28 +50,45 @@ namespace Ogre {
     {
     protected:
         /// Compiles and links the vertex and fragment programs
-        void compileAndLink(void) override;
+        void compileAndLink(void);
 
         void buildGLUniformReferences(void);
 
     public:
         /// Constructor should only be used by GLSLMonolithicProgramManager
-        explicit GLSLMonolithicProgram(const GLShaderList& shaders);
+        GLSLMonolithicProgram(GLSLShader* vertexProgram,
+                              GLSLShader* hullProgram,
+                              GLSLShader* domainProgram,
+                              GLSLShader* geometryProgram,
+                              GLSLShader* fragmentProgram,
+                              GLSLShader* computeProgram);
         ~GLSLMonolithicProgram(void);
 
         /** Makes a program object active by making sure it is linked
             and then putting it in use.
         */
-        void activate(void) override;
+        void activate(void);
 
         /** Updates program object uniforms using data from
             GpuProgramParameters.  normally called by
             GLSLShader::bindParameters() just before rendering
             occurs.
         */
-        void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) override;
+        void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object uniform blocks using data from
+            GpuProgramParameters.  normally called by
+            GLSLShader::bindParameters() just before rendering
+            occurs.
+        */
+        void updateUniformBlocks(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object uniforms using data from pass
+            iteration GpuProgramParameters.  normally called by
+            GLSLShader::bindMultiPassParameters() just before multi
+            pass rendering occurs.
+        */
+        void updatePassIterationUniforms(GpuProgramParametersSharedPtr params);
 
-        void updateAtomicCounters(const GpuProgramParametersSharedPtr& params, uint16 mask,
+        void updateAtomicCounters(GpuProgramParametersSharedPtr params, uint16 mask,
                                   GpuProgramType fromProgType) {}
     };
 

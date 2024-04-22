@@ -30,11 +30,10 @@ THE SOFTWARE.
 
 #include "OgrePrerequisites.h"
 #include "OgrePixelFormat.h"
+#include "OgreIteratorWrappers.h"
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre {
-    template <typename T> class VectorIterator;
-
     /** \addtogroup Core
     *  @{
     */
@@ -69,7 +68,6 @@ namespace Ogre {
             String refTexName;  //If a reference, the name of the texture in the compositor being referenced
             uint32 width;       // 0 means adapt to target width
             uint32 height;      // 0 means adapt to target height
-            TextureType type;   // either 2d or cubic
             float widthFactor;  // multiple of target width to use (if width = 0)
             float heightFactor; // multiple of target height to use (if height = 0)
             PixelFormatList formatList; // more than one means MRT
@@ -79,7 +77,7 @@ namespace Ogre {
             bool pooled;        // whether to use pooled textures for this one
             TextureScope scope; // Which scope has access to this texture
 
-            TextureDefinition() :width(0), height(0), type(TEX_TYPE_2D), widthFactor(1.0f), heightFactor(1.0f),
+            TextureDefinition() :width(0), height(0), widthFactor(1.0f), heightFactor(1.0f), 
                 fsaa(true), hwGammaWrite(false), depthBufferId(1), pooled(false), scope(TS_LOCAL) {}
         };
         /// Typedefs for several iterators
@@ -98,15 +96,18 @@ namespace Ogre {
         void removeTextureDefinition(size_t idx);
         
         /** Get a local texture definition.
+        @deprecated use getTextureDefinitions()
         */
-        TextureDefinition *getTextureDefinition(size_t idx) const { return mTextureDefinitions.at(idx); }
+        TextureDefinition *getTextureDefinition(size_t idx);
         
         /** Get a local texture definition with a specific name.
         */
-        TextureDefinition *getTextureDefinition(const String& name) const;
+        TextureDefinition *getTextureDefinition(const String& name);
 
-        /** Get the number of local texture definitions.*/
-        size_t getNumTextureDefinitions() const { return mTextureDefinitions.size(); }
+        /** Get the number of local texture definitions.
+        @deprecated use getTextureDefinitions()
+        */
+        OGRE_DEPRECATED size_t getNumTextureDefinitions();
         
         /** Remove all Texture Definitions
         */
@@ -127,11 +128,14 @@ namespace Ogre {
         void removeTargetPass(size_t idx);
         
         /** Get a target pass.
+        @deprecated use getTargetPasses()
         */
-        CompositionTargetPass* getTargetPass(size_t idx) const { return mTargetPasses.at(idx); }
+        OGRE_DEPRECATED CompositionTargetPass *getTargetPass(size_t idx);
         
-        /** Get the number of target passes. */
-        size_t getNumTargetPasses() const { return mTargetPasses.size(); }
+        /** Get the number of target passes.
+        @deprecated use getTargetPasses()
+        */
+        OGRE_DEPRECATED size_t getNumTargetPasses();
         
         /** Remove all target passes.
         */
@@ -145,7 +149,7 @@ namespace Ogre {
         
         /** Get output (final) target pass
          */
-        CompositionTargetPass *getOutputTargetPass() const { return mOutputTarget; }
+        CompositionTargetPass *getOutputTargetPass();
         
         /** Determine if this technique is supported on the current rendering device. 
         @param allowTextureDegradation True to accept a reduction in texture depth

@@ -29,7 +29,7 @@ THE SOFTWARE.
 
 #include "OgreShaderPrerequisites.h"
 #include "OgreShaderSubRenderState.h"
-#include "OgreVector.h"
+#include "OgreVector4.h"
 #include "OgreLight.h"
 #include "OgreCommon.h"
 
@@ -48,28 +48,28 @@ public:
     /** 
     @see SubRenderState::getType.
     */
-    const Ogre::String& getType() const override;
+    virtual const Ogre::String& getType() const;
 
     /** 
     @see SubRenderState::getType.
     */
-    int getExecutionOrder() const override;
+    virtual int getExecutionOrder() const;
 
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    void updateGpuProgramsParams(Ogre::Renderable* rend, const Ogre::Pass* pass, const Ogre::AutoParamDataSource* source, const Ogre::LightList* pLightList) override;
+    virtual void updateGpuProgramsParams(Ogre::Renderable* rend, const Ogre::Pass* pass, const Ogre::AutoParamDataSource* source, const Ogre::LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
     */
-    void copyFrom(const Ogre::RTShader::SubRenderState& rhs) override;
+    virtual void copyFrom(const Ogre::RTShader::SubRenderState& rhs);
 
 
     /** 
     @see SubRenderState::preAddToRenderState.
     */
-    bool preAddToRenderState(const Ogre::RTShader::RenderState* renderState, Ogre::Pass* srcPass, Ogre::Pass* dstPass) override;
+    virtual bool preAddToRenderState(const Ogre::RTShader::RenderState* renderState, Ogre::Pass* srcPass, Ogre::Pass* dstPass);
 
 
 
@@ -114,8 +114,13 @@ protected:
     Set the light count per light type that this sub render state will generate.
     @see ShaderGenerator::setLightCount.
     */
-    void setLightCount(int lightCount);
+    void setLightCount(const int lightCount[3]);
 
+    /** 
+    Get the light count per light type that this sub render state will generate.
+    @see ShaderGenerator::getLightCount.
+    */
+    void getLightCount(int lightCount[3]) const;
     /** 
     Set the specular component state. If set to true this sub render state will compute a specular
     lighting component in addition to the diffuse component.
@@ -132,7 +137,7 @@ protected:
     /** 
     @see SubRenderState::resolveParameters.
     */
-    bool resolveParameters(Ogre::RTShader::ProgramSet* programSet) override;
+    virtual bool resolveParameters(Ogre::RTShader::ProgramSet* programSet);
 
     /** Resolve global lighting parameters */
     bool resolveGlobalParameters(Ogre::RTShader::ProgramSet* programSet);
@@ -143,12 +148,12 @@ protected:
     /** 
     @see SubRenderState::resolveDependencies.
     */
-    bool resolveDependencies(Ogre::RTShader::ProgramSet* programSet) override;
+    virtual bool resolveDependencies(Ogre::RTShader::ProgramSet* programSet);
 
     /** 
     @see SubRenderState::addFunctionInvocations.
     */
-    bool addFunctionInvocations(Ogre::RTShader::ProgramSet* programSet) override;
+    virtual bool addFunctionInvocations(Ogre::RTShader::ProgramSet* programSet);
 
 
     /** 
@@ -233,17 +238,17 @@ public:
     /** 
     @see SubRenderStateFactory::getType.
     */
-    const Ogre::String& getType() const override;
+    virtual const Ogre::String& getType() const;
 
     /** 
     @see SubRenderStateFactory::createInstance.
     */
-    Ogre::RTShader::SubRenderState* createInstance(Ogre::ScriptCompiler* compiler, Ogre::PropertyAbstractNode* prop, Ogre::Pass* pass, Ogre::RTShader::SGScriptTranslator* translator) override;
+    virtual Ogre::RTShader::SubRenderState* createInstance(Ogre::ScriptCompiler* compiler, Ogre::PropertyAbstractNode* prop, Ogre::Pass* pass, Ogre::RTShader::SGScriptTranslator* translator);
 
     /** 
     @see SubRenderStateFactory::writeInstance.
     */
-    void writeInstance(Ogre::MaterialSerializer* ser, Ogre::RTShader::SubRenderState* subRenderState, Ogre::Pass* srcPass, Ogre::Pass* dstPass) override;
+    virtual void writeInstance(Ogre::MaterialSerializer* ser, Ogre::RTShader::SubRenderState* subRenderState, Ogre::Pass* srcPass, Ogre::Pass* dstPass);
 
 
 protected:
@@ -251,7 +256,7 @@ protected:
     /** 
     @see SubRenderStateFactory::createInstanceImpl.
     */
-    Ogre::RTShader::SubRenderState* createInstanceImpl() override;
+    virtual Ogre::RTShader::SubRenderState* createInstanceImpl();
 
 
 };

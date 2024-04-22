@@ -24,6 +24,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
+OgrePCZSceneQuery.h  -  description
+-----------------------------------------------------------------------------
+begin                : Wed Feb 21, 2007
+author               : Eric Cha
+email                : ericc@xenopi.com
+Code Style Update    :
+-----------------------------------------------------------------------------
 */
 
 #ifndef PCZSCENEQUERY_H
@@ -44,7 +51,7 @@ namespace Ogre
         ~PCZIntersectionSceneQuery();
 
         /** See IntersectionSceneQuery. */
-        void execute(IntersectionSceneQueryListener* listener) override;
+        void execute(IntersectionSceneQueryListener* listener);
     };
     /** PCZ implementation of AxisAlignedBoxSceneQuery. */
     class _OgrePCZPluginExport PCZAxisAlignedBoxSceneQuery : public DefaultAxisAlignedBoxSceneQuery
@@ -54,7 +61,7 @@ namespace Ogre
         ~PCZAxisAlignedBoxSceneQuery();
 
         /** See RaySceneQuery. */
-        void execute(SceneQueryListener* listener) override;
+        void execute(SceneQueryListener* listener);
 
         /** set the zone to start the scene query */
         void setStartZone(PCZone * startZone) {mStartZone = startZone;}
@@ -72,7 +79,7 @@ namespace Ogre
         ~PCZRaySceneQuery();
 
         /** See RayScenQuery. */
-        void execute(RaySceneQueryListener* listener) override;
+        void execute(RaySceneQueryListener* listener);
 
         /** set the zone to start the scene query */
         void setStartZone(PCZone * startZone) {mStartZone = startZone;}
@@ -90,7 +97,7 @@ namespace Ogre
         ~PCZSphereSceneQuery();
 
         /** See SceneQuery. */
-        void execute(SceneQueryListener* listener) override;
+        void execute(SceneQueryListener* listener);
 
         /** set the zone to start the scene query */
         void setStartZone(PCZone * startZone) {mStartZone = startZone;}
@@ -108,7 +115,7 @@ namespace Ogre
         ~PCZPlaneBoundedVolumeListSceneQuery();
 
         /** See SceneQuery. */
-        void execute(SceneQueryListener* listener) override;
+        void execute(SceneQueryListener* listener);
 
         /** set the zone to start the scene query */
         void setStartZone(PCZone * startZone) {mStartZone = startZone;}

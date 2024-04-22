@@ -24,34 +24,63 @@ public:
             "start/stop a silly dance routine.";
     }
 
+    bool frameRenderingQueued(const FrameEvent& evt)
+    {
+        // let character update animations and camera
+        mChara->addTime(evt.timeSinceLastFrame);
+        return SdkSample::frameRenderingQueued(evt);
+    }
+    
+    bool keyPressed(const KeyboardEvent& evt)
+    {
+        // relay input events to character controller
+        if (!mTrayMgr->isDialogVisible()) mChara->injectKeyDown(evt);
+        return SdkSample::keyPressed(evt);
+    }
+    
+    bool keyReleased(const KeyboardEvent& evt)
+    {
+        // relay input events to character controller
+        if (!mTrayMgr->isDialogVisible()) mChara->injectKeyUp(evt);
+        return SdkSample::keyReleased(evt);
+    }
+
+    bool mouseMoved(const MouseMotionEvent& evt)
+    {
+        // Relay input events to character controller.
+        if (!mTrayMgr->isDialogVisible()) mChara->injectMouseMove(evt);
+        return SdkSample::mouseMoved(evt);
+    }
+
+    virtual bool mouseWheelRolled(const MouseWheelEvent& evt) {
+        // Relay input events to character controller.
+        if (!mTrayMgr->isDialogVisible()) mChara->injectMouseWheel(evt);
+        return SdkSample::mouseWheelRolled(evt);
+    }
+
+    bool mousePressed(const MouseButtonEvent& evt)
+    {
+        // Relay input events to character controller.
+        if (!mTrayMgr->isDialogVisible()) mChara->injectMouseDown(evt);
+        return SdkSample::mousePressed(evt);
+    }
+
 protected:
 
-    void setupContent() override
-    {
-#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
-        // add integrated depth shadows
-        auto& rtShaderGen = RTShader::ShaderGenerator::getSingleton();
-        auto schemRenderState = rtShaderGen.getRenderState(MSN_SHADERGEN);
-        schemRenderState->addTemplateSubRenderState(rtShaderGen.createSubRenderState(RTShader::SRS_SHADOW_MAPPING));
-
-        // Make this viewport work with shader generator scheme.
-        mViewport->setMaterialScheme(MSN_SHADERGEN);
-        // update scheme for FFP supporting rendersystems
-        MaterialManager::getSingleton().setActiveScheme(mViewport->getMaterialScheme());
-#endif
+    void setupContent()
+    {   
         // set background and some fog
         mViewport->setBackgroundColour(ColourValue(1.0f, 1.0f, 0.8f));
         mSceneMgr->setFog(Ogre::FOG_LINEAR, ColourValue(1.0f, 1.0f, 0.8f), 0, 15, 100);
 
         // set shadow properties
-        mSceneMgr->setShadowTechnique(SHADOWTYPE_TEXTURE_MODULATIVE_INTEGRATED);
-        mSceneMgr->setShadowTexturePixelFormat(PF_DEPTH16);
+        mSceneMgr->setShadowTechnique(SHADOWTYPE_TEXTURE_MODULATIVE);
         mSceneMgr->setShadowColour(ColourValue(0.5, 0.5, 0.5));
         mSceneMgr->setShadowTextureSize(1024);
         mSceneMgr->setShadowTextureCount(1);
         mSceneMgr->setShadowDirLightTextureOffset(0);
         mSceneMgr->setShadowFarDistance(50);
-        mSceneMgr->setShadowCameraSetup(LiSPSMShadowCameraSetup::create());
+        mSceneMgr->setShadowCameraSetup(FocusedShadowCameraSetup::create());
 
         // disable default camera control so the character can do its own
         mCameraMan->setStyle(CS_MANUAL);
@@ -60,7 +89,8 @@ protected:
         mSceneMgr->setAmbientLight(ColourValue(0.3, 0.3, 0.3));
 
         // add a bright light above the scene
-        Light* light = mSceneMgr->createLight(Light::LT_POINT);
+        Light* light = mSceneMgr->createLight();
+        light->setType(Light::LT_POINT);
         mSceneMgr->getRootSceneNode()
             ->createChildSceneNode(Vector3(-10, 40, 20))
             ->attachObject(light);
@@ -78,9 +108,7 @@ protected:
 
 //      LogManager::getSingleton().logMessage("creating sinbad");
         // create our character controller
-        mChara = std::make_unique<SinbadCharacterController>(mCamera);
-
-        mInputListenerChain = TouchAgnosticInputListenerChain(mWindow, {mTrayMgr.get(), this, mChara.get()});
+        mChara = new SinbadCharacterController(mCamera);
 
 //      LogManager::getSingleton().logMessage("toggling stats");
         mTrayMgr->toggleAdvancedFrameStats();
@@ -94,12 +122,18 @@ protected:
 //      LogManager::getSingleton().logMessage("all done");
     }
 
-    void cleanupContent() override
+    void cleanupContent()
     {
+        // clean up character controller and the floor mesh
+        if (mChara)
+        {
+            delete mChara;
+            mChara = 0;
+        }
         MeshManager::getSingleton().remove("floor", ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     }
 
-    std::unique_ptr<SinbadCharacterController> mChara;
+    SinbadCharacterController* mChara;
 };
 
 #endif

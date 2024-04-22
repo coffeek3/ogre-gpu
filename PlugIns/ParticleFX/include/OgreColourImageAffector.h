@@ -37,23 +37,25 @@ THE SOFTWARE.
 namespace Ogre {
 
 
-    class ColourImageAffector : public ParticleAffector
+    class _OgreParticleFXExport ColourImageAffector : public ParticleAffector
     {
     public:
         /** Command object for red adjust (see ParamCommand).*/
         class CmdImageAdjust : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
         /** Default constructor. */
         ColourImageAffector(ParticleSystem* psys);
 
-        void _initParticle(Particle* pParticle) override;
+        /** See ParticleAffector. */
+        void _initParticle(Particle* pParticle);
 
-        void _affectParticles(ParticleSystem* pSystem, Real timeElapsed) override;
+        /** See ParticleAffector. */
+        void _affectParticles(ParticleSystem* pSystem, Real timeElapsed);
 
         void setImageAdjust(String name);
         String getImageAdjust(void) const;

@@ -31,8 +31,37 @@ THE SOFTWARE.
 #include "OgrePrerequisites.h"
 #include "OgreHeaderPrefix.h"
 
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32 || OGRE_PLATFORM == OGRE_PLATFORM_WINRT
+#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32
+#    define DYNLIB_HANDLE hInstance
+#    define DYNLIB_LOAD( a ) LoadLibraryEx( a, NULL, 0 ) // we can not use LOAD_WITH_ALTERED_SEARCH_PATH with relative paths
+#    define DYNLIB_GETSYM( a, b ) GetProcAddress( a, b )
+#    define DYNLIB_UNLOAD( a ) !FreeLibrary( a )
+
 struct HINSTANCE__;
+typedef struct HINSTANCE__* hInstance;
+
+#elif OGRE_PLATFORM == OGRE_PLATFORM_WINRT
+#    define DYNLIB_HANDLE hInstance
+#    define DYNLIB_LOAD( a ) LoadPackagedLibrary( stringToWstring(a).c_str(), 0 )
+#    define DYNLIB_GETSYM( a, b ) GetProcAddress( a, b )
+#    define DYNLIB_UNLOAD( a ) !FreeLibrary( a )
+
+struct HINSTANCE__;
+typedef struct HINSTANCE__* hInstance;
+
+#elif OGRE_PLATFORM == OGRE_PLATFORM_LINUX || OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
+#    define DYNLIB_HANDLE void*
+#    define DYNLIB_LOAD( a ) dlopen( a, RTLD_LAZY | RTLD_GLOBAL)
+#    define DYNLIB_GETSYM( a, b ) dlsym( a, b )
+#    define DYNLIB_UNLOAD( a ) dlclose( a )
+
+#elif OGRE_PLATFORM == OGRE_PLATFORM_APPLE || OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
+#    define DYNLIB_HANDLE void*
+#    define DYNLIB_LOAD( a ) mac_loadDylib( a )
+#    define FRAMEWORK_LOAD( a ) mac_loadFramework( a )
+#    define DYNLIB_GETSYM( a, b ) dlsym( a, b )
+#    define DYNLIB_UNLOAD( a ) dlclose( a )
+
 #endif
 
 namespace Ogre {
@@ -43,14 +72,8 @@ namespace Ogre {
     *  @{
     */
 
-#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32 || OGRE_PLATFORM == OGRE_PLATFORM_WINRT
-    typedef struct HINSTANCE__* DYNLIB_HANDLE;
-#else
-    typedef void* DYNLIB_HANDLE;
-#endif
-
     /** Resource holding data about a dynamic library.
-
+        @remarks
             This class holds the data required to get symbols from
             libraries loaded at run-time (i.e. from DLL's for so's)
         @author
@@ -60,7 +83,7 @@ namespace Ogre {
     */
     class _OgreExport DynLib : public DynLibAlloc
     {
-    private:
+    protected:
         String mName;
         /// Gets the last loading error
         String dynlibError(void);
@@ -97,7 +120,7 @@ namespace Ogre {
         */
         void* getSymbol( const String& strName ) const throw();
 
-    private:
+    protected:
 
         /// Handle to the loaded library.
         DYNLIB_HANDLE mInst;

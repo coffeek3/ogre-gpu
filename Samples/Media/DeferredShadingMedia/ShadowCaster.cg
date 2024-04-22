@@ -13,7 +13,6 @@ void ShadowCasterVP(
 }
 
 void ShadowCasterFP(
-    float4 oPosition : POSITION,
     float3 iViewPos : TEXCOORD0,
 		
     out float4 oColor : COLOR0,

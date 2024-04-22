@@ -40,10 +40,10 @@ namespace Ogre
         AutoConstantDefinition(ACT_TRANSPOSE_WORLD_MATRIX,             "transpose_world_matrix",            16, ET_REAL, ACDT_NONE),
         AutoConstantDefinition(ACT_INVERSE_TRANSPOSE_WORLD_MATRIX, "inverse_transpose_world_matrix", 16, ET_REAL, ACDT_NONE),
 
-        AutoConstantDefinition(ACT_BONE_MATRIX_ARRAY_3x4,        "bone_matrix_array_3x4",      12, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_BONE_MATRIX_ARRAY,            "bone_matrix_array",          16, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_BONE_DUALQUATERNION_ARRAY_2x4, "bone_dualquaternion_array_2x4",      8, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_BONE_SCALE_SHEAR_MATRIX_ARRAY_3x4, "bone_scale_shear_matrix_array_3x4", 12, ET_REAL, ACDT_NONE),
+        AutoConstantDefinition(ACT_WORLD_MATRIX_ARRAY_3x4,        "world_matrix_array_3x4",      12, ET_REAL, ACDT_NONE),
+        AutoConstantDefinition(ACT_WORLD_MATRIX_ARRAY,            "world_matrix_array",          16, ET_REAL, ACDT_NONE),
+        AutoConstantDefinition(ACT_WORLD_DUALQUATERNION_ARRAY_2x4, "world_dualquaternion_array_2x4",      8, ET_REAL, ACDT_NONE),
+        AutoConstantDefinition(ACT_WORLD_SCALE_SHEAR_MATRIX_ARRAY_3x4, "world_scale_shear_matrix_array_3x4", 12, ET_REAL, ACDT_NONE),
         AutoConstantDefinition(ACT_VIEW_MATRIX,                   "view_matrix",                 16, ET_REAL, ACDT_NONE),
         AutoConstantDefinition(ACT_INVERSE_VIEW_MATRIX,           "inverse_view_matrix",         16, ET_REAL, ACDT_NONE),
         AutoConstantDefinition(ACT_TRANSPOSE_VIEW_MATRIX,              "transpose_view_matrix",             16, ET_REAL, ACDT_NONE),
@@ -140,20 +140,20 @@ namespace Ogre
         AutoConstantDefinition(ACT_SPOTLIGHT_WORLDVIEWPROJ_MATRIX_ARRAY,  "spotlight_worldviewproj_matrix_array",16, ET_REAL, ACDT_INT),
         AutoConstantDefinition(ACT_CUSTOM,                        "custom",                       4, ET_REAL, ACDT_INT),  // *** needs to be tested
         AutoConstantDefinition(ACT_TIME,                               "time",                               1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_TIME_0_X,                      "time_0_x",                     1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_COSTIME_0_X,                   "costime_0_x",                  1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_SINTIME_0_X,                   "sintime_0_x",                  1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_TANTIME_0_X,                   "tantime_0_x",                  1, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_TIME_0_X,                      "time_0_x",                     4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_COSTIME_0_X,                   "costime_0_x",                  4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_SINTIME_0_X,                   "sintime_0_x",                  4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_TANTIME_0_X,                   "tantime_0_x",                  4, ET_REAL, ACDT_REAL),
         AutoConstantDefinition(ACT_TIME_0_X_PACKED,               "time_0_x_packed",              4, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_TIME_0_1,                      "time_0_1",                     1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_COSTIME_0_1,                   "costime_0_1",                  1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_SINTIME_0_1,                   "sintime_0_1",                  1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_TANTIME_0_1,                   "tantime_0_1",                  1, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_TIME_0_1,                      "time_0_1",                     4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_COSTIME_0_1,                   "costime_0_1",                  4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_SINTIME_0_1,                   "sintime_0_1",                  4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_TANTIME_0_1,                   "tantime_0_1",                  4, ET_REAL, ACDT_REAL),
         AutoConstantDefinition(ACT_TIME_0_1_PACKED,               "time_0_1_packed",              4, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_TIME_0_2PI,                    "time_0_2pi",                   1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_COSTIME_0_2PI,                 "costime_0_2pi",                1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_SINTIME_0_2PI,                 "sintime_0_2pi",                1, ET_REAL, ACDT_REAL),
-        AutoConstantDefinition(ACT_TANTIME_0_2PI,                 "tantime_0_2pi",                1, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_TIME_0_2PI,                    "time_0_2pi",                   4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_COSTIME_0_2PI,                 "costime_0_2pi",                4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_SINTIME_0_2PI,                 "sintime_0_2pi",                4, ET_REAL, ACDT_REAL),
+        AutoConstantDefinition(ACT_TANTIME_0_2PI,                 "tantime_0_2pi",                4, ET_REAL, ACDT_REAL),
         AutoConstantDefinition(ACT_TIME_0_2PI_PACKED,             "time_0_2pi_packed",            4, ET_REAL, ACDT_REAL),
         AutoConstantDefinition(ACT_FRAME_TIME,                    "frame_time",                   1, ET_REAL, ACDT_REAL),
         AutoConstantDefinition(ACT_FPS,                           "fps",                          1, ET_REAL, ACDT_NONE),
@@ -184,22 +184,51 @@ namespace Ogre
         AutoConstantDefinition(ACT_LOD_CAMERA_POSITION_OBJECT_SPACE,  "lod_camera_position_object_space", 3, ET_REAL, ACDT_NONE),
         AutoConstantDefinition(ACT_LIGHT_CUSTOM,        "light_custom", 4, ET_REAL, ACDT_INT),
         AutoConstantDefinition(ACT_POINT_PARAMS,                    "point_params",                   4, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_MATERIAL_LOD_INDEX,       "material_lod_index",             1, ET_INT, ACDT_NONE),
-
-        // NOTE: new auto constants must be added before this line, as the following are merely aliases
-        // to allow legacy world_ names in scripts
-        AutoConstantDefinition(ACT_BONE_MATRIX_ARRAY_3x4,        "world_matrix_array_3x4",      12, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_BONE_MATRIX_ARRAY,            "world_matrix_array",          16, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_BONE_DUALQUATERNION_ARRAY_2x4, "world_dualquaternion_array_2x4",      8, ET_REAL, ACDT_NONE),
-        AutoConstantDefinition(ACT_BONE_SCALE_SHEAR_MATRIX_ARRAY_3x4, "world_scale_shear_matrix_array_3x4", 12, ET_REAL, ACDT_NONE),
     };
 
-    GpuNamedConstants::GpuNamedConstants() : bufferSize(0), registerCount(0) {}
-    GpuNamedConstants::~GpuNamedConstants() {}
+    bool GpuNamedConstants::msGenerateAllConstantDefinitionArrayEntries = false;
 
-    GpuLogicalBufferStruct::GpuLogicalBufferStruct() : bufferSize(0) {}
-    GpuLogicalBufferStruct::~GpuLogicalBufferStruct() {}
+    //---------------------------------------------------------------------
+    void GpuNamedConstants::generateConstantDefinitionArrayEntries(
+        const String& paramName, const GpuConstantDefinition& baseDef)
+    {
+        // Copy definition for use with arrays
+        GpuConstantDefinition arrayDef = baseDef;
+        arrayDef.arraySize = 1;
+        String arrayName;
 
+        // Add parameters for array accessors
+        // [0] will refer to the same location, [1+] will increment
+        // only populate others individually up to 16 array slots so as not to get out of hand,
+        // unless the system has been explicitly configured to allow all the parameters to be added
+
+        // paramName[0] version will always exist
+        size_t maxArrayIndex = 1;
+        if (baseDef.arraySize <= 16 || msGenerateAllConstantDefinitionArrayEntries)
+            maxArrayIndex = baseDef.arraySize;
+
+        for (size_t i = 0; i < maxArrayIndex; i++)
+        {
+            arrayName = paramName + "[" + StringConverter::toString(i) + "]";
+            map.emplace(arrayName, arrayDef);
+            // increment location
+            arrayDef.physicalIndex += arrayDef.elementSize;
+        }
+        // note no increment of buffer sizes since this is shared with main array def
+
+    }
+
+    //---------------------------------------------------------------------
+    bool GpuNamedConstants::getGenerateAllConstantDefinitionArrayEntries()
+    {
+        return msGenerateAllConstantDefinitionArrayEntries;
+    }
+
+    //---------------------------------------------------------------------
+    void GpuNamedConstants::setGenerateAllConstantDefinitionArrayEntries(bool generateAll)
+    {
+        msGenerateAllConstantDefinitionArrayEntries = generateAll;
+    }
     //---------------------------------------------------------------------
     //  GpuNamedConstants methods
     //---------------------------------------------------------------------
@@ -217,7 +246,11 @@ namespace Ogre
     //-----------------------------------------------------------------------------
     size_t GpuNamedConstants::calculateSize(void) const
     {
-        size_t memSize = sizeof(*this);
+        size_t memSize = 0;
+
+        // Buffer size refs
+        memSize += 3 * sizeof(size_t);
+
         // Tally up constant defs
         memSize += sizeof(GpuConstantDefinition) * map.size();
 
@@ -239,7 +272,10 @@ namespace Ogre
     void GpuNamedConstantsSerializer::exportNamedConstants(
         const GpuNamedConstants* pConsts, const String& filename, Endian endianMode)
     {
-        DataStreamPtr stream = _openFileStream(filename, std::ios::binary | std::ios::out);
+        std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
+        f->open(filename.c_str(), std::ios::binary | std::ios::out);
+        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(f));
+
         exportNamedConstants(pConsts, stream, endianMode);
 
         stream->close();
@@ -256,21 +292,22 @@ namespace Ogre
         {
             OGRE_EXCEPT(Exception::ERR_CANNOT_WRITE_TO_FILE,
                         "Unable to write to stream " + stream->getName(),
-                        "GpuNamedConstantsSerializer::exportNamedConstants");
+                        "GpuNamedConstantsSerializer::exportSkeleton");
         }
 
         writeFileHeader();
 
-        writeInts(((const uint32*)&pConsts->bufferSize), 1);
-        writeInts(((const uint32*)&pConsts->bufferSize), 1);
-        writeInts(((const uint32*)&pConsts->bufferSize), 1);
+        writeInts(((const uint32*)&pConsts->floatBufferSize), 1);
+        writeInts(((const uint32*)&pConsts->doubleBufferSize), 1);
+        writeInts(((const uint32*)&pConsts->intBufferSize), 1);
 
         // simple export of all the named constants, no chunks
         // name, physical index
-        for (const auto& i : pConsts->map)
+        for (GpuConstantDefinitionMap::const_iterator i = pConsts->map.begin();
+             i != pConsts->map.end(); ++i)
         {
-            const String& name = i.first;
-            const GpuConstantDefinition& def = i.second;
+            const String& name = i->first;
+            const GpuConstantDefinition& def = i->second;
 
             writeString(name);
             writeInts(((const uint32*)&def.physicalIndex), 1);
@@ -295,9 +332,9 @@ namespace Ogre
         // simple file structure, no chunks
         pDest->map.clear();
 
-        readInts(stream, ((uint32*)&pDest->bufferSize), 1);
-        readInts(stream, ((uint32*)&pDest->bufferSize), 1);
-        readInts(stream, ((uint32*)&pDest->bufferSize), 1);
+        readInts(stream, ((uint32*)&pDest->floatBufferSize), 1);
+        readInts(stream, ((uint32*)&pDest->doubleBufferSize), 1);
+        readInts(stream, ((uint32*)&pDest->intBufferSize), 1);
 
         while (!stream->eof())
         {
@@ -315,7 +352,11 @@ namespace Ogre
             readInts(stream, ((uint32*)&def.arraySize), 1);
 
             pDest->map[name] = def;
+
         }
+
+
+
     }
 
     //-----------------------------------------------------------------------------
@@ -323,22 +364,28 @@ namespace Ogre
     //-----------------------------------------------------------------------------
     GpuSharedParameters::GpuSharedParameters(const String& name)
         :mName(name)
-        , mVersion(0), mOffset(0), mDirty(false)
+        , mFrameLastUpdated(Root::getSingleton().getNextFrameNumber())
+        , mVersion(0), mDirty(false)
     {
 
     }
     //-----------------------------------------------------------------------------
     size_t GpuSharedParameters::calculateSize(void) const
     {
-        size_t memSize = sizeof(*this);
+        size_t memSize = 0;
 
-        memSize += mConstants.size();
+        memSize += sizeof(float) * mFloatConstants.size();
+        memSize += sizeof(double) * mDoubleConstants.size();
+        memSize += sizeof(int) * mIntConstants.size(); 
         memSize += mName.size() * sizeof(char);
+        memSize += sizeof(Any);
+        memSize += sizeof(size_t);
+        memSize += sizeof(unsigned long);
 
         return memSize;
     }
     //---------------------------------------------------------------------
-    void GpuSharedParameters::addConstantDefinition(const String& name, GpuConstantType constType, uint32 arraySize)
+    void GpuSharedParameters::addConstantDefinition(const String& name, GpuConstantType constType, size_t arraySize)
     {
         if (mNamedConstants.map.find(name) != mNamedConstants.map.end())
         {
@@ -349,45 +396,28 @@ namespace Ogre
         GpuConstantDefinition def;
         def.arraySize = arraySize;
         def.constType = constType;
-
-		// here, we do not consider padding, but rather alignment
+        // for compatibility we do not pad values to multiples of 4
+        // when it comes to arrays, user is responsible for creating matching defs
         def.elementSize = GpuConstantDefinition::getElementSize(constType, false);
 
-		// we try to adhere to GLSL std140 packing rules
-		// handle alignment requirements
-        size_t align_size = std::min<size_t>(def.elementSize == 3 ? 4 : def.elementSize, 4); // vec3 is 16 byte aligned, which is max
-        align_size *= 4; // bytes
-
-        size_t nextAlignedOffset = ((mOffset + align_size - 1) / align_size) * align_size;
-
-        // abuse logical index to store offset
-        if (mOffset + align_size > nextAlignedOffset)
-        {
-            def.logicalIndex = nextAlignedOffset;
-        }
-        else
-        {
-            def.logicalIndex = mOffset;
-        }
-
-        mOffset = def.logicalIndex + (def.constType == GCT_MATRIX_4X3 ? 16 : def.elementSize) * 4; // mat4x3 have a size of 64 bytes
-
+        // not used
+        def.logicalIndex = 0;
         def.variability = (uint16)GPV_GLOBAL;
 
         if (def.isFloat())
         {
-            def.physicalIndex = mConstants.size();
-            mConstants.resize(mConstants.size() + def.arraySize * def.elementSize*4);
+            def.physicalIndex = mFloatConstants.size();
+            mFloatConstants.resize(mFloatConstants.size() + def.arraySize * def.elementSize);
         }
         else if (def.isDouble())
         {
-            def.physicalIndex = mConstants.size();
-            mConstants.resize(mConstants.size() + def.arraySize * def.elementSize*8);
+            def.physicalIndex = mDoubleConstants.size();
+            mDoubleConstants.resize(mDoubleConstants.size() + def.arraySize * def.elementSize);
         }
-        else if (def.isInt() || def.isUnsignedInt() || def.isBool())
+        else if (def.isInt() || def.isSampler() || def.isSubroutine() || def.isUnsignedInt() || def.isBool())
         {
-            def.physicalIndex = mConstants.size();
-            mConstants.resize(mConstants.size() + def.arraySize * def.elementSize*4);
+            def.physicalIndex = mIntConstants.size();
+            mIntConstants.resize(mIntConstants.size() + def.arraySize * def.elementSize);
         }
         else 
         {
@@ -408,30 +438,44 @@ namespace Ogre
         if (i != mNamedConstants.map.end())
         {
             GpuConstantDefinition& def = i->second;
+            bool isFloat = def.isFloat(); //TODO does a double check belong here too?
             size_t numElems = def.elementSize * def.arraySize;
 
-            for (auto& j : mNamedConstants.map)
+            for (GpuConstantDefinitionMap::iterator j = mNamedConstants.map.begin();
+                 j != mNamedConstants.map.end(); ++j)
             {
-                GpuConstantDefinition& otherDef = j.second;
-                // comes after in the buffer
-                if (otherDef.physicalIndex > def.physicalIndex)
+                GpuConstantDefinition& otherDef = j->second;
+                bool otherIsFloat = otherDef.isFloat();
+
+                // same type, and comes after in the buffer
+                if ( (isFloat == otherIsFloat) &&
+                     otherDef.physicalIndex > def.physicalIndex)
                 {
                     // adjust index
-                    otherDef.logicalIndex -= numElems;
                     otherDef.physicalIndex -= numElems;
                 }
             }
 
-            // remove and reduce buffer
-            if (def.isFloat() || def.isInt() || def.isUnsignedInt() || def.isBool())
+            // remove floats and reduce buffer
+            if (isFloat)
             {
-                mNamedConstants.bufferSize -= numElems;
+                mNamedConstants.floatBufferSize -= numElems;
 
-                ConstantList::iterator beg = mConstants.begin();
+                FloatConstantList::iterator beg = mFloatConstants.begin();
                 std::advance(beg, def.physicalIndex);
-                ConstantList::iterator en = beg;
-                std::advance(en, numElems*4);
-                mConstants.erase(beg, en);
+                FloatConstantList::iterator en = beg;
+                std::advance(en, numElems);
+                mFloatConstants.erase(beg, en);
+            }
+            else if (def.isInt() || def.isSampler() || def.isSubroutine() || def.isUnsignedInt() || def.isBool())
+            {
+                mNamedConstants.intBufferSize -= numElems;
+
+                IntConstantList::iterator beg = mIntConstants.begin();
+                std::advance(beg, def.physicalIndex);
+                IntConstantList::iterator en = beg;
+                std::advance(en, numElems);
+                mIntConstants.erase(beg, en);
             }
             else {
                 //TODO exception handling
@@ -441,28 +485,16 @@ namespace Ogre
         }
 
     }
-
-    void GpuSharedParameters::_upload() const
-    {
-        OgreAssert(mHardwareBuffer, "not backed by a HardwareBuffer");
-
-        if (!mDirty)
-            return;
-
-        mHardwareBuffer->writeData(0, mConstants.size(), mConstants.data());
-    }
-    void GpuSharedParameters::download()
-    {
-        OgreAssert(mHardwareBuffer, "not backed by a HardwareBuffer");
-        mHardwareBuffer->readData(0, mConstants.size(), mConstants.data());
-    }
     //---------------------------------------------------------------------
     void GpuSharedParameters::removeAllConstantDefinitions()
     {
-		mOffset = 0;
         mNamedConstants.map.clear();
-        mNamedConstants.bufferSize = 0;
-        mConstants.clear();
+        mNamedConstants.floatBufferSize = 0;
+        mNamedConstants.doubleBufferSize = 0;
+        mNamedConstants.intBufferSize = 0;
+        mFloatConstants.clear();
+        mDoubleConstants.clear();
+        mIntConstants.clear();
     }
     //---------------------------------------------------------------------
     GpuConstantDefinitionIterator GpuSharedParameters::getConstantDefinitionIterator(void) const
@@ -487,49 +519,107 @@ namespace Ogre
         return mNamedConstants;
     }
     //---------------------------------------------------------------------
-    void GpuSharedParameters::setNamedConstant(const String& name, const Matrix4& m)
+    void GpuSharedParameters::setNamedConstant(const String& name, Real val)
     {
-        _setNamedConstant(name, m[0], 16);
+        setNamedConstant(name, &val, 1);
     }
     //---------------------------------------------------------------------
-    void GpuSharedParameters::setNamedConstant(const String& name, const Matrix4* m, uint32 numEntries)
+    void GpuSharedParameters::setNamedConstant(const String& name, int val)
     {
-        _setNamedConstant(name, m[0][0], 16 * numEntries);
+        setNamedConstant(name, &val, 1);
+    }
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, uint val)
+    {
+        setNamedConstant(name, &val, 1);
+    }
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, const Vector4& vec)
+    {
+        setNamedConstant(name, vec.ptr(), 4);
+    }
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, const Vector3& vec)
+    {
+        setNamedConstant(name, vec.ptr(), 3);
+    }
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, const Vector2& vec)
+    {
+        setNamedConstant(name, vec.ptr(), 2);
+    }
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, const Matrix4& m)
+    {
+        setNamedConstant(name, m[0], 16);
+    }
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, const Matrix4* m, size_t numEntries)
+    {
+        setNamedConstant(name, m[0][0], 16 * numEntries);
     }
     //---------------------------------------------------------------------
     void GpuSharedParameters::setNamedConstant(const String& name, const ColourValue& colour)
     {
-        _setNamedConstant(name, colour.ptr(), 4);
+        setNamedConstant(name, colour.ptr(), 4);
     }
     //---------------------------------------------------------------------
-    template <typename T> void GpuSharedParameters::_setNamedConstant(const String& name, const T* val, uint32 count)
+    void GpuSharedParameters::setNamedConstant(const String& name, const float *val, size_t count)
     {
         GpuConstantDefinitionMap::const_iterator i = mNamedConstants.map.find(name);
-        if (i == mNamedConstants.map.end())
-            return; // ignore
+        if (i != mNamedConstants.map.end())
+        {
+            const GpuConstantDefinition& def = i->second;
+            memcpy(&mFloatConstants[def.physicalIndex], val,
+                   sizeof(float) * std::min(count, def.elementSize * def.arraySize));
+        }
 
-        const GpuConstantDefinition& def = i->second;
-        memcpy(&mConstants[def.physicalIndex], val, sizeof(float) * std::min(count, def.elementSize * def.arraySize));
         _markDirty();
     }
-    void GpuSharedParameters::setNamedConstant(const String& name, const float* val, uint32 count)
+    //---------------------------------------------------------------------
+    void GpuSharedParameters::setNamedConstant(const String& name, const double *val, size_t count)
     {
-        _setNamedConstant(name, val, count);
+        GpuConstantDefinitionMap::const_iterator i = mNamedConstants.map.find(name);
+        if (i != mNamedConstants.map.end())
+        {
+            const GpuConstantDefinition& def = i->second;
+
+            count = std::min(count, def.elementSize * def.arraySize);
+            const double* src = val;
+            double* dst = &mDoubleConstants[def.physicalIndex];
+            for (size_t v = 0; v < count; ++v)
+            {
+                *dst++ = static_cast<double>(*src++);
+            }
+        }
+
+        _markDirty();
     }
     //---------------------------------------------------------------------
-    void GpuSharedParameters::setNamedConstant(const String& name, const double* val, uint32 count)
+    void GpuSharedParameters::setNamedConstant(const String& name, const int *val, size_t count)
     {
-        _setNamedConstant(name, val, count);
+        GpuConstantDefinitionMap::const_iterator i = mNamedConstants.map.find(name);
+        if (i != mNamedConstants.map.end())
+        {
+            const GpuConstantDefinition& def = i->second;
+            memcpy(&mIntConstants[def.physicalIndex], val,
+                   sizeof(int) * std::min(count, def.elementSize * def.arraySize));
+        }
+
+        _markDirty();
     }
     //---------------------------------------------------------------------
-    void GpuSharedParameters::setNamedConstant(const String& name, const int* val, uint32 count)
+    void GpuSharedParameters::setNamedConstant(const String& name, const uint *val, size_t count)
     {
-        _setNamedConstant(name, val, count);
-    }
-    //---------------------------------------------------------------------
-    void GpuSharedParameters::setNamedConstant(const String& name, const uint* val, uint32 count)
-    {
-        _setNamedConstant(name, val, count);
+        GpuConstantDefinitionMap::const_iterator i = mNamedConstants.map.find(name);
+        if (i != mNamedConstants.map.end())
+        {
+            const GpuConstantDefinition& def = i->second;
+            memcpy(&mIntConstants[def.physicalIndex], val,
+                   sizeof(uint) * std::min(count, def.elementSize * def.arraySize));
+        }
+
+        _markDirty();
     }
     //---------------------------------------------------------------------
     void GpuSharedParameters::_markClean()
@@ -539,6 +629,7 @@ namespace Ogre
     //---------------------------------------------------------------------
     void GpuSharedParameters::_markDirty()
     {
+        mFrameLastUpdated = Root::getSingleton().getNextFrameNumber();
         mDirty = true;
     }
     
@@ -560,10 +651,10 @@ namespace Ogre
         mCopyDataList.clear();
 
         const GpuConstantDefinitionMap& sharedmap = mSharedParams->getConstantDefinitions().map;
-        for (const auto& i : sharedmap)
+        for (GpuConstantDefinitionMap::const_iterator i = sharedmap.begin(); i != sharedmap.end(); ++i)
         {
-            const String& pName = i.first;
-            const GpuConstantDefinition& shareddef = i.second;
+            const String& pName = i->first;
+            const GpuConstantDefinition& shareddef = i->second;
 
             const GpuConstantDefinition* instdef = mParams->_findNamedConstantDefinition(pName, false);
             if (instdef)
@@ -586,17 +677,19 @@ namespace Ogre
         mCopyDataVersion = mSharedParams->getVersion();
     }
     //---------------------------------------------------------------------
-    void GpuSharedParametersUsage::_copySharedParamsToTargetParams() const
+    void GpuSharedParametersUsage::_copySharedParamsToTargetParams()
     {
         // check copy data version
         if (mCopyDataVersion != mSharedParams->getVersion())
-            const_cast<GpuSharedParametersUsage*>(this)->initCopyData();
+            initCopyData();
 
         // force const call to get*Pointer
         const GpuSharedParameters* sharedParams = mSharedParams.get();
 
-        for (const CopyDataEntry& e : mCopyDataList)
+        for (CopyDataList::iterator i = mCopyDataList.begin(); i != mCopyDataList.end(); ++i)
         {
+            CopyDataEntry& e = *i;
+
             if (e.dstDefinition->isFloat())
             {
                 const float* pSrc = sharedParams->getFloatPointer(e.srcDefinition->physicalIndex);
@@ -683,7 +776,9 @@ namespace Ogre
                     }
                 }
             }
-            else if (e.dstDefinition->isInt())
+            else if (e.dstDefinition->isInt() || 
+                     e.dstDefinition->isSampler() ||
+                     e.dstDefinition->isSubroutine())
             {
                 const int* pSrc = sharedParams->getIntPointer(e.srcDefinition->physicalIndex);
                 int* pDst = mParams->getIntPointer(e.dstDefinition->physicalIndex);
@@ -752,11 +847,7 @@ namespace Ogre
         , mIgnoreMissingParams(false)
         , mActivePassIterationIndex(std::numeric_limits<size_t>::max())
     {
-        static_assert((sizeof(AutoConstantDictionary) / sizeof(AutoConstantDefinition) - 5) == ACT_MATERIAL_LOD_INDEX,
-                      "AutoConstantDictionary out of sync");
     }
-    GpuProgramParameters::~GpuProgramParameters() {}
-
     //-----------------------------------------------------------------------------
 
     GpuProgramParameters::GpuProgramParameters(const GpuProgramParameters& oth)
@@ -769,10 +860,13 @@ namespace Ogre
     {
         // let compiler perform shallow copies of structures
         // AutoConstantEntry, RealConstantEntry, IntConstantEntry
-        mConstants = oth.mConstants;
-        mRegisters = oth.mRegisters;
+        mFloatConstants = oth.mFloatConstants;
+        mDoubleConstants = oth.mDoubleConstants;
+        mIntConstants  = oth.mIntConstants;
         mAutoConstants = oth.mAutoConstants;
-        mLogicalToPhysical = oth.mLogicalToPhysical;
+        mFloatLogicalToPhysical = oth.mFloatLogicalToPhysical;
+        mDoubleLogicalToPhysical = oth.mDoubleLogicalToPhysical;
+        mIntLogicalToPhysical = oth.mIntLogicalToPhysical;
         mNamedConstants = oth.mNamedConstants;
         copySharedParamSetUsage(oth.mSharedParamSets);
 
@@ -787,24 +881,37 @@ namespace Ogre
     void GpuProgramParameters::copySharedParamSetUsage(const GpuSharedParamUsageList& srcList)
     {
         mSharedParamSets.clear();
-        for (const auto& i : srcList)
+        for (GpuSharedParamUsageList::const_iterator i = srcList.begin(); i != srcList.end(); ++i)
         {
-            mSharedParamSets.push_back(GpuSharedParametersUsage(i.getSharedParams(), this));
+            mSharedParamSets.push_back(GpuSharedParametersUsage(i->getSharedParams(), this));
         }
 
     }
     //-----------------------------------------------------------------------------
     size_t GpuProgramParameters::calculateSize(void) const
     {
-        size_t memSize = sizeof(*this);
+        size_t memSize = 0;
 
-        memSize += mConstants.size();
-        memSize += mRegisters.size()*4;
+        memSize += sizeof(float) * mFloatConstants.size();
+        memSize += sizeof(double) * mDoubleConstants.size();
+        memSize += sizeof(int) * mIntConstants.size();
+        memSize += sizeof(Any);
+        memSize += sizeof(size_t);
+        memSize += sizeof(bool) * 2;
+        memSize += sizeof(uint16);
 
-        for (const auto& ac : mAutoConstants)
+        for (AutoConstantList::const_iterator i = mAutoConstants.begin();
+             i != mAutoConstants.end(); ++i)
         {
-            memSize += sizeof(ac);
+            memSize += sizeof((*i));
         }
+
+        if(mFloatLogicalToPhysical)
+            memSize += mFloatLogicalToPhysical->bufferSize;
+        if(mDoubleLogicalToPhysical)
+            memSize += mDoubleLogicalToPhysical->bufferSize;
+        if(mIntLogicalToPhysical)
+            memSize += mIntLogicalToPhysical->bufferSize;
 
         return memSize;
     }
@@ -817,27 +924,50 @@ namespace Ogre
         // Determine any extension to local buffers
 
         // Size and reset buffer (fill with zero to make comparison later ok)
-        if (namedConstants->bufferSize*4 > mConstants.size())
+        if (namedConstants->floatBufferSize > mFloatConstants.size())
         {
-            mConstants.insert(mConstants.end(), namedConstants->bufferSize * 4 - mConstants.size(), 0);
+            mFloatConstants.insert(mFloatConstants.end(),
+                                   namedConstants->floatBufferSize - mFloatConstants.size(), 0.0f);
         }
-
-        if(namedConstants->registerCount > mRegisters.size())
-            mRegisters.insert(mRegisters.end(), namedConstants->registerCount - mRegisters.size(), 0);
+        if (namedConstants->doubleBufferSize > mDoubleConstants.size())
+        {
+            mDoubleConstants.insert(mDoubleConstants.end(),
+                                   namedConstants->doubleBufferSize - mDoubleConstants.size(), 0.0f);
+        }
+        if (namedConstants->intBufferSize > mIntConstants.size())
+        {
+            mIntConstants.insert(mIntConstants.end(),
+                                 namedConstants->intBufferSize - mIntConstants.size(), 0);
+        }
     }
     //---------------------------------------------------------------------
-    void GpuProgramParameters::_setLogicalIndexes(const GpuLogicalBufferStructPtr& indexMap)
+    void GpuProgramParameters::_setLogicalIndexes(const GpuLogicalBufferStructPtr& floatIndexMap,
+                                                  const GpuLogicalBufferStructPtr& doubleIndexMap,
+                                                  const GpuLogicalBufferStructPtr& intIndexMap)
     {
-        mLogicalToPhysical = indexMap;
+        mFloatLogicalToPhysical = floatIndexMap;
+        mDoubleLogicalToPhysical = doubleIndexMap;
+        mIntLogicalToPhysical = intIndexMap;
 
         // resize the internal buffers
         // Note that these will only contain something after the first parameter
         // set has set some parameters
 
         // Size and reset buffer (fill with zero to make comparison later ok)
-        if (indexMap && indexMap->bufferSize*4 > mConstants.size())
+        if (floatIndexMap && floatIndexMap->bufferSize > mFloatConstants.size())
         {
-            mConstants.insert(mConstants.end(), indexMap->bufferSize * 4 - mConstants.size(), 0);
+            mFloatConstants.insert(mFloatConstants.end(),
+                                   floatIndexMap->bufferSize - mFloatConstants.size(), 0.0f);
+        }
+        if (doubleIndexMap && doubleIndexMap->bufferSize > mDoubleConstants.size())
+        {
+            mDoubleConstants.insert(mDoubleConstants.end(),
+                                    doubleIndexMap->bufferSize - mDoubleConstants.size(), 0.0f);
+        }
+        if (intIndexMap &&  intIndexMap->bufferSize > mIntConstants.size())
+        {
+            mIntConstants.insert(mIntConstants.end(),
+                                 intIndexMap->bufferSize - mIntConstants.size(), 0);
         }
     }
     //---------------------------------------------------------------------()
@@ -905,9 +1035,9 @@ namespace Ogre
         // Raw buffer size is 4x count
         size_t rawCount = count * 4;
         // get physical index
-        assert(mLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
+        assert(mFloatLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
 
-        size_t physicalIndex = _getConstantPhysicalIndex(index, rawCount, GPV_GLOBAL, BCT_FLOAT);
+        size_t physicalIndex = _getFloatConstantPhysicalIndex(index, rawCount, GPV_GLOBAL);
 
         // Copy
         _writeRawConstants(physicalIndex, val, rawCount);
@@ -919,11 +1049,17 @@ namespace Ogre
         // Raw buffer size is 4x count
         size_t rawCount = count * 4;
         // get physical index
-        assert(mLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
+        assert(mFloatLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
 
-        size_t physicalIndex = _getConstantPhysicalIndex(index, rawCount, GPV_GLOBAL, BCT_DOUBLE);
-        // Copy
-        _writeRawConstants(physicalIndex, val, rawCount);
+        size_t physicalIndex = _getFloatConstantPhysicalIndex(index, rawCount, GPV_GLOBAL);
+        assert(physicalIndex + rawCount <= mFloatConstants.size());
+        // Copy manually since cast required
+        for (size_t i = 0; i < rawCount; ++i)
+        {
+            mFloatConstants[physicalIndex + i] =
+                static_cast<float>(val[i]);
+        }
+
     }
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::setConstant(size_t index, const int *val, size_t count)
@@ -931,9 +1067,9 @@ namespace Ogre
         // Raw buffer size is 4x count
         size_t rawCount = count * 4;
         // get physical index
-        assert(mLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
+        assert(mIntLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
 
-        size_t physicalIndex = _getConstantPhysicalIndex(index, rawCount, GPV_GLOBAL, BCT_INT);
+        size_t physicalIndex = _getIntConstantPhysicalIndex(index, rawCount, GPV_GLOBAL);
         // Copy
         _writeRawConstants(physicalIndex, val, rawCount);
     }
@@ -943,11 +1079,49 @@ namespace Ogre
         // Raw buffer size is 4x count
         size_t rawCount = count * 4;
         // get physical index
-        assert(mLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
+        assert(mIntLogicalToPhysical && "GpuProgram hasn't set up the logical -> physical map!");
 
-        size_t physicalIndex = _getConstantPhysicalIndex(index, rawCount, GPV_GLOBAL, BCT_INT);
+        size_t physicalIndex = _getIntConstantPhysicalIndex(index, rawCount, GPV_GLOBAL);
         // Copy
         _writeRawConstants(physicalIndex, val, rawCount);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, const Vector4& vec,
+                                                 size_t count)
+    {
+        // remember, raw content access uses raw float count rather than float4
+        // write either the number requested (for packed types) or up to 4
+        _writeRawConstants(physicalIndex, vec.ptr(), std::min(count, (size_t)4));
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, Real val)
+    {
+        _writeRawConstants(physicalIndex, &val, 1);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, Real val, size_t count)
+    {
+        _writeRawConstants(physicalIndex, &val, count);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, int val)
+    {
+        _writeRawConstants(physicalIndex, &val, 1);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, uint val)
+    {
+        _writeRawConstants(physicalIndex, &val, 1);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, const Vector3& vec)
+    {
+        _writeRawConstants(physicalIndex, vec.ptr(), 3);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, const Vector2& vec)
+    {
+        _writeRawConstants(physicalIndex, vec.ptr(), 2);
     }
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::_writeRawConstant(size_t physicalIndex, const Matrix4& m, size_t elementCount)
@@ -991,7 +1165,7 @@ namespace Ogre
             {
                 Matrix4 t = pMatrix[i].transpose();
                 _writeRawConstants(physicalIndex, t[0], 16);
-                physicalIndex += 16*sizeof(Real);
+                physicalIndex += 16;
             }
         }
         else
@@ -1011,29 +1185,41 @@ namespace Ogre
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::_writeRawConstants(size_t physicalIndex, const double* val, size_t count)
     {
-        assert(physicalIndex + sizeof(float) * count <= mConstants.size());
+        assert(physicalIndex + count <= mFloatConstants.size());
         for (size_t i = 0; i < count; ++i)
         {
-            float tmp = val[i];
-            memcpy(&mConstants[physicalIndex + i * sizeof(float)], &tmp, sizeof(float));
+            mFloatConstants[physicalIndex+i] = static_cast<float>(val[i]);
         }
     }
-    void GpuProgramParameters::_writeRegisters(size_t index, const int* val, size_t count)
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstants(size_t physicalIndex, const float* val, size_t count)
     {
-        assert(index + count <= mRegisters.size());
-        memcpy(&mRegisters[index], val, sizeof(int) * count);
+        assert(physicalIndex + count <= mFloatConstants.size());
+        memcpy(&mFloatConstants[physicalIndex], val, sizeof(float) * count);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstants(size_t physicalIndex, const int* val, size_t count)
+    {
+        assert(physicalIndex + count <= mIntConstants.size());
+        memcpy(&mIntConstants[physicalIndex], val, sizeof(int) * count);
+    }
+    //-----------------------------------------------------------------------------
+    void GpuProgramParameters::_writeRawConstants(size_t physicalIndex, const uint* val, size_t count)
+    {
+        assert(physicalIndex + count <= mIntConstants.size());
+        memcpy(&mIntConstants[physicalIndex], val, sizeof(uint) * count);
     }
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::_readRawConstants(size_t physicalIndex, size_t count, float* dest)
     {
-        assert(physicalIndex + count <= mConstants.size());
-        memcpy(dest, &mConstants[physicalIndex], sizeof(float) * count);
+        assert(physicalIndex + count <= mFloatConstants.size());
+        memcpy(dest, &mFloatConstants[physicalIndex], sizeof(float) * count);
     }
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::_readRawConstants(size_t physicalIndex, size_t count, int* dest)
     {
-        assert(physicalIndex + count <= mConstants.size());
-        memcpy(dest, &mConstants[physicalIndex], sizeof(int) * count);
+        assert(physicalIndex + count <= mIntConstants.size());
+        memcpy(dest, &mIntConstants[physicalIndex], sizeof(int) * count);
     }
     //---------------------------------------------------------------------
     uint16 GpuProgramParameters::deriveVariability(GpuProgramParameters::AutoConstantType act)
@@ -1200,28 +1386,73 @@ namespace Ogre
 
     }
     //---------------------------------------------------------------------
-    GpuLogicalIndexUse* GpuProgramParameters::getConstantLogicalIndexUse(
-        size_t logicalIndex, size_t requestedSize, uint16 variability, BaseConstantType type)
+    template <typename T> bool isElementType(GpuProgramParameters::ElementType)
     {
-        OgreAssert(type != BCT_SAMPLER, "");
-        if (!mLogicalToPhysical || int(logicalIndex) == -1)
-            return NULL;
+        return false;
+    }
+    template <> bool isElementType<float>(GpuProgramParameters::ElementType et)
+    {
+        return et == GpuProgramParameters::ET_REAL;
+    }
+    template <> bool isElementType<int>(GpuProgramParameters::ElementType et)
+    {
+        return et == GpuProgramParameters::ET_INT;
+    }
 
+    template <typename T> bool isDefType(const GpuConstantDefinition&)
+    {
+        return false;
+    }
+
+    template <> bool isDefType<float>(const GpuConstantDefinition& def)
+    {
+        return def.isFloat();
+    }
+
+    template <> bool isDefType<double>(const GpuConstantDefinition& def)
+    {
+        return def.isDouble();
+    }
+
+    template <> bool isDefType<int>(const GpuConstantDefinition& def)
+    {
+        return def.isInt();
+    }
+
+    template <typename T> void incrementBufferSize(GpuNamedConstantsPtr& consts, size_t inc) {}
+    template <> void incrementBufferSize<float>(GpuNamedConstantsPtr& consts, size_t inc)
+    {
+        consts->floatBufferSize += inc;
+    }
+    template <> void incrementBufferSize<double>(GpuNamedConstantsPtr& consts, size_t inc)
+    {
+        consts->doubleBufferSize += inc;
+    }
+    template <> void incrementBufferSize<int>(GpuNamedConstantsPtr& consts, size_t inc)
+    {
+        consts->intBufferSize += inc;
+    }
+
+    template <typename T>
+    GpuLogicalIndexUse* GpuProgramParameters::getConstantLogicalIndexUse(
+        const GpuLogicalBufferStructPtr& logicalToPhysical, std::vector<T>& constants,
+        size_t logicalIndex, size_t requestedSize, uint16 variability)
+    {
         GpuLogicalIndexUse* indexUse = 0;
-        OGRE_LOCK_MUTEX(mLogicalToPhysical->mutex);
+        OGRE_LOCK_MUTEX(logicalToPhysical->mutex);
 
-        auto logi = mLogicalToPhysical->map.find(logicalIndex);
-        if (logi == mLogicalToPhysical->map.end())
+        auto logi = logicalToPhysical->map.find(logicalIndex);
+        if (logi == logicalToPhysical->map.end())
         {
             if (requestedSize)
             {
-                size_t physicalIndex = mConstants.size();
+                size_t physicalIndex = constants.size();
 
                 // Expand at buffer end
-                mConstants.insert(mConstants.end(), requestedSize*4, 0);
+                constants.insert(constants.end(), requestedSize, 0);
 
                 // Record extended size for future GPU params re-using this information
-                mLogicalToPhysical->bufferSize = mConstants.size()/4;
+                logicalToPhysical->bufferSize = constants.size();
 
                 // low-level programs will not know about mapping ahead of time, so
                 // populate it. Other params objects will be able to just use this
@@ -1229,19 +1460,22 @@ namespace Ogre
 
                 // Set up a mapping for all items in the count
                 size_t currPhys = physicalIndex;
-                size_t count = std::max<size_t>(requestedSize / 4, 1);
+                size_t count = requestedSize / 4;
+                GpuLogicalIndexUseMap::iterator insertedIterator;
 
                 for (size_t logicalNum = 0; logicalNum < count; ++logicalNum)
                 {
                     GpuLogicalIndexUseMap::iterator it =
-                            mLogicalToPhysical->map.emplace(
+                            logicalToPhysical->map.emplace(
                                 logicalIndex + logicalNum,
-                                GpuLogicalIndexUse(currPhys, requestedSize, variability, type)).first;
+                                GpuLogicalIndexUse(currPhys, requestedSize, variability)).first;
                     currPhys += 4;
 
                     if (logicalNum == 0)
-                        indexUse = &(it->second);
+                        insertedIterator = it;
                 }
+
+                indexUse = &(insertedIterator->second);
             }
             else
             {
@@ -1252,77 +1486,134 @@ namespace Ogre
         }
         else
         {
+            size_t physicalIndex = logi->second.physicalIndex;
             indexUse = &(logi->second);
             // check size
-            if (indexUse->currentSize < requestedSize)
+            if (logi->second.currentSize < requestedSize)
             {
-                size_t physicalIndex = indexUse->physicalIndex;
                 // init buffer entry wasn't big enough; could be a mistake on the part
                 // of the original use, or perhaps a variable length we can't predict
                 // until first actual runtime use e.g. world matrix array
-                size_t insertCount = requestedSize - indexUse->currentSize;
-                auto insertPos = mConstants.begin();
+                size_t insertCount = requestedSize - logi->second.currentSize;
+                auto insertPos = constants.begin();
                 std::advance(insertPos, physicalIndex);
-                mConstants.insert(insertPos, insertCount*4, 0);
+                constants.insert(insertPos, insertCount, 0);
 
                 // shift all physical positions after this one
-                for (auto& p : mLogicalToPhysical->map)
+                for (auto& p : logicalToPhysical->map)
                 {
                     if (p.second.physicalIndex > physicalIndex)
-                        p.second.physicalIndex += insertCount*4;
+                        p.second.physicalIndex += insertCount;
                 }
-                mLogicalToPhysical->bufferSize += insertCount;
+                logicalToPhysical->bufferSize += insertCount;
                 for (auto& ac : mAutoConstants)
                 {
                     auto def = getAutoConstantDefinition(ac.paramType);
-                    if (ac.physicalIndex > physicalIndex && def)
+                    if (ac.physicalIndex > physicalIndex && def && isElementType<T>(def->elementType))
                     {
-                        ac.physicalIndex += insertCount*4;
+                        ac.physicalIndex += insertCount;
                     }
                 }
                 if (mNamedConstants)
                 {
                     for (auto& p : mNamedConstants->map)
                     {
-                        if (p.second.physicalIndex > physicalIndex)
-                            p.second.physicalIndex += insertCount * 4;
+                        if (isDefType<T>(p.second) && p.second.physicalIndex > physicalIndex)
+                            p.second.physicalIndex += insertCount;
                     }
-                    mNamedConstants->bufferSize += insertCount;
+                    incrementBufferSize<T>(mNamedConstants, insertCount);
                 }
 
-                indexUse->currentSize += insertCount;
+                logi->second.currentSize += insertCount;
             }
         }
 
-        if (indexUse && requestedSize)
+        if (indexUse)
             indexUse->variability = variability;
 
         return indexUse;
     }
-    //-----------------------------------------------------------------------------
-    size_t GpuProgramParameters::_getConstantPhysicalIndex(
-        size_t logicalIndex, size_t requestedSize, uint16 variability, BaseConstantType type)
+
+    GpuLogicalIndexUse* GpuProgramParameters::_getFloatConstantLogicalIndexUse(
+        size_t logicalIndex, size_t requestedSize, uint16 variability)
     {
-        GpuLogicalIndexUse* indexUse = getConstantLogicalIndexUse(logicalIndex, requestedSize, variability, type);
+        if (!mFloatLogicalToPhysical)
+            return NULL;
+        return getConstantLogicalIndexUse(mFloatLogicalToPhysical, mFloatConstants, logicalIndex,
+                                          requestedSize, variability);
+    }
+    //---------------------------------------------------------------------
+    GpuLogicalIndexUse* GpuProgramParameters::_getDoubleConstantLogicalIndexUse(
+        size_t logicalIndex, size_t requestedSize, uint16 variability)
+    {
+        if (!mDoubleLogicalToPhysical)
+            return NULL;
+        return getConstantLogicalIndexUse(mDoubleLogicalToPhysical, mDoubleConstants, logicalIndex,
+                                          requestedSize, variability);
+    }
+    //---------------------------------------------------------------------()
+    GpuLogicalIndexUse* GpuProgramParameters::_getIntConstantLogicalIndexUse(size_t logicalIndex, size_t requestedSize, uint16 variability)
+    {
+        if (!mIntLogicalToPhysical)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "This is not a low-level parameter parameter object",
+                        "GpuProgramParameters::_getIntConstantPhysicalIndex");
+
+        return getConstantLogicalIndexUse(mIntLogicalToPhysical, mIntConstants, logicalIndex,
+                                          requestedSize, variability);
+    }
+    //-----------------------------------------------------------------------------
+    size_t GpuProgramParameters::_getFloatConstantPhysicalIndex(
+        size_t logicalIndex, size_t requestedSize, uint16 variability)
+    {
+        GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(logicalIndex, requestedSize, variability);
         return indexUse ? indexUse->physicalIndex : 0;
     }
     //-----------------------------------------------------------------------------
-    size_t GpuProgramParameters::getLogicalIndexForPhysicalIndex(size_t physicalIndex)
+    size_t GpuProgramParameters::_getDoubleConstantPhysicalIndex(
+        size_t logicalIndex, size_t requestedSize, uint16 variability)
+    {
+        GpuLogicalIndexUse* indexUse = _getDoubleConstantLogicalIndexUse(logicalIndex, requestedSize, variability);
+        return indexUse ? indexUse->physicalIndex : 0;
+    }
+    //-----------------------------------------------------------------------------
+    size_t GpuProgramParameters::_getIntConstantPhysicalIndex(
+        size_t logicalIndex, size_t requestedSize, uint16 variability)
+    {
+        GpuLogicalIndexUse* indexUse = _getIntConstantLogicalIndexUse(logicalIndex, requestedSize, variability);
+        return indexUse ? indexUse->physicalIndex : 0;
+    }
+    //-----------------------------------------------------------------------------
+    static size_t getLogicalIndexForPhysicalIndex(const GpuLogicalBufferStructPtr& logicalToPhysical,
+                                                  size_t physicalIndex)
     {
         // perhaps build a reverse map of this sometime (shared in GpuProgram)
-        for (const auto& p : mLogicalToPhysical->map)
+        for (const auto& p : logicalToPhysical->map)
         {
             if (p.second.physicalIndex == physicalIndex)
                 return p.first;
         }
         return std::numeric_limits<size_t>::max();
     }
+    size_t GpuProgramParameters::getFloatLogicalIndexForPhysicalIndex(size_t physicalIndex)
+    {
+        return getLogicalIndexForPhysicalIndex(mFloatLogicalToPhysical, physicalIndex);
+    }
+    size_t GpuProgramParameters::getDoubleLogicalIndexForPhysicalIndex(size_t physicalIndex)
+    {
+        return getLogicalIndexForPhysicalIndex(mDoubleLogicalToPhysical, physicalIndex);
+    }
+    size_t GpuProgramParameters::getIntLogicalIndexForPhysicalIndex(size_t physicalIndex)
+    {
+        return getLogicalIndexForPhysicalIndex(mIntLogicalToPhysical, physicalIndex);
+    }
     //-----------------------------------------------------------------------------
     GpuConstantDefinitionIterator GpuProgramParameters::getConstantDefinitionIterator(void) const
     {
         if (!mNamedConstants)
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "Named constants have not been initialised, perhaps a compile error");
+                        "This params object is not based on a program with named parameters.",
+                        "GpuProgramParameters::getConstantDefinitionIterator");
 
         return GpuConstantDefinitionIterator(mNamedConstants->map.begin(),
                                              mNamedConstants->map.end());
@@ -1333,7 +1624,8 @@ namespace Ogre
     {
         if (!mNamedConstants)
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "Named constants have not been initialised, perhaps a compile error");
+                        "This params object is not based on a program with named parameters.",
+                        "GpuProgramParameters::getConstantDefinitionIterator");
 
         return *mNamedConstants;
     }
@@ -1342,7 +1634,7 @@ namespace Ogre
     {
         if (!mNamedConstants)
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "Named constants have not been initialised, perhaps a compile error",
+                        "This params object is not based on a program with named parameters.",
                         "GpuProgramParameters::getConstantDefinitionIterator");
 
 
@@ -1361,14 +1653,13 @@ namespace Ogre
         {
             if (throwExceptionIfNotFound)
                 OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                            "Named constants have not been initialised, perhaps a compile error");
+                            "Named constants have not been initialised, perhaps a compile error.",
+                            "GpuProgramParameters::_findNamedConstantDefinition");
             return 0;
         }
 
-        // strip array extension
-        size_t arrStart = name.back() == ']' ? name.find('[') : String::npos;
-        auto i = mNamedConstants->map.find(arrStart == String::npos ? name : name.substr(0, arrStart));
-        if (i == mNamedConstants->map.end() || (i->second.arraySize == 1 && arrStart != String::npos))
+        GpuConstantDefinitionMap::const_iterator i = mNamedConstants->map.find(name);
+        if (i == mNamedConstants->map.end())
         {
             if (throwExceptionIfNotFound)
 			{
@@ -1391,7 +1682,7 @@ namespace Ogre
         }
     }
     //-----------------------------------------------------------------------------
-    void GpuProgramParameters::setAutoConstant(size_t index, AutoConstantType acType, uint32 extraInfo)
+    void GpuProgramParameters::setAutoConstant(size_t index, AutoConstantType acType, size_t extraInfo)
     {
         // Get auto constant definition for sizing
         const AutoConstantDefinition* autoDef = getAutoConstantDefinition(acType);
@@ -1408,25 +1699,26 @@ namespace Ogre
             sz += 4 - (sz % 4);
         }
 
-        GpuLogicalIndexUse* indexUse = getConstantLogicalIndexUse(index, sz, deriveVariability(acType), BCT_FLOAT);
+        GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(index, sz, deriveVariability(acType));
 
         if(indexUse)
             _setRawAutoConstant(indexUse->physicalIndex, acType, extraInfo, indexUse->variability, sz);
     }
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::_setRawAutoConstant(size_t physicalIndex,
-                                                   AutoConstantType acType, uint32 extraInfo, uint16 variability, uint8 elementSize)
+                                                   AutoConstantType acType, size_t extraInfo, uint16 variability, size_t elementSize)
     {
         // update existing index if it exists
         bool found = false;
-        for (auto& ac : mAutoConstants)
+        for (AutoConstantList::iterator i = mAutoConstants.begin();
+             i != mAutoConstants.end(); ++i)
         {
-            if (ac.physicalIndex == physicalIndex)
+            if (i->physicalIndex == physicalIndex)
             {
-                ac.paramType = acType;
-                ac.data = extraInfo;
-                ac.elementCount = elementSize;
-                ac.variability = variability;
+                i->paramType = acType;
+                i->data = extraInfo;
+                i->elementCount = elementSize;
+                i->variability = variability;
                 found = true;
                 break;
             }
@@ -1439,19 +1731,44 @@ namespace Ogre
 
     }
     //-----------------------------------------------------------------------------
+    void GpuProgramParameters::setAutoConstant(size_t index, AutoConstantType acType, uint16 extraInfo1, uint16 extraInfo2)
+    {
+        size_t extraInfo = (size_t)extraInfo1 | ((size_t)extraInfo2) << 16;
+
+        // Get auto constant definition for sizing
+        const AutoConstantDefinition* autoDef = getAutoConstantDefinition(acType);
+
+        if(!autoDef)
+            OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, "No constant definition found for type " +
+                        StringConverter::toString(acType),
+                        "GpuProgramParameters::setAutoConstant");
+
+        // round up to nearest multiple of 4
+        size_t sz = autoDef->elementCount;
+        if (sz % 4 > 0)
+        {
+            sz += 4 - (sz % 4);
+        }
+
+        GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(index, sz, deriveVariability(acType));
+
+        _setRawAutoConstant(indexUse->physicalIndex, acType, extraInfo, indexUse->variability, sz);
+    }
+    //-----------------------------------------------------------------------------
     void GpuProgramParameters::_setRawAutoConstantReal(size_t physicalIndex,
-                                                       AutoConstantType acType, float rData, uint16 variability, uint8 elementSize)
+                                                       AutoConstantType acType, Real rData, uint16 variability, size_t elementSize)
     {
         // update existing index if it exists
         bool found = false;
-        for (auto& ac : mAutoConstants)
+        for (AutoConstantList::iterator i = mAutoConstants.begin();
+             i != mAutoConstants.end(); ++i)
         {
-            if (ac.physicalIndex == physicalIndex)
+            if (i->physicalIndex == physicalIndex)
             {
-                ac.paramType = acType;
-                ac.fData = rData;
-                ac.elementCount = elementSize;
-                ac.variability = variability;
+                i->paramType = acType;
+                i->fData = rData;
+                i->elementCount = elementSize;
+                i->variability = variability;
                 found = true;
                 break;
             }
@@ -1464,12 +1781,11 @@ namespace Ogre
     //-----------------------------------------------------------------------------
     void GpuProgramParameters::clearAutoConstant(size_t index)
     {
-        GpuLogicalIndexUse* indexUse = getConstantLogicalIndexUse(index, 0, GPV_GLOBAL, BCT_FLOAT);
+        GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(index, 0, GPV_GLOBAL);
 
         if (indexUse)
         {
-            // do not clear variability, indexUse is shared across all instances
-
+            indexUse->variability = GPV_GLOBAL;
             size_t physicalIndex = indexUse->physicalIndex;
             // update existing index if it exists
             for (AutoConstantList::iterator i = mAutoConstants.begin();
@@ -1489,7 +1805,7 @@ namespace Ogre
         const GpuConstantDefinition* def = _findNamedConstantDefinition(name);
         if (def)
         {
-            // do not clear variability, def is shared across all instances
+            def->variability = GPV_GLOBAL;
 
             // Autos are always floating point
             if (def->isFloat()) {
@@ -1512,7 +1828,7 @@ namespace Ogre
         mCombinedVariability = GPV_GLOBAL;
     }
     //-----------------------------------------------------------------------------
-    void GpuProgramParameters::setAutoConstantReal(size_t index, AutoConstantType acType, float rData)
+    void GpuProgramParameters::setAutoConstantReal(size_t index, AutoConstantType acType, Real rData)
     {
         // Get auto constant definition for sizing
         const AutoConstantDefinition* autoDef = getAutoConstantDefinition(acType);
@@ -1529,7 +1845,7 @@ namespace Ogre
             sz += 4 - (sz % 4);
         }
 
-        GpuLogicalIndexUse* indexUse = getConstantLogicalIndexUse(index, sz, deriveVariability(acType), BCT_FLOAT);
+        GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(index, sz, deriveVariability(acType));
 
         _setRawAutoConstantReal(indexUse->physicalIndex, acType, rData, indexUse->variability, sz);
     }
@@ -1557,357 +1873,355 @@ namespace Ogre
         mActivePassIterationIndex = std::numeric_limits<size_t>::max();
 
         // Autoconstant index is not a physical index
-        for (const auto& ac : mAutoConstants)
+        for (AutoConstantList::const_iterator i = mAutoConstants.begin(); i != mAutoConstants.end(); ++i)
         {
             // Only update needed slots
-            if (ac.variability & mask)
+            if (i->variability & mask)
             {
 
-                switch(ac.paramType)
+                switch(i->paramType)
                 {
                 case ACT_VIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getViewMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_VIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseViewMatrix(),i->elementCount);
                     break;
                 case ACT_TRANSPOSE_VIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTransposeViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTransposeViewMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_TRANSPOSE_VIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTransposeViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTransposeViewMatrix(),i->elementCount);
                     break;
 
                 case ACT_PROJECTION_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getProjectionMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getProjectionMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_PROJECTION_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseProjectionMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseProjectionMatrix(),i->elementCount);
                     break;
                 case ACT_TRANSPOSE_PROJECTION_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTransposeProjectionMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTransposeProjectionMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_TRANSPOSE_PROJECTION_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTransposeProjectionMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTransposeProjectionMatrix(),i->elementCount);
                     break;
 
                 case ACT_VIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getViewProjectionMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getViewProjectionMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_VIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_TRANSPOSE_VIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTransposeViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTransposeViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_TRANSPOSE_VIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTransposeViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTransposeViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_RENDER_TARGET_FLIPPING:
-                    _writeRawConstant(ac.physicalIndex, source->getCurrentRenderTarget()->requiresTextureFlipping() ? -1.f : +1.f);
+                    _writeRawConstant(i->physicalIndex, source->getCurrentRenderTarget()->requiresTextureFlipping() ? -1.f : +1.f);
                     break;
                 case ACT_VERTEX_WINDING:
                     {
                         RenderSystem* rsys = Root::getSingleton().getRenderSystem();
-                        _writeRawConstant(ac.physicalIndex, rsys->getInvertVertexWinding() ? -1.f : +1.f);
+                        _writeRawConstant(i->physicalIndex, rsys->getInvertVertexWinding() ? -1.f : +1.f);
                     }
                     break;
 
                     // NB ambient light still here because it's not related to a specific light
                 case ACT_AMBIENT_LIGHT_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getAmbientLightColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getAmbientLightColour(),
+                                      i->elementCount);
                     break;
                 case ACT_DERIVED_AMBIENT_LIGHT_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getDerivedAmbientLightColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getDerivedAmbientLightColour(),
+                                      i->elementCount);
                     break;
                 case ACT_DERIVED_SCENE_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getDerivedSceneColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getDerivedSceneColour(),
+                                      i->elementCount);
                     break;
 
                 case ACT_FOG_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getFogColour(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getFogColour());
                     break;
                 case ACT_FOG_PARAMS:
-                    _writeRawConstant(ac.physicalIndex, source->getFogParams(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getFogParams(), i->elementCount);
                     break;
                 case ACT_POINT_PARAMS:
-                    _writeRawConstant(ac.physicalIndex, source->getPointParams(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getPointParams(), i->elementCount);
                     break;
                 case ACT_SURFACE_AMBIENT_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getSurfaceAmbientColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSurfaceAmbientColour(),
+                                      i->elementCount);
                     break;
                 case ACT_SURFACE_DIFFUSE_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getSurfaceDiffuseColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSurfaceDiffuseColour(),
+                                      i->elementCount);
                     break;
                 case ACT_SURFACE_SPECULAR_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getSurfaceSpecularColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSurfaceSpecularColour(),
+                                      i->elementCount);
                     break;
                 case ACT_SURFACE_EMISSIVE_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getSurfaceEmissiveColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSurfaceEmissiveColour(),
+                                      i->elementCount);
                     break;
                 case ACT_SURFACE_SHININESS:
-                    _writeRawConstant(ac.physicalIndex, source->getSurfaceShininess());
+                    _writeRawConstant(i->physicalIndex, source->getSurfaceShininess());
                     break;
                 case ACT_SURFACE_ALPHA_REJECTION_VALUE:
-                    _writeRawConstant(ac.physicalIndex, source->getSurfaceAlphaRejectionValue());
+                    _writeRawConstant(i->physicalIndex, source->getSurfaceAlphaRejectionValue());
                     break;
 
                 case ACT_CAMERA_POSITION:
-                    _writeRawConstant(ac.physicalIndex, source->getCameraPosition(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getCameraPosition(), i->elementCount);
                     break;
                 case ACT_CAMERA_RELATIVE_POSITION:
-                    _writeRawConstant (ac.physicalIndex, source->getCameraRelativePosition(), ac.elementCount);
+                    _writeRawConstant (i->physicalIndex, source->getCameraRelativePosition(), i->elementCount);
                     break;
                 case ACT_TIME:
-                    _writeRawConstant(ac.physicalIndex, source->getTime() * ac.fData);
+                    _writeRawConstant(i->physicalIndex, source->getTime() * i->fData);
                     break;
                 case ACT_TIME_0_X:
-                    _writeRawConstant(ac.physicalIndex, source->getTime_0_X(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getTime_0_X(i->fData));
                     break;
                 case ACT_COSTIME_0_X:
-                    _writeRawConstant(ac.physicalIndex, source->getCosTime_0_X(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getCosTime_0_X(i->fData));
                     break;
                 case ACT_SINTIME_0_X:
-                    _writeRawConstant(ac.physicalIndex, source->getSinTime_0_X(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getSinTime_0_X(i->fData));
                     break;
                 case ACT_TANTIME_0_X:
-                    _writeRawConstant(ac.physicalIndex, source->getTanTime_0_X(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getTanTime_0_X(i->fData));
                     break;
                 case ACT_TIME_0_X_PACKED:
-                    _writeRawConstant(ac.physicalIndex, source->getTime_0_X_packed(ac.fData), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTime_0_X_packed(i->fData), i->elementCount);
                     break;
                 case ACT_TIME_0_1:
-                    _writeRawConstant(ac.physicalIndex, source->getTime_0_1(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getTime_0_1(i->fData));
                     break;
                 case ACT_COSTIME_0_1:
-                    _writeRawConstant(ac.physicalIndex, source->getCosTime_0_1(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getCosTime_0_1(i->fData));
                     break;
                 case ACT_SINTIME_0_1:
-                    _writeRawConstant(ac.physicalIndex, source->getSinTime_0_1(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getSinTime_0_1(i->fData));
                     break;
                 case ACT_TANTIME_0_1:
-                    _writeRawConstant(ac.physicalIndex, source->getTanTime_0_1(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getTanTime_0_1(i->fData));
                     break;
                 case ACT_TIME_0_1_PACKED:
-                    _writeRawConstant(ac.physicalIndex, source->getTime_0_1_packed(ac.fData), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTime_0_1_packed(i->fData), i->elementCount);
                     break;
                 case ACT_TIME_0_2PI:
-                    _writeRawConstant(ac.physicalIndex, source->getTime_0_2Pi(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getTime_0_2Pi(i->fData));
                     break;
                 case ACT_COSTIME_0_2PI:
-                    _writeRawConstant(ac.physicalIndex, source->getCosTime_0_2Pi(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getCosTime_0_2Pi(i->fData));
                     break;
                 case ACT_SINTIME_0_2PI:
-                    _writeRawConstant(ac.physicalIndex, source->getSinTime_0_2Pi(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getSinTime_0_2Pi(i->fData));
                     break;
                 case ACT_TANTIME_0_2PI:
-                    _writeRawConstant(ac.physicalIndex, source->getTanTime_0_2Pi(ac.fData));
+                    _writeRawConstant(i->physicalIndex, source->getTanTime_0_2Pi(i->fData));
                     break;
                 case ACT_TIME_0_2PI_PACKED:
-                    _writeRawConstant(ac.physicalIndex, source->getTime_0_2Pi_packed(ac.fData), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTime_0_2Pi_packed(i->fData), i->elementCount);
                     break;
                 case ACT_FRAME_TIME:
-                    _writeRawConstant(ac.physicalIndex, source->getFrameTime() * ac.fData);
+                    _writeRawConstant(i->physicalIndex, source->getFrameTime() * i->fData);
                     break;
                 case ACT_FPS:
-                    _writeRawConstant(ac.physicalIndex, source->getFPS());
+                    _writeRawConstant(i->physicalIndex, source->getFPS());
                     break;
                 case ACT_VIEWPORT_WIDTH:
-                    _writeRawConstant(ac.physicalIndex, source->getViewportWidth());
+                    _writeRawConstant(i->physicalIndex, source->getViewportWidth());
                     break;
                 case ACT_VIEWPORT_HEIGHT:
-                    _writeRawConstant(ac.physicalIndex, source->getViewportHeight());
+                    _writeRawConstant(i->physicalIndex, source->getViewportHeight());
                     break;
                 case ACT_INVERSE_VIEWPORT_WIDTH:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseViewportWidth());
+                    _writeRawConstant(i->physicalIndex, source->getInverseViewportWidth());
                     break;
                 case ACT_INVERSE_VIEWPORT_HEIGHT:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseViewportHeight());
+                    _writeRawConstant(i->physicalIndex, source->getInverseViewportHeight());
                     break;
                 case ACT_VIEWPORT_SIZE:
-                    _writeRawConstant(ac.physicalIndex, Vector4f(
+                    _writeRawConstant(i->physicalIndex, Vector4(
                         source->getViewportWidth(),
                         source->getViewportHeight(),
                         source->getInverseViewportWidth(),
-                        source->getInverseViewportHeight()), ac.elementCount);
+                        source->getInverseViewportHeight()), i->elementCount);
                     break;
                 case ACT_TEXEL_OFFSETS:
                     {
                         RenderSystem* rsys = Root::getSingleton().getRenderSystem();
-                        _writeRawConstant(ac.physicalIndex, Vector4f(
+                        _writeRawConstant(i->physicalIndex, Vector4(
                             rsys->getHorizontalTexelOffset(),
                             rsys->getVerticalTexelOffset(),
                             rsys->getHorizontalTexelOffset() * source->getInverseViewportWidth(),
                             rsys->getVerticalTexelOffset() * source->getInverseViewportHeight()),
-                                          ac.elementCount);
+                                          i->elementCount);
                     }
                     break;
                 case ACT_TEXTURE_SIZE:
-                    _writeRawConstant(ac.physicalIndex, source->getTextureSize(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTextureSize(i->data), i->elementCount);
                     break;
                 case ACT_INVERSE_TEXTURE_SIZE:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTextureSize(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTextureSize(i->data), i->elementCount);
                     break;
                 case ACT_PACKED_TEXTURE_SIZE:
-                    _writeRawConstant(ac.physicalIndex, source->getPackedTextureSize(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getPackedTextureSize(i->data), i->elementCount);
                     break;
                 case ACT_SCENE_DEPTH_RANGE:
-                    _writeRawConstant(ac.physicalIndex, source->getSceneDepthRange(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSceneDepthRange(), i->elementCount);
                     break;
                 case ACT_VIEW_DIRECTION:
-                    _writeRawConstant(ac.physicalIndex, source->getViewDirection());
+                    _writeRawConstant(i->physicalIndex, source->getViewDirection());
                     break;
                 case ACT_VIEW_SIDE_VECTOR:
-                    _writeRawConstant(ac.physicalIndex, source->getViewSideVector());
+                    _writeRawConstant(i->physicalIndex, source->getViewSideVector());
                     break;
                 case ACT_VIEW_UP_VECTOR:
-                    _writeRawConstant(ac.physicalIndex, source->getViewUpVector());
+                    _writeRawConstant(i->physicalIndex, source->getViewUpVector());
                     break;
                 case ACT_FOV:
-                    _writeRawConstant(ac.physicalIndex, source->getFOV());
+                    _writeRawConstant(i->physicalIndex, source->getFOV());
                     break;
                 case ACT_NEAR_CLIP_DISTANCE:
-                    _writeRawConstant(ac.physicalIndex, source->getNearClipDistance());
+                    _writeRawConstant(i->physicalIndex, source->getNearClipDistance());
                     break;
                 case ACT_FAR_CLIP_DISTANCE:
-                    _writeRawConstant(ac.physicalIndex, source->getFarClipDistance());
+                    _writeRawConstant(i->physicalIndex, source->getFarClipDistance());
                     break;
                 case ACT_PASS_NUMBER:
-                    _writeRawConstant(ac.physicalIndex, (float)source->getPassNumber());
+                    _writeRawConstant(i->physicalIndex, (float)source->getPassNumber());
                     break;
                 case ACT_PASS_ITERATION_NUMBER:
                     // this is actually just an initial set-up, it's bound separately, so still global
-                    _writeRawConstant(ac.physicalIndex, 0.0f);
-                    mActivePassIterationIndex = ac.physicalIndex;
+                    _writeRawConstant(i->physicalIndex, 0.0f);
+                    mActivePassIterationIndex = i->physicalIndex;
                     break;
                 case ACT_TEXTURE_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTextureTransformMatrix(ac.data),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTextureTransformMatrix(i->data),i->elementCount);
                     break;
                 case ACT_LOD_CAMERA_POSITION:
-                    _writeRawConstant(ac.physicalIndex, source->getLodCameraPosition(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLodCameraPosition(), i->elementCount);
                     break;
-                case ACT_MATERIAL_LOD_INDEX:
-                    _writeRawConstant(ac.physicalIndex, (float)source->getMaterialLodIndex());
-                    break;
+
                 case ACT_TEXTURE_WORLDVIEWPROJ_MATRIX:
                     // can also be updated in lights
-                    _writeRawConstant(ac.physicalIndex, source->getTextureWorldViewProjMatrix(ac.data),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTextureWorldViewProjMatrix(i->data),i->elementCount);
                     break;
                 case ACT_TEXTURE_WORLDVIEWPROJ_MATRIX_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         // can also be updated in lights
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Matrix4),
-                                          source->getTextureWorldViewProjMatrix(l),ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getTextureWorldViewProjMatrix(l),i->elementCount);
                     }
                     break;
                 case ACT_SPOTLIGHT_WORLDVIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getSpotlightWorldViewProjMatrix(ac.data),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSpotlightWorldViewProjMatrix(i->data),i->elementCount);
                     break;
                 case ACT_SPOTLIGHT_WORLDVIEWPROJ_MATRIX_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Matrix4), source->getSpotlightWorldViewProjMatrix(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount, source->getSpotlightWorldViewProjMatrix(l), i->elementCount);
                     break;
                 case ACT_LIGHT_POSITION_OBJECT_SPACE:
-                    _writeRawConstant(ac.physicalIndex,
+                    _writeRawConstant(i->physicalIndex,
                                       source->getInverseWorldMatrix() *
-                                          source->getLightAs4DVector(ac.data),
-                                      ac.elementCount);
+                                          source->getLightAs4DVector(i->data),
+                                      i->elementCount);
                     break;
                 case ACT_LIGHT_DIRECTION_OBJECT_SPACE:
                     // We need the inverse of the inverse transpose
                     m3 = source->getTransposeWorldMatrix().linear();
-                    vec3 = m3 * source->getLightDirection(ac.data);
+                    vec3 = m3 * source->getLightDirection(i->data);
                     vec3.normalise();
                     // Set as 4D vector for compatibility
-                    _writeRawConstant(ac.physicalIndex, Vector4f(vec3.x, vec3.y, vec3.z, 0.0f), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, Vector4(vec3.x, vec3.y, vec3.z, 0.0f), i->elementCount);
                     break;
                 case ACT_LIGHT_DISTANCE_OBJECT_SPACE:
-                    vec3 = source->getInverseWorldMatrix() * source->getLightPosition(ac.data);
-                    _writeRawConstant(ac.physicalIndex, vec3.length());
+                    vec3 = source->getInverseWorldMatrix() * source->getLightPosition(i->data);
+                    _writeRawConstant(i->physicalIndex, vec3.length());
                     break;
                 case ACT_LIGHT_POSITION_OBJECT_SPACE_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
                                           source->getInverseWorldMatrix() *
                                               source->getLightAs4DVector(l),
-                                          ac.elementCount);
+                                          i->elementCount);
                     break;
 
                 case ACT_LIGHT_DIRECTION_OBJECT_SPACE_ARRAY:
                     // We need the inverse of the inverse transpose
                     m3 = source->getTransposeWorldMatrix().linear();
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         vec3 = m3 * source->getLightDirection(l);
                         vec3.normalise();
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
-                                          Vector4f(vec3.x, vec3.y, vec3.z, 0.0f), ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          Vector4(vec3.x, vec3.y, vec3.z, 0.0f), i->elementCount);
                     }
                     break;
 
                 case ACT_LIGHT_DISTANCE_OBJECT_SPACE_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         vec3 = source->getInverseWorldMatrix() * source->getLightPosition(l);
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Real), vec3.length());
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount, vec3.length());
                     }
                     break;
 
                 case ACT_WORLD_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getWorldMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getWorldMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_WORLD_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseWorldMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseWorldMatrix(),i->elementCount);
                     break;
                 case ACT_TRANSPOSE_WORLD_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTransposeWorldMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTransposeWorldMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_TRANSPOSE_WORLD_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTransposeWorldMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTransposeWorldMatrix(),i->elementCount);
                     break;
 
-                case ACT_BONE_MATRIX_ARRAY_3x4:
+                case ACT_WORLD_MATRIX_ARRAY_3x4:
                     // Loop over matrices
-                    pMatrix = source->getBoneMatrixArray();
-                    numMatrices = source->getBoneMatrixCount();
-                    index = ac.physicalIndex;
+                    pMatrix = source->getWorldMatrixArray();
+                    numMatrices = source->getWorldMatrixCount();
+                    index = i->physicalIndex;
                     for (m = 0; m < numMatrices; ++m)
                     {
                         _writeRawConstants(index, (*pMatrix)[0], 12);
-                        index += 12*sizeof(Real);
+                        index += 12;
                         ++pMatrix;
                     }
                     break;
-                case ACT_BONE_MATRIX_ARRAY:
-                    _writeRawConstant(ac.physicalIndex, source->getBoneMatrixArray(),
-                                      source->getBoneMatrixCount());
+                case ACT_WORLD_MATRIX_ARRAY:
+                    _writeRawConstant(i->physicalIndex, source->getWorldMatrixArray(),
+                                      source->getWorldMatrixCount());
                     break;
-                case ACT_BONE_DUALQUATERNION_ARRAY_2x4:
+                case ACT_WORLD_DUALQUATERNION_ARRAY_2x4:
                     // Loop over matrices
-                    pMatrix = source->getBoneMatrixArray();
-                    numMatrices = source->getBoneMatrixCount();
-                    index = ac.physicalIndex;
+                    pMatrix = source->getWorldMatrixArray();
+                    numMatrices = source->getWorldMatrixCount();
+                    index = i->physicalIndex;
                     for (m = 0; m < numMatrices; ++m)
                     {
                         dQuat.fromTransformationMatrix(*pMatrix);
                         _writeRawConstants(index, dQuat.ptr(), 8);
-                        index += sizeof(DualQuaternion);
+                        index += 8;
                         ++pMatrix;
                     }
                     break;
-                case ACT_BONE_SCALE_SHEAR_MATRIX_ARRAY_3x4:
+                case ACT_WORLD_SCALE_SHEAR_MATRIX_ARRAY_3x4:
                     // Loop over matrices
-                    pMatrix = source->getBoneMatrixArray();
-                    numMatrices = source->getBoneMatrixCount();
-                    index = ac.physicalIndex;
+                    pMatrix = source->getWorldMatrixArray();
+                    numMatrices = source->getWorldMatrixCount();
+                    index = i->physicalIndex;
 
                     scaleM = Matrix4::IDENTITY;
 
@@ -1936,258 +2250,258 @@ namespace Ogre
                         scaleM[1][2] = vecU[2];
 
                         _writeRawConstants(index, scaleM[0], 12);
-                        index += 12*sizeof(Real);
+                        index += 12;
                         ++pMatrix;
                     }
                     break;
                 case ACT_WORLDVIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getWorldViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getWorldViewMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_WORLDVIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseWorldViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseWorldViewMatrix(),i->elementCount);
                     break;
                 case ACT_TRANSPOSE_WORLDVIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTransposeWorldViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTransposeWorldViewMatrix(),i->elementCount);
                     break;
                 case ACT_NORMAL_MATRIX:
-                    if(ac.elementCount == 9) // check if shader supports packed data
+                    if(i->elementCount == 9) // check if shader supports packed data
                     {
-                        _writeRawConstant(ac.physicalIndex, source->getInverseTransposeWorldViewMatrix().linear(),ac.elementCount);
+                        _writeRawConstant(i->physicalIndex, source->getInverseTransposeWorldViewMatrix().linear(),i->elementCount);
                         break;
                     }
                     OGRE_FALLTHROUGH; // fallthrough to padded 4x4 matrix
                 case ACT_INVERSE_TRANSPOSE_WORLDVIEW_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTransposeWorldViewMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTransposeWorldViewMatrix(),i->elementCount);
                     break;
 
                 case ACT_WORLDVIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getWorldViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getWorldViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_WORLDVIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseWorldViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseWorldViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_TRANSPOSE_WORLDVIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getTransposeWorldViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTransposeWorldViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_INVERSE_TRANSPOSE_WORLDVIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getInverseTransposeWorldViewProjMatrix(),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getInverseTransposeWorldViewProjMatrix(),i->elementCount);
                     break;
                 case ACT_CAMERA_POSITION_OBJECT_SPACE:
-                    _writeRawConstant(ac.physicalIndex, source->getCameraPositionObjectSpace(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getCameraPositionObjectSpace(), i->elementCount);
                     break;
                 case ACT_LOD_CAMERA_POSITION_OBJECT_SPACE:
-                    _writeRawConstant(ac.physicalIndex, source->getLodCameraPositionObjectSpace(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLodCameraPositionObjectSpace(), i->elementCount);
                     break;
 
                 case ACT_CUSTOM:
                 case ACT_ANIMATION_PARAMETRIC:
-                    source->getCurrentRenderable()->_updateCustomGpuParameter(ac, this);
+                    source->getCurrentRenderable()->_updateCustomGpuParameter(*i, this);
                     break;
                 case ACT_LIGHT_CUSTOM:
-                    source->updateLightCustomGpuParameter(ac, this);
+                    source->updateLightCustomGpuParameter(*i, this);
                     break;
                 case ACT_LIGHT_COUNT:
-                    _writeRawConstant(ac.physicalIndex, source->getLightCount());
+                    _writeRawConstant(i->physicalIndex, source->getLightCount());
                     break;
                 case ACT_LIGHT_DIFFUSE_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getLightDiffuseColour(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLightDiffuseColour(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_SPECULAR_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getLightSpecularColour(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLightSpecularColour(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_POSITION:
                     // Get as 4D vector, works for directional lights too
                     // Use element count in case uniform slot is smaller
-                    _writeRawConstant(ac.physicalIndex,
-                                      source->getLightAs4DVector(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex,
+                                      source->getLightAs4DVector(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_DIRECTION:
-                    vec3 = source->getLightDirection(ac.data);
+                    vec3 = source->getLightDirection(i->data);
                     // Set as 4D vector for compatibility
                     // Use element count in case uniform slot is smaller
-                    _writeRawConstant(ac.physicalIndex, Vector4f(vec3.x, vec3.y, vec3.z, 1.0f), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, Vector4(vec3.x, vec3.y, vec3.z, 1.0f), i->elementCount);
                     break;
                 case ACT_LIGHT_POSITION_VIEW_SPACE:
-                    _writeRawConstant(ac.physicalIndex,
-                                      source->getViewMatrix() * source->getLightAs4DVector(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex,
+                                      source->getViewMatrix() * source->getLightAs4DVector(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_DIRECTION_VIEW_SPACE:
                     m3 = source->getInverseTransposeViewMatrix().linear();
                     // inverse transpose in case of scaling
-                    vec3 = m3 * source->getLightDirection(ac.data);
+                    vec3 = m3 * source->getLightDirection(i->data);
                     vec3.normalise();
                     // Set as 4D vector for compatibility
-                    _writeRawConstant(ac.physicalIndex, Vector4f(vec3.x, vec3.y, vec3.z, 0.0f),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, Vector4(vec3.x, vec3.y, vec3.z, 0.0f),i->elementCount);
                     break;
                 case ACT_SHADOW_EXTRUSION_DISTANCE:
                     // extrusion is in object-space, so we have to rescale by the inverse
                     // of the world scaling to deal with scaled objects
                     m3 = source->getWorldMatrix().linear();
-                    _writeRawConstant(ac.physicalIndex, source->getShadowExtrusionDistance() /
+                    _writeRawConstant(i->physicalIndex, source->getShadowExtrusionDistance() /
                                       Math::Sqrt(std::max(std::max(m3.GetColumn(0).squaredLength(), m3.GetColumn(1).squaredLength()), m3.GetColumn(2).squaredLength())));
                     break;
                 case ACT_SHADOW_SCENE_DEPTH_RANGE:
-                    _writeRawConstant(ac.physicalIndex, source->getShadowSceneDepthRange(ac.data));
+                    _writeRawConstant(i->physicalIndex, source->getShadowSceneDepthRange(i->data));
                     break;
                 case ACT_SHADOW_SCENE_DEPTH_RANGE_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*ac.elementCount, source->getShadowSceneDepthRange(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount, source->getShadowSceneDepthRange(l), i->elementCount);
                     break;
                 case ACT_SHADOW_COLOUR:
-                    _writeRawConstant(ac.physicalIndex, source->getShadowColour(), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getShadowColour(), i->elementCount);
                     break;
                 case ACT_LIGHT_POWER_SCALE:
-                    _writeRawConstant(ac.physicalIndex, source->getLightPowerScale(ac.data));
+                    _writeRawConstant(i->physicalIndex, source->getLightPowerScale(i->data));
                     break;
                 case ACT_LIGHT_DIFFUSE_COLOUR_POWER_SCALED:
-                    _writeRawConstant(ac.physicalIndex, source->getLightDiffuseColourWithPower(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLightDiffuseColourWithPower(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_SPECULAR_COLOUR_POWER_SCALED:
-                    _writeRawConstant(ac.physicalIndex, source->getLightSpecularColourWithPower(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLightSpecularColourWithPower(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_NUMBER:
-                    _writeRawConstant(ac.physicalIndex, source->getLightNumber(ac.data));
+                    _writeRawConstant(i->physicalIndex, source->getLightNumber(i->data));
                     break;
                 case ACT_LIGHT_CASTS_SHADOWS:
-                    _writeRawConstant(ac.physicalIndex, source->getLightCastsShadows(ac.data));
+                    _writeRawConstant(i->physicalIndex, source->getLightCastsShadows(i->data));
                     break;
                 case ACT_LIGHT_CASTS_SHADOWS_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(float), source->getLightCastsShadows(l));
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount, source->getLightCastsShadows(l), i->elementCount);
                     break;
                 case ACT_LIGHT_ATTENUATION:
-                    _writeRawConstant(ac.physicalIndex, source->getLightAttenuation(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getLightAttenuation(i->data), i->elementCount);
                     break;
                 case ACT_SPOTLIGHT_PARAMS:
-                    _writeRawConstant(ac.physicalIndex, source->getSpotlightParams(ac.data), ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSpotlightParams(i->data), i->elementCount);
                     break;
                 case ACT_LIGHT_DIFFUSE_COLOUR_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(ColourValue),
-                                          source->getLightDiffuseColour(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getLightDiffuseColour(l), i->elementCount);
                     break;
 
                 case ACT_LIGHT_SPECULAR_COLOUR_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(ColourValue),
-                                          source->getLightSpecularColour(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getLightSpecularColour(l), i->elementCount);
                     break;
                 case ACT_LIGHT_DIFFUSE_COLOUR_POWER_SCALED_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(ColourValue),
-                                          source->getLightDiffuseColourWithPower(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getLightDiffuseColourWithPower(l), i->elementCount);
                     break;
 
                 case ACT_LIGHT_SPECULAR_COLOUR_POWER_SCALED_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(ColourValue),
-                                          source->getLightSpecularColourWithPower(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getLightSpecularColourWithPower(l), i->elementCount);
                     break;
 
                 case ACT_LIGHT_POSITION_ARRAY:
                     // Get as 4D vector, works for directional lights too
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
-                                          source->getLightAs4DVector(l), ac.elementCount);
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getLightAs4DVector(l), i->elementCount);
                     break;
 
                 case ACT_LIGHT_DIRECTION_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         vec3 = source->getLightDirection(l);
                         // Set as 4D vector for compatibility
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
-                                          Vector4f(vec3.x, vec3.y, vec3.z, 0.0f), ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          Vector4(vec3.x, vec3.y, vec3.z, 0.0f), i->elementCount);
                     }
                     break;
 
                 case ACT_LIGHT_POSITION_VIEW_SPACE_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
                                           source->getViewMatrix() *
                                               source->getLightAs4DVector(l),
-                                          ac.elementCount);
+                                          i->elementCount);
                     break;
 
                 case ACT_LIGHT_DIRECTION_VIEW_SPACE_ARRAY:
                     m3 = source->getInverseTransposeViewMatrix().linear();
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         vec3 = m3 * source->getLightDirection(l);
                         vec3.normalise();
                         // Set as 4D vector for compatibility
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
-                                          Vector4f(vec3.x, vec3.y, vec3.z, 0.0f), ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          Vector4(vec3.x, vec3.y, vec3.z, 0.0f), i->elementCount);
                     }
                     break;
 
                 case ACT_LIGHT_POWER_SCALE_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Real),
+                    for (size_t l = 0; l < i->data; ++l)
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
                                           source->getLightPowerScale(l));
                     break;
 
                 case ACT_LIGHT_ATTENUATION_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f),
-                                          source->getLightAttenuation(l), ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getLightAttenuation(l), i->elementCount);
                     }
                     break;
                 case ACT_SPOTLIGHT_PARAMS_ARRAY:
-                    for (size_t l = 0 ; l < ac.data; ++l)
+                    for (size_t l = 0 ; l < i->data; ++l)
                     {
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Vector4f), source->getSpotlightParams(l),
-                                          ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount, source->getSpotlightParams(l),
+                                          i->elementCount);
                     }
                     break;
                 case ACT_DERIVED_LIGHT_DIFFUSE_COLOUR:
-                    _writeRawConstant(ac.physicalIndex,
-                                      source->getLightDiffuseColourWithPower(ac.data) * source->getSurfaceDiffuseColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex,
+                                      source->getLightDiffuseColourWithPower(i->data) * source->getSurfaceDiffuseColour(),
+                                      i->elementCount);
                     break;
                 case ACT_DERIVED_LIGHT_SPECULAR_COLOUR:
-                    _writeRawConstant(ac.physicalIndex,
-                                      source->getLightSpecularColourWithPower(ac.data) * source->getSurfaceSpecularColour(),
-                                      ac.elementCount);
+                    _writeRawConstant(i->physicalIndex,
+                                      source->getLightSpecularColourWithPower(i->data) * source->getSurfaceSpecularColour(),
+                                      i->elementCount);
                     break;
                 case ACT_DERIVED_LIGHT_DIFFUSE_COLOUR_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(ColourValue),
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
                                           source->getLightDiffuseColourWithPower(l) * source->getSurfaceDiffuseColour(),
-                                          ac.elementCount);
+                                          i->elementCount);
                     }
                     break;
                 case ACT_DERIVED_LIGHT_SPECULAR_COLOUR_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(ColourValue),
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
                                           source->getLightSpecularColourWithPower(l) * source->getSurfaceSpecularColour(),
-                                          ac.elementCount);
+                                          i->elementCount);
                     }
                     break;
                 case ACT_TEXTURE_VIEWPROJ_MATRIX:
                     // can also be updated in lights
-                    _writeRawConstant(ac.physicalIndex, source->getTextureViewProjMatrix(ac.data),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getTextureViewProjMatrix(i->data),i->elementCount);
                     break;
                 case ACT_TEXTURE_VIEWPROJ_MATRIX_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         // can also be updated in lights
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Matrix4),
-                                          source->getTextureViewProjMatrix(l),ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getTextureViewProjMatrix(l),i->elementCount);
                     }
                     break;
                 case ACT_SPOTLIGHT_VIEWPROJ_MATRIX:
-                    _writeRawConstant(ac.physicalIndex, source->getSpotlightViewProjMatrix(ac.data),ac.elementCount);
+                    _writeRawConstant(i->physicalIndex, source->getSpotlightViewProjMatrix(i->data),i->elementCount);
                     break;
                 case ACT_SPOTLIGHT_VIEWPROJ_MATRIX_ARRAY:
-                    for (size_t l = 0; l < ac.data; ++l)
+                    for (size_t l = 0; l < i->data; ++l)
                     {
                         // can also be updated in lights
-                        _writeRawConstant(ac.physicalIndex + l*sizeof(Matrix4),
-                                          source->getSpotlightViewProjMatrix(l),ac.elementCount);
+                        _writeRawConstant(i->physicalIndex + l*i->elementCount,
+                                          source->getSpotlightViewProjMatrix(l),i->elementCount);
                     }
                     break;
 
@@ -2199,42 +2513,22 @@ namespace Ogre
 
     }
     //---------------------------------------------------------------------------
-    static size_t withArrayOffset(const GpuConstantDefinition* def, const String& name)
-    {
-        uint32 offset = 0;
-        if(name.back() == ']')
-        {
-            size_t start = name.find('[');
-            offset = StringConverter::parseInt(name.substr(start + 1, name.size() - start - 2));
-            offset = std::min(offset, def->arraySize - 1);
-            size_t type_sz = def->isDouble() ? 8 : ( def->isSampler() ? 1 : 4);
-            offset *= type_sz;
-        }
-
-        return def->physicalIndex + offset * def->elementSize;
-    }
-
     void GpuProgramParameters::setNamedConstant(const String& name, Real val)
     {
         // look up, and throw an exception if we're not ignoring missing
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), val);
+            _writeRawConstant(def->physicalIndex, val);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, int val)
     {
         // look up, and throw an exception if we're not ignoring missing
-        const GpuConstantDefinition* def = _findNamedConstantDefinition(name, !mIgnoreMissingParams);
-
-        if(!def)
-            return;
-
-        if(def->isSampler())
-            _writeRegisters(withArrayOffset(def, name), &val, 1);
-        else
-            _writeRawConstant(withArrayOffset(def, name), val);
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(name, !mIgnoreMissingParams);
+        if (def)
+            _writeRawConstant(def->physicalIndex, val);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, uint val)
@@ -2243,7 +2537,7 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), val);
+            _writeRawConstant(def->physicalIndex, val);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, const Vector4& vec)
@@ -2252,7 +2546,7 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), vec, def->elementSize);
+            _writeRawConstant(def->physicalIndex, vec, def->elementSize);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, const Vector3& vec)
@@ -2261,7 +2555,7 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), vec);
+            _writeRawConstant(def->physicalIndex, vec);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, const Vector2& vec)
@@ -2270,7 +2564,7 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), vec);
+            _writeRawConstant(def->physicalIndex, vec);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, const Matrix4& m)
@@ -2279,7 +2573,7 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), m, def->elementSize);
+            _writeRawConstant(def->physicalIndex, m, def->elementSize);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, const Matrix4* m,
@@ -2289,7 +2583,7 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), m, numEntries);
+            _writeRawConstant(def->physicalIndex, m, numEntries);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name, const ColourValue& colour)
@@ -2298,35 +2592,29 @@ namespace Ogre
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
-            _writeRawConstant(withArrayOffset(def, name), colour, def->elementSize);
+            _writeRawConstant(def->physicalIndex, colour, def->elementSize);
     }
     //---------------------------------------------------------------------------
-    template <typename T> void GpuProgramParameters::_setNamedConstant(const String& name, const T* val, size_t count)
+    void GpuProgramParameters::setNamedConstant(const String& name,
+                                                const float *val, size_t count, size_t multiple)
     {
+        size_t rawCount = count * multiple;
         // look up, and throw an exception if we're not ignoring missing
-        const GpuConstantDefinition* def = _findNamedConstantDefinition(name, !mIgnoreMissingParams);
-
-        if (!def)
-            return;
-
-        if (count > def->arraySize * def->elementSize)
-        {
-            // The shader compiler may trim the array if the trailing elements
-            // are unused or their usage can be optimized away. Therefore,
-            // a count exceeding the array size not not an error.
-            count = def->arraySize * def->elementSize;
-        }
-
-        _writeRawConstants(withArrayOffset(def, name), val, count);
-    }
-    void GpuProgramParameters::setNamedConstant(const String& name, const float* val, size_t count, size_t multiple)
-    {
-        _setNamedConstant(name, val, count * multiple);
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(name, !mIgnoreMissingParams);
+        if (def)
+            _writeRawConstants(def->physicalIndex, val, rawCount);
     }
     //---------------------------------------------------------------------------
-    void GpuProgramParameters::setNamedConstant(const String& name, const double* val, size_t count, size_t multiple)
+    void GpuProgramParameters::setNamedConstant(const String& name,
+                                                const double *val, size_t count, size_t multiple)
     {
-        _setNamedConstant(name, val, count * multiple);
+        size_t rawCount = count * multiple;
+        // look up, and throw an exception if we're not ignoring missing
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(name, !mIgnoreMissingParams);
+        if (def)
+            _writeRawConstants(def->physicalIndex, val, rawCount);
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedConstant(const String& name,
@@ -2334,40 +2622,53 @@ namespace Ogre
     {
         size_t rawCount = count * multiple;
         // look up, and throw an exception if we're not ignoring missing
-        const GpuConstantDefinition* def = _findNamedConstantDefinition(name, !mIgnoreMissingParams);
-
-        if(!def)
-            return;
-
-        if (rawCount > def->arraySize * def->elementSize)
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        StringUtil::format("Too many values for parameter %s: %zu > %d", name.c_str(), count,
-                                           def->arraySize * def->elementSize));
-
-        if (def->isSampler())
-            _writeRegisters(withArrayOffset(def, name), val, rawCount);
-        else
-            _writeRawConstants(withArrayOffset(def, name), val, rawCount);
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(name, !mIgnoreMissingParams);
+        if (def)
+            _writeRawConstants(def->physicalIndex, val, rawCount);
     }
     //---------------------------------------------------------------------------
-    void GpuProgramParameters::setNamedConstant(const String& name, const uint* val, size_t count, size_t multiple)
+    void GpuProgramParameters::setNamedConstant(const String& name,
+                                                const uint *val, size_t count, size_t multiple)
     {
-        _setNamedConstant(name, val, count * multiple);
+        size_t rawCount = count * multiple;
+        // look up, and throw an exception if we're not ignoring missing
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(name, !mIgnoreMissingParams);
+        if (def)
+            _writeRawConstants(def->physicalIndex, val, rawCount);
+    }
+    //---------------------------------------------------------------------
+    void GpuProgramParameters::setNamedSubroutine(const String& subroutineSlot, const String& subroutine)
+    {
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(subroutineSlot, !mIgnoreMissingParams);
+        if (def)
+        {
+            setSubroutine(def->logicalIndex, subroutine);
+        }
+    }
+    //---------------------------------------------------------------------
+    void GpuProgramParameters::setSubroutine(size_t index, const String& subroutine)
+    {
+        mSubroutineMap.insert(std::make_pair(index, subroutine));
     }
     //---------------------------------------------------------------------------
     void GpuProgramParameters::setNamedAutoConstant(const String& name,
-                                                    AutoConstantType acType, uint32 extraInfo)
+                                                    AutoConstantType acType, size_t extraInfo)
     {
         // look up, and throw an exception if we're not ignoring missing
         const GpuConstantDefinition* def =
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
         {
-            OgreAssert(def->isFloat(), "incompatible parameter type in shader");
             def->variability = deriveVariability(acType);
             // make sure we also set variability on the logical index map
-            getConstantLogicalIndexUse(def->logicalIndex, def->elementSize * def->arraySize, def->variability, BCT_FLOAT);
-            _setRawAutoConstant(withArrayOffset(def, name), acType, extraInfo, def->variability, def->elementSize);
+            GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(def->logicalIndex, def->elementSize * def->arraySize, def->variability);
+            if (indexUse)
+                indexUse->variability = def->variability;
+
+            _setRawAutoConstant(def->physicalIndex, acType, extraInfo, def->variability, def->elementSize);
         }
 
     }
@@ -2380,12 +2681,43 @@ namespace Ogre
             _findNamedConstantDefinition(name, !mIgnoreMissingParams);
         if (def)
         {
-            OgreAssert(def->isFloat(), "incompatible parameter type in shader");
             def->variability = deriveVariability(acType);
             // make sure we also set variability on the logical index map
-            getConstantLogicalIndexUse(def->logicalIndex, def->elementSize * def->arraySize, def->variability, BCT_FLOAT);
-            _setRawAutoConstantReal(withArrayOffset(def, name), acType, rData, def->variability, def->elementSize);
+            GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(def->logicalIndex, def->elementSize * def->arraySize, def->variability);
+            if (indexUse)
+                indexUse->variability = def->variability;
+            _setRawAutoConstantReal(def->physicalIndex, acType, rData, def->variability, def->elementSize);
         }
+    }
+    //---------------------------------------------------------------------------
+    void GpuProgramParameters::setNamedAutoConstant(const String& name,
+                                                    AutoConstantType acType, uint16 extraInfo1, uint16 extraInfo2)
+    {
+        size_t extraInfo = (size_t)extraInfo1 | ((size_t)extraInfo2) << 16;
+
+        // look up, and throw an exception if we're not ignoring missing
+        const GpuConstantDefinition* def =
+            _findNamedConstantDefinition(name, !mIgnoreMissingParams);
+        if (def)
+        {
+            def->variability = deriveVariability(acType);
+            // make sure we also set variability on the logical index map
+            GpuLogicalIndexUse* indexUse = _getFloatConstantLogicalIndexUse(def->logicalIndex, def->elementSize * def->arraySize, def->variability);
+            if (indexUse)
+                indexUse->variability = def->variability;
+
+            _setRawAutoConstant(def->physicalIndex, acType, extraInfo, def->variability, def->elementSize);
+        }
+    }
+    //---------------------------------------------------------------------------
+    void GpuProgramParameters::setConstantFromTime(size_t index, Real factor)
+    {
+        setAutoConstantReal(index, ACT_TIME, factor);
+    }
+    //---------------------------------------------------------------------------
+    void GpuProgramParameters::setNamedConstantFromTime(const String& name, Real factor)
+    {
+        setNamedAutoConstantReal(name, ACT_TIME, factor);
     }
     //---------------------------------------------------------------------------
     GpuProgramParameters::AutoConstantEntry* GpuProgramParameters::getAutoConstantEntry(const size_t index)
@@ -2403,14 +2735,50 @@ namespace Ogre
     const GpuProgramParameters::AutoConstantEntry*
     GpuProgramParameters::findFloatAutoConstantEntry(size_t logicalIndex)
     {
-        if (!mLogicalToPhysical)
+        if (!mFloatLogicalToPhysical)
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
                         "This is not a low-level parameter parameter object",
                         "GpuProgramParameters::findFloatAutoConstantEntry");
 
         return _findRawAutoConstantEntryFloat(
-            _getConstantPhysicalIndex(logicalIndex, 0, GPV_GLOBAL, BCT_FLOAT));
+            _getFloatConstantPhysicalIndex(logicalIndex, 0, GPV_GLOBAL));
 
+    }
+    //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::findDoubleAutoConstantEntry(size_t logicalIndex)
+    {
+        if (!mDoubleLogicalToPhysical)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "This is not a low-level parameter parameter object",
+                        "GpuProgramParameters::findDoubleAutoConstantEntry");
+
+        return _findRawAutoConstantEntryDouble(
+            _getDoubleConstantPhysicalIndex(logicalIndex, 0, GPV_GLOBAL));
+    }
+    //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::findIntAutoConstantEntry(size_t logicalIndex)
+    {
+        if (!mIntLogicalToPhysical)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "This is not a low-level parameter parameter object",
+                        "GpuProgramParameters::findIntAutoConstantEntry");
+
+        return _findRawAutoConstantEntryInt(
+            _getIntConstantPhysicalIndex(logicalIndex, 0, GPV_GLOBAL));
+    }
+    //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::findUnsignedIntAutoConstantEntry(size_t logicalIndex)
+    {
+        if (!mIntLogicalToPhysical)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
+                        "This is not a low-level parameter parameter object",
+                        "GpuProgramParameters::findUnsignedIntAutoConstantEntry");
+
+        return _findRawAutoConstantEntryUnsignedInt(
+            _getIntConstantPhysicalIndex(logicalIndex, 0, GPV_GLOBAL));
     }
     //---------------------------------------------------------------------------
     const GpuProgramParameters::AutoConstantEntry*
@@ -2422,16 +2790,23 @@ namespace Ogre
                         "GpuProgramParameters::findAutoConstantEntry");
 
         const GpuConstantDefinition& def = getConstantDefinition(paramName);
-        if(def.isSampler())
-            return NULL;
-        return _findRawAutoConstantEntryFloat(def.physicalIndex);
+        if (def.isFloat())
+        {
+            return _findRawAutoConstantEntryFloat(def.physicalIndex);
+        }
+        else
+        {
+            return _findRawAutoConstantEntryInt(def.physicalIndex);
+        }
     }
     //---------------------------------------------------------------------------
     const GpuProgramParameters::AutoConstantEntry*
     GpuProgramParameters::_findRawAutoConstantEntryFloat(size_t physicalIndex) const
     {
-        for(const auto& ac : mAutoConstants)
+        for(AutoConstantList::const_iterator i = mAutoConstants.begin();
+            i != mAutoConstants.end(); ++i)
         {
+            const AutoConstantEntry& ac = *i;
             // should check that auto is float and not int so that physicalIndex
             // doesn't have any ambiguity
             // However, all autos are float I think so no need
@@ -2443,11 +2818,51 @@ namespace Ogre
 
     }
     //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::_findRawAutoConstantEntryDouble(size_t physicalIndex) const
+    {
+        for(AutoConstantList::const_iterator i = mAutoConstants.begin();
+            i != mAutoConstants.end(); ++i)
+        {
+            const AutoConstantEntry& ac = *i;
+            // should check that auto is double and not int or float so that physicalIndex
+            // doesn't have any ambiguity
+            // However, all autos are float I think so no need
+            if (ac.physicalIndex == physicalIndex)
+                return &ac;
+        }
+
+        return 0;
+
+    }
+    //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::_findRawAutoConstantEntryInt(size_t physicalIndex) const
+    {
+        // No autos are float?
+        return 0;
+    }
+    //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::_findRawAutoConstantEntryUnsignedInt(size_t physicalIndex) const
+    {
+        //TODO  No autos are float?
+        return 0;
+    }
+    //---------------------------------------------------------------------------
+    const GpuProgramParameters::AutoConstantEntry*
+    GpuProgramParameters::_findRawAutoConstantEntryBool(size_t physicalIndex) const
+    {
+        //TODO No autos are float?
+        return 0;
+    }
+    //---------------------------------------------------------------------------
     void GpuProgramParameters::copyConstantsFrom(const GpuProgramParameters& source)
     {
         // Pull buffers & auto constant list over directly
-        mConstants = source.getConstantList();
-        mRegisters = source.mRegisters;
+        mFloatConstants = source.getFloatConstantList();
+        mDoubleConstants = source.getDoubleConstantList();
+        mIntConstants = source.getIntConstantList();
         mAutoConstants = source.getAutoConstantList();
         mCombinedVariability = source.mCombinedVariability;
         copySharedParamSetUsage(source.mSharedParamSets);
@@ -2458,10 +2873,11 @@ namespace Ogre
         if (mNamedConstants && source.mNamedConstants)
         {
             std::map<size_t, String> srcToDestNamedMap;
-            for (auto& m : source.mNamedConstants->map)
+            for (GpuConstantDefinitionMap::const_iterator i = source.mNamedConstants->map.begin();
+                 i != source.mNamedConstants->map.end(); ++i)
             {
-                const String& paramName = m.first;
-                const GpuConstantDefinition& olddef = m.second;
+                const String& paramName = i->first;
+                const GpuConstantDefinition& olddef = i->second;
                 const GpuConstantDefinition* newdef = _findNamedConstantDefinition(paramName, false);
                 if (newdef)
                 {
@@ -2469,12 +2885,12 @@ namespace Ogre
                     size_t srcsz = olddef.elementSize * olddef.arraySize;
                     size_t destsz = newdef->elementSize * newdef->arraySize;
                     size_t sz = std::min(srcsz, destsz);
-                    if (newdef->isFloat() || newdef->isInt() || newdef->isUnsignedInt() || newdef->isBool())
+                    if (newdef->isFloat())
                     {
-                        OgreAssert(mConstants.size() >= (newdef->physicalIndex + sz * 4), "Invalid physical index or size");
+
                         memcpy(getFloatPointer(newdef->physicalIndex),
                                source.getFloatPointer(olddef.physicalIndex),
-                               sz * 4);
+                               sz * sizeof(float));
                     }
                     else if (newdef->isDouble())
                     {
@@ -2483,9 +2899,19 @@ namespace Ogre
                                source.getDoublePointer(olddef.physicalIndex),
                                sz * sizeof(double));
                     }
-                    else if (newdef->isSampler())
+                    else if (newdef->isInt() || 
+                             newdef->isSampler() || 
+                             newdef->isSubroutine())
                     {
-                        *getRegPointer(newdef->physicalIndex) = *source.getRegPointer(olddef.physicalIndex);
+                        memcpy(getIntPointer(newdef->physicalIndex),
+                               source.getIntPointer(olddef.physicalIndex),
+                               sz * sizeof(int));
+                    }
+                    else if (newdef->isUnsignedInt() || newdef->isBool())
+                    {
+                        memcpy(getUnsignedIntPointer(newdef->physicalIndex),
+                               source.getUnsignedIntPointer(olddef.physicalIndex),
+                               sz * sizeof(uint));
                     }
                     else
                     {
@@ -2498,8 +2924,10 @@ namespace Ogre
                 }
             }
 
-            for (const auto& autoEntry : source.mAutoConstants)
+            for (AutoConstantList::const_iterator i = source.mAutoConstants.begin();
+                 i != source.mAutoConstants.end(); ++i)
             {
+                const GpuProgramParameters::AutoConstantEntry& autoEntry = *i;
                 // find dest physical index
                 std::map<size_t, String>::iterator mi = srcToDestNamedMap.find(autoEntry.physicalIndex);
                 if (mi != srcToDestNamedMap.end())
@@ -2517,8 +2945,10 @@ namespace Ogre
             }
 
             // Copy shared param sets
-            for (const auto& usage : source.mSharedParamSets)
+            for (GpuSharedParamUsageList::const_iterator i = source.mSharedParamSets.begin();
+                 i != source.mSharedParamSets.end(); ++i)
             {
+                const GpuSharedParametersUsage& usage = *i;
                 if (!isUsingSharedParameters(usage.getName()))
                 {
                     addSharedParameters(usage.getSharedParams());
@@ -2551,12 +2981,18 @@ namespace Ogre
 
     //-----------------------------------------------------------------------
     const GpuProgramParameters::AutoConstantDefinition*
-    GpuProgramParameters::getAutoConstantDefinition(AutoConstantType idx)
+    GpuProgramParameters::getAutoConstantDefinition(const size_t idx)
     {
-        // verify index is equal to acType
-        // if they are not equal then the dictionary was not setup properly
-        assert(idx == AutoConstantDictionary[idx].acType);
-        return &AutoConstantDictionary[idx];
+
+        if (idx < getNumAutoConstantDefinitions())
+        {
+            // verify index is equal to acType
+            // if they are not equal then the dictionary was not setup properly
+            assert(idx == static_cast<size_t>(AutoConstantDictionary[idx].acType));
+            return &AutoConstantDictionary[idx];
+        }
+        else
+            return 0;
     }
     //-----------------------------------------------------------------------
     size_t GpuProgramParameters::getNumAutoConstantDefinitions(void)
@@ -2570,7 +3006,7 @@ namespace Ogre
         if (mActivePassIterationIndex != std::numeric_limits<size_t>::max())
         {
             // This is a physical index
-            *getFloatPointer(mActivePassIterationIndex) += 1;
+            ++mFloatConstants[mActivePassIterationIndex];
         }
     }
     //---------------------------------------------------------------------
@@ -2589,9 +3025,10 @@ namespace Ogre
     //---------------------------------------------------------------------
     bool GpuProgramParameters::isUsingSharedParameters(const String& sharedParamsName) const
     {
-        for (const auto& mSharedParamSet : mSharedParamSets)
+        for (GpuSharedParamUsageList::const_iterator i = mSharedParamSets.begin();
+             i != mSharedParamSets.end(); ++i)
         {
-            if (mSharedParamSet.getName() == sharedParamsName)
+            if (i->getName() == sharedParamsName)
                 return true;
         }
         return false;
@@ -2623,25 +3060,15 @@ namespace Ogre
     //---------------------------------------------------------------------
     void GpuProgramParameters::_copySharedParams()
     {
-        for (auto& usage : mSharedParamSets)
+        for (GpuSharedParamUsageList::iterator i = mSharedParamSets.begin();
+             i != mSharedParamSets.end(); ++i )
         {
-            usage._copySharedParamsToTargetParams();
+            i->_copySharedParamsToTargetParams();
         }
+
     }
 
-    void GpuProgramParameters::_updateSharedParams()
-    {
-        for (auto& usage : mSharedParamSets)
-        {
-            const GpuSharedParametersPtr& sharedParams = usage.getSharedParams();
-            if(sharedParams->_getHardwareBuffer())
-            {
-                sharedParams->_upload();
-                sharedParams->_markClean();
-                continue;
-            }
 
-            usage._copySharedParamsToTargetParams();
-        }
-    }
+
+
 }

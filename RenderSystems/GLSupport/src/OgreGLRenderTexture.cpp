@@ -49,9 +49,9 @@ namespace Ogre {
         // Initialise state
         mDepth.buffer = 0;
         mStencil.buffer = 0;
-        for(auto & x : mColour)
+        for(size_t x = 0; x < OGRE_MAX_MULTIPLE_RENDER_TARGETS; ++x)
         {
-            x.buffer=0;
+            mColour[x].buffer=0;
         }
     }
 
@@ -109,41 +109,26 @@ namespace Ogre {
             return format;
         }
 
-        if(PixelUtil::isDepth(format))
+        /// Find first alternative
+        PixelComponentType pct = PixelUtil::getComponentType(format);
+
+        switch (pct)
         {
-            switch (format)
-            {
-                default:
-                case PF_DEPTH16:
-                    format = PF_FLOAT16_R;
-                    break;
-                case PF_DEPTH24_STENCIL8:
-                case PF_DEPTH32F:
-                case PF_DEPTH32:
-                    format = PF_FLOAT32_R;
-                    break;
-            }
-        }
-        else
-        {
-            /// Find first alternative
-            switch (PixelUtil::getComponentType(format))
-            {
-            case PCT_BYTE:
-                format = PF_BYTE_RGBA; // native endian
-                break;
-            case PCT_SHORT:
-                format = PF_SHORT_RGBA;
-                break;
-            case PCT_FLOAT16:
-                format = PF_FLOAT16_RGBA;
-                break;
-            case PCT_FLOAT32:
-                format = PF_FLOAT32_RGBA;
-                break;
-            default:
-                break;
-            }
+        case PCT_BYTE:
+            format = PF_BYTE_RGBA; // native endian
+            break;
+        case PCT_SHORT:
+            format = PF_SHORT_RGBA;
+            break;
+        case PCT_FLOAT16:
+            format = PF_FLOAT16_RGBA;
+            break;
+        case PCT_FLOAT32:
+            format = PF_FLOAT32_RGBA;
+            break;
+        case PCT_COUNT:
+        default:
+            break;
         }
 
         if (checkFormat(format))

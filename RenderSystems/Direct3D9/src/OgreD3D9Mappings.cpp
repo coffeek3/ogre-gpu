@@ -31,8 +31,6 @@ THE SOFTWARE.
 #include "OgreLogManager.h"
 #include "OgreException.h"
 
-#define D3DFMT_INTZ ( (D3DFORMAT)MAKEFOURCC('I', 'N', 'T', 'Z') )
-
 namespace Ogre 
 {
     //---------------------------------------------------------------------
@@ -42,13 +40,26 @@ namespace Ogre
         {
         case SO_FLAT:
             return D3DSHADE_FLAT;
-        case SO_PHONG:
-            // phong is not supported in D3D9
-            OGRE_FALLTHROUGH;
         case SO_GOURAUD:
             return D3DSHADE_GOURAUD;
+        case SO_PHONG:
+            return D3DSHADE_PHONG;
         }
         return 0;
+    }
+    //---------------------------------------------------------------------
+    D3DLIGHTTYPE D3D9Mappings::get(Ogre::Light::LightTypes lightType)
+    {
+        switch( lightType )
+        {
+        case Light::LT_POINT:
+            return D3DLIGHT_POINT;
+        case Light::LT_DIRECTIONAL:
+            return D3DLIGHT_DIRECTIONAL;
+        case Light::LT_SPOTLIGHT:
+            return D3DLIGHT_SPOT;
+        }
+        return D3DLIGHT_FORCE_DWORD;
     }
     //---------------------------------------------------------------------
     DWORD D3D9Mappings::get(TexCoordCalcMethod m, const D3DCAPS9& caps)
@@ -59,10 +70,19 @@ namespace Ogre
             return D3DTSS_TCI_PASSTHRU;
         case TEXCALC_ENVIRONMENT_MAP_REFLECTION:
             return D3DTSS_TCI_CAMERASPACEREFLECTIONVECTOR;
+        case TEXCALC_ENVIRONMENT_MAP_PLANAR:
+            if (caps.VertexProcessingCaps & D3DVTXPCAPS_TEXGEN_SPHEREMAP)
+            {
+                // Use sphere map if available
+                return D3DTSS_TCI_SPHEREMAP;
+            }
+            else
+            {
+                // If not, fall back on camera space reflection vector which isn't as good
+                return D3DTSS_TCI_CAMERASPACEREFLECTIONVECTOR;
+            }
         case TEXCALC_ENVIRONMENT_MAP_NORMAL:
             return D3DTSS_TCI_CAMERASPACENORMAL;
-        case TEXCALC_ENVIRONMENT_MAP_PLANAR:
-            // should be D3DTSS_TCI_CAMERASPACEPOSITION, but it has been like this since v0.12
         case TEXCALC_ENVIRONMENT_MAP:
             if (caps.VertexProcessingCaps & D3DVTXPCAPS_TEXGEN_SPHEREMAP)
             {
@@ -448,9 +468,16 @@ namespace Ogre
         DWORD ret = 0;
         if (usage & HardwareBuffer::HBU_DYNAMIC)
         {
+#if OGRE_D3D_MANAGE_BUFFERS
+            // Only add the dynamic flag for default pool, and
+            // we use default pool when buffer is discardable
+            if (usage & HardwareBuffer::HBU_DISCARDABLE)
+                ret |= D3DUSAGE_DYNAMIC;
+#else
             ret |= D3DUSAGE_DYNAMIC;
+#endif
         }
-        if (usage & HBU_DETAIL_WRITE_ONLY)
+        if (usage & HardwareBuffer::HBU_WRITE_ONLY)
         {
             ret |= D3DUSAGE_WRITEONLY;
         }
@@ -462,24 +489,38 @@ namespace Ogre
         DWORD ret = 0;
         if (options == HardwareBuffer::HBL_DISCARD)
         {
+#if OGRE_D3D_MANAGE_BUFFERS
+            // Only add the discard flag for dynamic usgae and default pool
+            if ((usage & HardwareBuffer::HBU_DYNAMIC) &&
+                (usage & HardwareBuffer::HBU_DISCARDABLE))
+                ret |= D3DLOCK_DISCARD;
+#else
             // D3D doesn't like discard or no_overwrite on non-dynamic buffers
             if (usage & HardwareBuffer::HBU_DYNAMIC)
                 ret |= D3DLOCK_DISCARD;
+#endif
         }
         if (options == HardwareBuffer::HBL_READ_ONLY)
         {
             // D3D debug runtime doesn't like you locking managed buffers readonly
             // when they were created with write-only (even though you CAN read
             // from the software backed version)
-            if (!(usage & HBU_DETAIL_WRITE_ONLY))
+            if (!(usage & HardwareBuffer::HBU_WRITE_ONLY))
                 ret |= D3DLOCK_READONLY;
 
         }
         if (options == HardwareBuffer::HBL_NO_OVERWRITE)
         {
+#if OGRE_D3D_MANAGE_BUFFERS
+            // Only add the nooverwrite flag for dynamic usgae and default pool
+            if ((usage & HardwareBuffer::HBU_DYNAMIC) &&
+                (usage & HardwareBuffer::HBU_DISCARDABLE))
+                ret |= D3DLOCK_NOOVERWRITE;
+#else
             // D3D doesn't like discard or no_overwrite on non-dynamic buffers
             if (usage & HardwareBuffer::HBU_DYNAMIC)
                 ret |= D3DLOCK_NOOVERWRITE;
+#endif 
         }
 
         return ret;
@@ -501,6 +542,10 @@ namespace Ogre
     {
         switch (vType)
         {
+        case VET_COLOUR:
+        case VET_COLOUR_ABGR:
+        case VET_COLOUR_ARGB:
+            return D3DDECLTYPE_D3DCOLOR;
         case VET_FLOAT1:
             return D3DDECLTYPE_FLOAT1;
         case VET_FLOAT2:
@@ -571,19 +616,19 @@ namespace Ogre
         return D3DDECLUSAGE_POSITION;
     }
     //---------------------------------------------------------------------
-    D3DMATRIX D3D9Mappings::makeD3DXMatrix( const Matrix4& mat )
+    D3DXMATRIX D3D9Mappings::makeD3DXMatrix( const Matrix4& mat )
     {
         // Transpose matrix
         // D3D9 uses row vectors i.e. V*M
         // Ogre, OpenGL and everything else uses column vectors i.e. M*V
-        return D3DMATRIX{
+        return D3DXMATRIX(
             mat[0][0], mat[1][0], mat[2][0], mat[3][0],
             mat[0][1], mat[1][1], mat[2][1], mat[3][1],
             mat[0][2], mat[1][2], mat[2][2], mat[3][2],
-            mat[0][3], mat[1][3], mat[2][3], mat[3][3]};
+            mat[0][3], mat[1][3], mat[2][3], mat[3][3]);
     }
     //---------------------------------------------------------------------
-    Matrix4 D3D9Mappings::convertD3DXMatrix( const D3DMATRIX& mat )
+    Matrix4 D3D9Mappings::convertD3DXMatrix( const D3DXMATRIX& mat )
     {
         return Matrix4(
             mat.m[0][0], mat.m[1][0], mat.m[2][0], mat.m[3][0],
@@ -652,8 +697,6 @@ namespace Ogre
             return PF_DXT4;
         case D3DFMT_DXT5:
             return PF_DXT5;
-        case D3DFMT_INTZ:
-            return PF_DEPTH16;
         default:
             return PF_UNKNOWN;
         }
@@ -719,8 +762,6 @@ namespace Ogre
             return D3DFMT_DXT4;
         case PF_DXT5:
             return D3DFMT_DXT5;
-        case PF_DEPTH16:
-            return D3DFMT_INTZ;
         case PF_UNKNOWN:
         default:
             return D3DFMT_UNKNOWN;
@@ -747,11 +788,6 @@ namespace Ogre
             return PF_FLOAT16_RGBA;
         case PF_FLOAT32_RGB:
             return PF_FLOAT32_RGBA;
-        case PF_DEPTH16:
-            return PF_L16;
-        case PF_DEPTH32:
-        case PF_DEPTH32F:
-            return PF_FLOAT32_R;
         case PF_UNKNOWN:
         default:
             return PF_A8R8G8B8;

@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include "OgreD3D11Prerequisites.h"
 #include "OgreD3D11DeviceResource.h"
 #include "OgreHighLevelGpuProgram.h"
+#include "OgreHardwareUniformBuffer.h"
 
 
 namespace Ogre {
@@ -38,7 +39,7 @@ namespace Ogre {
 
     /** Specialization of HighLevelGpuProgram to provide support for D3D11 
     High-Level Shader Language (HLSL).
-
+    @remarks
     Note that the syntax of D3D11 HLSL is identical to nVidia's Cg language, therefore
     unless you know you will only ever be deploying on Direct3D, or you have some specific
     reason for not wanting to use the Cg plugin, I suggest you use Cg instead since that
@@ -49,8 +50,22 @@ namespace Ogre {
         , protected D3D11DeviceResource
     {
     public:
+        /// Command object for setting entry point
+        class CmdEntryPoint : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
         /// Command object for setting target assembler
         class CmdTarget : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
+        /// Command object for setting macro defines
+        class CmdPreprocessorDefines : public ParamCommand
         {
         public:
             String doGet(const void* target) const;
@@ -71,28 +86,43 @@ namespace Ogre {
             void doSet(void* target, const String& val);
         };
 
-        typedef std::vector<D3D11_SIGNATURE_PARAMETER_DESC> D3d11ShaderParameters;
     protected:
 
+        static CmdEntryPoint msCmdEntryPoint;
         static CmdTarget msCmdTarget;
+        static CmdPreprocessorDefines msCmdPreprocessorDefines;
         static CmdColumnMajorMatrices msCmdColumnMajorMatrices;
         static CmdEnableBackwardsCompatibility msCmdEnableBackwardsCompatibility;
         
         void notifyDeviceLost(D3D11Device* device);
         void notifyDeviceRestored(D3D11Device* device);
 
-        /// noop
-        void createLowLevelImpl(void) override {}
+        /** Internal method for creating an appropriate low-level program from this
+        high-level program, must be implemented by subclasses. */
+        void createLowLevelImpl(void);
         /// Internal unload implementation, must be implemented by subclasses
-        void unloadHighLevelImpl(void) override;
-        void unprepareImpl() override;
+        void unloadHighLevelImpl(void);
+        /// Populate the passed parameters with name->index map, must be overridden
+        void populateParameterNames(GpuProgramParametersSharedPtr params);
 
-        static void populateDef(D3D11_SHADER_TYPE_DESC& d3dDesc, GpuConstantDefinition& def);
+        // Recursive utility method for populateParameterNames
+        void processParamElement(String prefix, LPCSTR pName, ID3D11ShaderReflectionType* varRefType);
 
+        void populateDef(D3D11_SHADER_TYPE_DESC& d3dDesc, GpuConstantDefinition& def) const;
+		
+		void getDefines(String& stringBuffer, std::vector<D3D_SHADER_MACRO>& defines, const String& definesString);
+		
+        String mTarget;
+        String mEntryPoint;
         bool mColumnMajorMatrices;
         bool mEnableBackwardsCompatibility;
 
+        bool mErrorsInCompile;
         MicroCode mMicroCode;
+        ComPtr<ID3D11Buffer> mConstantBuffer;
+        
+        D3D_SHADER_MACRO* mShaderMacros;
+        bool shaderMacroSet;
 
         D3D11Device & mDevice;
 
@@ -102,11 +132,108 @@ namespace Ogre {
         ComPtr<ID3D11DomainShader> mDomainShader;
         ComPtr<ID3D11HullShader> mHullShader;
         ComPtr<ID3D11ComputeShader> mComputeShader;
+
+        struct ShaderVarWithPosInBuf
+        {
+            mutable String name;
+            size_t size;
+            size_t startOffset;
+            
+            ShaderVarWithPosInBuf& operator=(const ShaderVarWithPosInBuf& var)
+            {
+                name = var.name;
+                size = var.size;
+                startOffset = var.startOffset;
+                return *this;
+            }
+        };
+        typedef std::vector<ShaderVarWithPosInBuf> ShaderVars;
+        typedef ShaderVars::iterator ShaderVarsIter;
+        typedef ShaderVars::const_iterator ShaderVarsConstIter; 
+
+        // A hack for cg to get the "original name" of the var in the "auto comments"
+        // that cg adds to the hlsl 4 output. This is to solve the issue that
+        // in some cases cg changes the name of the var to a new name.
+        void fixVariableNameFromCg(const ShaderVarWithPosInBuf& newVar);
+        //ShaderVars mShaderVars;
         
-        HardwareBufferPtr mDefaultBuffer; // for $Globals OR $Params
+        // HACK: Multi-index emulation container to store constant buffer information by index and name at same time
+        // using tips from http://www.boost.org/doc/libs/1_35_0/libs/multi_index/doc/performance.html
+        // and http://cnx.org/content/m35767/1.2/
+#define INVALID_IDX (unsigned int)-1
+        struct BufferInfo
+        {
+            static _StringHash mHash;
+            unsigned int mIdx;
+            String mName;
+            mutable HardwareUniformBufferSharedPtr mUniformBuffer;
+            mutable ShaderVars mShaderVars;
+                
+            // Default constructor
+            BufferInfo() : mIdx(0), mName("") { mUniformBuffer.reset(); }
+            BufferInfo(unsigned int index, const String& name)
+                : mIdx(index), mName(name)
+            {
+                mUniformBuffer.reset();
+            }
+            
+            // Copy constructor
+            BufferInfo(const BufferInfo& info) 
+                : mIdx(info.mIdx)
+                , mName(info.mName)
+                , mUniformBuffer(info.mUniformBuffer)
+                , mShaderVars(info.mShaderVars)
+            {
+
+            }
+
+            // Copy operator
+            BufferInfo& operator=(const BufferInfo& info)
+            {
+                this->mIdx = info.mIdx;
+                this->mName = info.mName;
+                mUniformBuffer = info.mUniformBuffer;
+                mShaderVars = info.mShaderVars;
+                return *this;
+            }
+            
+            // Constructors and operators used for search
+            BufferInfo(unsigned int index) : mIdx(index), mName("") { }
+            BufferInfo(const String& name) : mIdx(INVALID_IDX), mName(name) { }
+            BufferInfo& operator=(unsigned int index) { this->mIdx = index; return *this; }
+            BufferInfo& operator=(const String& name) { this->mName = name; return *this; } 
+            
+            bool operator==(const BufferInfo& other) const
+            {
+                return mName == other.mName && mIdx == other.mIdx;
+            }
+            bool operator<(const BufferInfo& other) const
+            {
+                if (mIdx == INVALID_IDX || other.mIdx == INVALID_IDX) 
+                {
+                    return mName < other.mName;
+                }
+                else if (mName == "" || other.mName == "")
+                {
+                    return mIdx < other.mIdx;
+                }
+                else 
+                {
+                    if (mName == other.mName)
+                    {
+                        return mIdx < other.mIdx;
+                    }
+                    else
+                    {
+                        return mName < other.mName;
+                    }
+                }
+            }
+        };
 
         // Make sure that objects have index and name, or some search will fail
-        typedef std::map<String, int> BufferInfoMap;
+        typedef std::set<BufferInfo> BufferInfoMap;
+        typedef std::set<BufferInfo>::iterator BufferInfoIterator;
         BufferInfoMap mBufferInfoMap;
 
         // Map to store interface slot position. 
@@ -115,15 +242,23 @@ namespace Ogre {
         typedef std::map<String, unsigned int>::const_iterator SlotIterator;
         SlotMap mSlotMap;
 
+        typedef std::vector<D3D11_SIGNATURE_PARAMETER_DESC> D3d11ShaderParameters;
         typedef D3d11ShaderParameters::iterator D3d11ShaderParametersIter; 
 
 
         typedef std::vector<D3D11_SHADER_VARIABLE_DESC> D3d11ShaderVariables;
         typedef D3d11ShaderVariables::iterator D3d11ShaderVariablesIter; 
 
+        struct GpuConstantDefinitionWithName : GpuConstantDefinition
+        {
+            LPCSTR                  Name;          
+        };
+        typedef std::vector<GpuConstantDefinitionWithName> D3d11ShaderVariableSubparts;
+        typedef D3d11ShaderVariableSubparts::iterator D3d11ShaderVariableSubpartsIter; 
+
         struct MemberTypeName
         {
-            String                  Name;
+            LPCSTR                  Name;           
         };
 
         std::vector<String *> mSerStrings;
@@ -136,9 +271,11 @@ namespace Ogre {
         UINT mConstantBufferSize;
         UINT mConstantBufferNr;
         UINT mNumSlots;
+        ShaderVars mShaderVars;
         D3d11ShaderParameters mD3d11ShaderInputParameters;
         D3d11ShaderParameters mD3d11ShaderOutputParameters;
         D3d11ShaderVariables mD3d11ShaderVariables;
+        D3d11ShaderVariableSubparts mD3d11ShaderVariableSubparts;
         D3d11ShaderBufferDescs mD3d11ShaderBufferDescs;
         D3d11ShaderVariables mVarDescBuffer;
         D3d11ShaderVariables mVarDescPointer;
@@ -147,6 +284,7 @@ namespace Ogre {
         MemberTypeNames mMemberTypeName;
         InterfaceSlots mInterfaceSlots;
 
+        void createConstantBuffer(const UINT ByteWidth);
         void analizeMicrocode();
         void getMicrocodeFromCache(uint32 id);
         void compileMicrocode(void);
@@ -155,12 +293,18 @@ namespace Ogre {
             const String& group, bool isManual, ManualResourceLoader* loader, D3D11Device & device);
         ~D3D11HLSLProgram();
 
+        /** Sets the entry point for this program ie the first method called. */
+        void setEntryPoint(const String& entryPoint) { mEntryPoint = entryPoint; }
+        /** Gets the entry point defined for this program. */
+        const String& getEntryPoint(void) const { return mEntryPoint; }
         /** Sets the shader target to compile down to, e.g. 'vs_1_1'. */
         void setTarget(const String& target);
         /** Gets the shader target to compile down to, e.g. 'vs_1_1'. */
-        const String& getTarget(void) const { return mSyntaxCode; }
+        const String& getTarget(void) const { return mTarget; }
         /** Gets the shader target promoted to the first compatible, e.g. 'vs_4_0' or 'ps_4_0' if backward compatibility is enabled. */
-        const char* getCompatibleTarget(void) const;
+        const String& getCompatibleTarget(void) const;
+        /** Sets shader macros created manually*/
+        void setShaderMacros(D3D_SHADER_MACRO* shaderMacros);
 
         /** Sets whether matrix packing in column-major order. */ 
         void setColumnMajorMatrices(bool columnMajor) { mColumnMajorMatrices = columnMajor; }
@@ -171,11 +315,13 @@ namespace Ogre {
         /** Gets whether backwards compatibility is enabled. */
         bool getEnableBackwardsCompatibility(void) const { return mEnableBackwardsCompatibility; }
         /// Overridden from GpuProgram
+        bool isSupported(void) const;
+        /// Overridden from GpuProgram
         GpuProgramParametersSharedPtr createParameters(void);
         /// Overridden from GpuProgram
         const String& getLanguage(void) const;
 
-        virtual void buildConstantDefinitions() override;
+        virtual void buildConstantDefinitions() const;
         ID3D11VertexShader* getVertexShader(void) const;
         ID3D11PixelShader* getPixelShader(void) const; 
         ID3D11GeometryShader* getGeometryShader(void) const; 
@@ -184,7 +330,11 @@ namespace Ogre {
         ID3D11ComputeShader* getComputeShader(void) const;
         const MicroCode &  getMicroCode(void) const;  
 
-        std::vector<ID3D11Buffer*> getConstantBuffers(const GpuProgramParametersPtr& params);
+        ID3D11Buffer* getConstantBuffer(GpuProgramParametersSharedPtr params, uint16 variabilityMask);
+
+        void getConstantBuffers(ID3D11Buffer** buffers, unsigned int& numBuffers,
+                                ID3D11ClassInstance** classes, unsigned int& numInstances,
+                                GpuProgramParametersSharedPtr params, uint16 variabilityMask);
 
         // Get slot for a specific interface
         unsigned int getSubroutineSlot(const String& subroutineSlotName) const;
@@ -196,21 +346,20 @@ namespace Ogre {
         void CreateHullShader();
         void CreateComputeShader();
 
-        /// shortcut as we there is no low-level separation here
-        GpuProgram* _getBindingDelegate(void) { return this; }
-
         /** Internal load implementation, must be implemented by subclasses.
         */
         void loadFromSource(void);
 
-        void prepareImpl();
-
         void reinterpretGSForStreamOut(void);
         bool mReinterpretingGS;
         
+        unsigned int getNumInputs(void)const;
+        unsigned int getNumOutputs(void)const;
+
         uint32 getNameForMicrocodeCache();
 
-        const D3d11ShaderParameters& getInputParams() const { return mD3d11ShaderInputParameters; }
+        const D3D11_SIGNATURE_PARAMETER_DESC & getInputParamDesc(unsigned int index) const;
+        const D3D11_SIGNATURE_PARAMETER_DESC & getOutputParamDesc(unsigned int index) const;    
     };
 }
 

@@ -32,11 +32,11 @@ public:
         
     }
 
-    void _shutdown() override
+    virtual void _shutdown()
     {
         RTShader::RenderState* pMainRenderState = 
-            RTShader::ShaderGenerator::getSingleton().createOrRetrieveRenderState(MSN_SHADERGEN).first;
-        pMainRenderState->resetToBuiltinSubRenderStates();
+            RTShader::ShaderGenerator::getSingleton().createOrRetrieveRenderState(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME).first;
+        pMainRenderState->reset();
         
         if (mSRSTextureFogFactory)
         {
@@ -49,14 +49,14 @@ public:
         SdkSample::_shutdown();
     }
 
-    bool frameRenderingQueued(const FrameEvent& evt) override
+    bool frameRenderingQueued(const FrameEvent& evt)
     {
         return SdkSample::frameRenderingQueued(evt);   // don't forget the parent class updates!
     }
 
 protected:
 
-   void setupContent() override
+   void setupContent()
     {
         mTrayMgr->createCheckBox(TL_BOTTOM, ACTIVATE_FOG_BUTTON, "Fog Active")->setChecked(true,false);
         mTrayMgr->createCheckBox(TL_BOTTOM, ACTIVATE_SKY_BUTTON, "Sky Box Active")->setChecked(true,false);
@@ -91,7 +91,7 @@ protected:
         addHead(Vector3(-100,0,200));
 
         //We will set the sky box far away so it will render with the color of the background
-        mSceneMgr->setSkyBox(true,"BaseWhiteNoLighting",2000);
+        mSceneMgr->setSkyBox(true,"BaseWhite",2000);
     }
 
    void addHead(const Vector3& pos)
@@ -110,8 +110,8 @@ protected:
         RTShader::ShaderGenerator* mGen = RTShader::ShaderGenerator::getSingletonPtr();
 
         RTShader::RenderState* pMainRenderState = 
-            mGen->createOrRetrieveRenderState(MSN_SHADERGEN).first;
-        pMainRenderState->resetToBuiltinSubRenderStates();
+            mGen->createOrRetrieveRenderState(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME).first;
+        pMainRenderState->reset();
 
         mSRSTextureFogFactory = new RTShaderSRSTexturedFogFactory;
         mGen->addSubRenderStateFactory(mSRSTextureFogFactory);
@@ -121,17 +121,17 @@ protected:
 
         
         
-        mGen->invalidateScheme(Ogre::MSN_SHADERGEN);
+        mGen->invalidateScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
 
         // Make this viewport work with shader generator scheme.
-        mViewport->setMaterialScheme(MSN_SHADERGEN);
+        mViewport->setMaterialScheme(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
     }
 
 
     
 
     //--------------------------------------------------------------------------
-    void sliderMoved(Slider* slider) override
+    void sliderMoved(Slider* slider)
     {
         if (slider->getName() == FOG_DISTANCE_SLIDER)
         {
@@ -151,11 +151,11 @@ protected:
             }
             mSRSTextureFogFactory->setBackgroundTextureName(textureName);
             RTShader::ShaderGenerator* gen = RTShader::ShaderGenerator::getSingletonPtr();
-            gen->invalidateScheme(Ogre::MSN_SHADERGEN);
+            gen->invalidateScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
         }
     }
         
-    void checkBoxToggled(CheckBox* box) override
+    void checkBoxToggled(CheckBox* box)
     {
         const String& cbName = box->getName();
         if (cbName == ACTIVATE_FOG_BUTTON)
@@ -166,12 +166,12 @@ protected:
         }
         if (cbName == ACTIVATE_SKY_BUTTON)
         {
-            mSceneMgr->setSkyBox(!mSceneMgr->isSkyBoxEnabled(),"BaseWhiteNoLighting",2000);
+            mSceneMgr->setSkyBox(!mSceneMgr->isSkyBoxEnabled(),"BaseWhite",2000);
 
         }
     }
 
-    bool mousePressed(const MouseButtonEvent& evt) override
+    bool mousePressed(const MouseButtonEvent& evt)
     {
         if (mTrayMgr->mousePressed(evt))
             return true;
@@ -184,7 +184,7 @@ protected:
     }
 
     
-    bool mouseReleased(const MouseButtonEvent& evt) override
+    bool mouseReleased(const MouseButtonEvent& evt)
     {
         if (mTrayMgr->mouseReleased(evt))
             return true;
@@ -197,7 +197,7 @@ protected:
     }
 
 
-    bool mouseMoved(const MouseMotionEvent& evt) override
+    bool mouseMoved(const MouseMotionEvent& evt)
     {
         if(mTrayMgr->mouseMoved(evt))
             return true;
@@ -209,7 +209,7 @@ protected:
         return true;
     }
 
-    void cleanupContent() override
+    void cleanupContent()
     {
         MeshManager::getSingleton().remove("floor", ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     }

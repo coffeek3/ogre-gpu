@@ -44,10 +44,10 @@ class _OgreLodExport LodCollapseCostProfiler :
 {
 public:
     LodCollapseCostProfiler(LodProfile& profile, LodCollapseCostPtr& costCalculator) : mProfile(profile), mCostCalculator(costCalculator) {}
-    void initCollapseCosts(LodData* data) override;
-    void computeVertexCollapseCost(LodData* data, LodData::Vertex* vertex, Real& collapseCost, LodData::Vertex*& collapseTo) override;
-    Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge) override;
-private:
+    virtual void initCollapseCosts(LodData* data);
+    virtual void computeVertexCollapseCost(LodData* data, LodData::Vertex* vertex, Real& collapseCost, LodData::Vertex*& collapseTo);
+    virtual Real computeEdgeCollapseCost(LodData* data, LodData::Vertex* src, LodData::Edge* dstEdge);
+protected:
 
     struct ProfiledEdge {
         LodData::Vertex* dst;

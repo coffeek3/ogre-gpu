@@ -29,33 +29,32 @@ THE SOFTWARE.
 #define __OctreePlugin_H__
 
 #include "OgrePlugin.h"
-#include "OgreOctreePrerequisites.h"
 
 namespace Ogre
 {
     class OctreeSceneManagerFactory;
 
     /** Plugin instance for Octree Manager */
-    class _OgreOctreePluginExport OctreePlugin : public Plugin
+    class OctreePlugin : public Plugin
     {
     public:
         OctreePlugin();
 
 
         /// @copydoc Plugin::getName
-        const String& getName() const override;
+        const String& getName() const;
 
         /// @copydoc Plugin::install
-        void install() override;
+        void install();
 
         /// @copydoc Plugin::initialise
-        void initialise() override;
+        void initialise();
 
         /// @copydoc Plugin::shutdown
-        void shutdown() override;
+        void shutdown();
 
         /// @copydoc Plugin::uninstall
-        void uninstall() override;
+        void uninstall();
     protected:
         OctreeSceneManagerFactory* mOctreeSMFactory;
 

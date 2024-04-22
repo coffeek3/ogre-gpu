@@ -25,8 +25,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
-#include <memory>
-
 #include "OgreStableHeaders.h"
 
 namespace Ogre {
@@ -36,19 +34,7 @@ namespace Ogre {
     UserObjectBindings::UserObjectBindings(const UserObjectBindings& other)
     {
         if (other.mAttributes)
-            mAttributes = std::make_unique<Attributes>(*other.mAttributes);
-    }
-
-    UserObjectBindings& UserObjectBindings::swap(UserObjectBindings& rhs)
-    {
-        std::swap(mAttributes, rhs.mAttributes);
-        return *this;
-    }
-
-    UserObjectBindings& UserObjectBindings::operator=(const UserObjectBindings& rhs)
-    {
-        UserObjectBindings(rhs).swap(*this);
-        return *this;
+            mAttributes.reset(new Attributes(*other.mAttributes));
     }
 
     //-----------------------------------------------------------------------
@@ -56,7 +42,7 @@ namespace Ogre {
     {
         // Allocate attributes on demand.
         if (!mAttributes)
-            mAttributes = std::make_unique<Attributes>();
+            mAttributes.reset(new Attributes);
 
         mAttributes->mKeylessAny = anything;
     }
@@ -76,11 +62,11 @@ namespace Ogre {
     {
         // Allocate attributes on demand.
         if (!mAttributes)
-            mAttributes = std::make_unique<Attributes>();
+            mAttributes.reset(new Attributes);
 
         // Case map doesn't exists.
         if (!mAttributes->mUserObjectsMap)
-            mAttributes->mUserObjectsMap = std::make_unique<UserObjectsMap>();
+            mAttributes->mUserObjectsMap.reset(new UserObjectsMap);
 
         (*mAttributes->mUserObjectsMap)[key] = anything;
     }

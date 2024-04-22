@@ -38,15 +38,15 @@ namespace Ogre {
 
     class _OgrePrivate EGLContext : public GLContext
     {
+        protected:
             ::EGLConfig    mConfig;
             const EGLSupport*    mGLSupport;
             ::EGLSurface   mDrawable;
             ::EGLContext   mContext;
             EGLDisplay mEglDisplay;
-            bool mExternalContext;
 
         public:
-            EGLContext(EGLDisplay eglDisplay, const EGLSupport* glsupport, ::EGLConfig fbconfig, ::EGLSurface drawable, ::EGLContext external);
+            EGLContext(EGLDisplay eglDisplay, const EGLSupport* glsupport, ::EGLConfig fbconfig, ::EGLSurface drawable);
 
             ~EGLContext();
 
@@ -57,11 +57,11 @@ namespace Ogre {
             void _updateInternalResources(EGLDisplay eglDisplay, ::EGLConfig glconfig, ::EGLSurface drawable);
 #endif
 
-            void setCurrent() override;
-            void endCurrent() override;
+            void setCurrent();
+            void endCurrent();
 
-            GLContext* clone() const override {
-                return new EGLContext(mEglDisplay, mGLSupport, mConfig, mDrawable, NULL);
+            GLContext* clone() const {
+                return new EGLContext(mEglDisplay, mGLSupport, mConfig, mDrawable);
             }
 
             EGLSurface getDrawable() const;

@@ -36,7 +36,6 @@ namespace Ogre {
 namespace RTShader {
 
     class ProgramWriter;
-    class ProgramProcessor;
 
 /** \addtogroup Optional
 *  @{
@@ -60,7 +59,7 @@ public:
 
 
     /** Override standard Singleton retrieval.
-
+    @remarks
     Why do we do this? Well, it's because the Singleton
     implementation is in a .h file, which means it gets compiled
     into anybody who includes it. This is needed for the
@@ -80,7 +79,7 @@ public:
     static ProgramManager* getSingletonPtr();
 
     /** Release CPU/GPU programs set associated with the given ProgramSet
-    @param programSet The ProgramSet holds the programs.
+    @param renderState The ProgramSet holds the programs.
     */
     void releasePrograms(const ProgramSet* programSet);
 
@@ -88,7 +87,7 @@ public:
     */
     void flushGpuProgramsCache();
 
-private:
+protected:
 
     //-----------------------------------------------------------------------------
     typedef std::map<String, GpuProgramPtr>            GpuProgramsMap;
@@ -100,6 +99,7 @@ private:
     typedef ProgramList::iterator                       ProgramListIterator;
     typedef std::map<String, ProgramWriter*>           ProgramWriterMap;
     typedef ProgramWriterMap::iterator                  ProgramWriterIterator;
+    typedef std::vector<ProgramWriterFactory*>         ProgramWriterFactoryList;
     
     //-----------------------------------------------------------------------------
     typedef std::map<String, ProgramProcessor*>        ProgramProcessorMap;
@@ -107,12 +107,22 @@ private:
     typedef ProgramProcessorMap::const_iterator         ProgramProcessorConstIterator;
     typedef std::vector<ProgramProcessor*>             ProgramProcessorList;
 
-
+    
+protected:
     /** Create default program processors. */
     void createDefaultProgramProcessors();
     
     /** Destroy default program processors. */
     void destroyDefaultProgramProcessors();
+
+    /** Create default program processors. */
+    void createDefaultProgramWriterFactories();
+
+    /** Destroy default program processors. */
+    void destroyDefaultProgramWriterFactories();
+
+    /** Destroy all program writers. */
+    void destroyProgramWriters();
 
     /** Create CPU program .    
     @param type The type of the program to create.
@@ -149,21 +159,52 @@ private:
         ProgramWriter* programWriter,
         const String& language,
         const String& profiles,
+        const StringVector& profilesList,
         const String& cachePath);
+
+    /** 
+    Add program processor instance to this manager.
+    @param processor The instance to add.
+    */
+    void addProgramProcessor(ProgramProcessor* processor);
+
+    /** 
+    Remove program processor instance from this manager. 
+    @param processor The instance to remove.
+    */
+    void removeProgramProcessor(ProgramProcessor* processor);
+
+    /** Destroy a GPU program by name.
+    @param gpuProgram The program to destroy.
+    */
+    void destroyGpuProgram(GpuProgramPtr& gpuProgram);
+
+    /** Flush the local GPU programs cache.
+    @param gpuProgramsMap The GPU programs cache.
+    */
+    void flushGpuProgramsCache(GpuProgramsMap& gpuProgramsMap);
     
     /** Return the number of created shaders. */
     size_t getShaderCount(GpuProgramType type) const;
 
     /** Fix the input of the pixel shader to be the same as the output of the vertex shader */
-    void matchVStoPSInterface(ProgramSet* programSet);
+    void synchronizePixelnToBeVertexOut(ProgramSet* programSet);
 
+protected:
+    // Map between target language and shader program writer.                   
+    ProgramWriterMap mProgramWritersMap;
     // Map between target language and shader program processor.    
     ProgramProcessorMap mProgramProcessorsMap;
-    // The generated shaders.
-    std::vector<GpuProgramPtr> mShaderList;
+    // Holds standard shader writer factories
+    ProgramWriterFactoryList mProgramWriterFactories;
+    // The generated vertex shaders.
+    GpuProgramsMap mVertexShaderMap;
+    // The generated fragment shaders.
+    GpuProgramsMap mFragmentShaderMap;
     // The default program processors.
     ProgramProcessorList mDefaultProgramProcessors;
 
+private:
     friend class ProgramSet;
     friend class TargetRenderState;
     friend class ShaderGenerator;

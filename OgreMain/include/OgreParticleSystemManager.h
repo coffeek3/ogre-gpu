@@ -31,6 +31,7 @@ THE SOFTWARE.
 
 #include "OgrePrerequisites.h"
 #include "OgreSingleton.h"
+#include "OgreScriptLoader.h"
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre {
@@ -46,29 +47,31 @@ namespace Ogre {
     */
     /** Manages particle systems, particle system scripts (templates) and the 
         available emitter & affector factories.
-
-        This singleton class is responsible for managing particle
-        systems. Although, the user interface to creating them is via
+    @remarks
+        This singleton class is responsible for creating and managing particle 
+        systems. All particle systems must be created and destroyed using this 
+        object, although the user interface to creating them is via
         SceneManager. Remember that like all other MovableObject
         subclasses, ParticleSystems do not get rendered until they are 
         attached to a SceneNode object.
-
+    @par
         This class also manages factories for ParticleEmitter and 
         ParticleAffector classes. To enable easy extensions to the types of 
         emitters (particle sources) and affectors (particle modifiers), the
         ParticleSystemManager lets plugins or applications register factory 
         classes which submit new subclasses to ParticleEmitter and 
-        ParticleAffector. The actual implementations,
+        ParticleAffector. Ogre comes with a number of them already provided,
         such as cone, sphere and box-shaped emitters, and simple affectors such
-        as constant directional force and colour faders are provided by the @ref ParticleFX Plugin shipped with %Ogre.
-        However using this registration process, a custom plugin can create any behaviour required.
-
+        as constant directional force and colour faders. However using this 
+        registration process, a plugin can create any behaviour required.
+    @par
         This class also manages the loading and parsing of particle system 
         scripts, which are text files describing named particle system 
         templates. Instances of particle systems using these templates can
-        then be created easily through the SceneManager::createParticleSystem method.
+        then be created easily through the createParticleSystem method.
     */
-    class _OgreExport ParticleSystemManager : public Singleton<ParticleSystemManager>
+    class _OgreExport ParticleSystemManager: 
+        public Singleton<ParticleSystemManager>, public ScriptLoader, public FXAlloc
     {
         friend class ParticleSystemFactory;
     public:
@@ -76,7 +79,7 @@ namespace Ogre {
         typedef std::map<String, ParticleAffectorFactory*> ParticleAffectorFactoryMap;
         typedef std::map<String, ParticleEmitterFactory*> ParticleEmitterFactoryMap;
         typedef std::map<String, ParticleSystemRendererFactory*> ParticleSystemRendererFactoryMap;
-    private:
+    protected:
         OGRE_AUTO_MUTEX;
             
         /// Templates based on scripts
@@ -101,6 +104,9 @@ namespace Ogre {
             const String& resourceGroup);
         /// Internal implementation of createSystem
         ParticleSystem* createSystemImpl(const String& name, const String& templateName);
+        /// Internal implementation of destroySystem
+        void destroySystemImpl(ParticleSystem* sys);
+        
         
     public:
 
@@ -108,7 +114,7 @@ namespace Ogre {
         virtual ~ParticleSystemManager();
 
         /** Adds a new 'factory' object for emitters to the list of available emitter types.
-
+        @remarks
             This method allows plugins etc to add new particle emitter types to Ogre. Particle emitters
             are sources of particles, and generate new particles with their start positions, colours and
             momentums appropriately. Plugins would create new subclasses of ParticleEmitter which 
@@ -127,7 +133,7 @@ namespace Ogre {
         void addEmitterFactory(ParticleEmitterFactory* factory);
 
         /** Adds a new 'factory' object for affectors to the list of available affector types.
-
+        @remarks
             This method allows plugins etc to add new particle affector types to Ogre. Particle
             affectors modify the particles in a system a certain way such as affecting their direction
             or changing their colour, lifespan etc. Plugins would
@@ -156,7 +162,7 @@ namespace Ogre {
         void addRendererFactory(ParticleSystemRendererFactory* factory);
 
         /** Adds a new particle system template to the list of available templates. 
-
+        @remarks
             Instances of particle systems in a scene are not normally unique - often you want to place the
             same effect in many places. This method allows you to register a ParticleSystem as a named template,
             which can subsequently be used to create instances using the createSystem method.
@@ -174,7 +180,7 @@ namespace Ogre {
         void addTemplate(const String& name, ParticleSystem* sysTemplate);
 
         /** Removes a specified template from the ParticleSystemManager.
-
+        @remarks
             This method removes a given template from the particle system manager, optionally deleting
             the template if the deleteTemplate method is called.  Throws an exception if the template
             could not be found.
@@ -186,7 +192,7 @@ namespace Ogre {
         void removeTemplate(const String& name, bool deleteTemplate = true);
 
         /** Removes a specified template from the ParticleSystemManager.
-
+        @remarks
             This method removes all templates from the ParticleSystemManager.
         @param deleteTemplate
             Whether or not to delete the templates before removing them.
@@ -194,8 +200,8 @@ namespace Ogre {
         void removeAllTemplates(bool deleteTemplate = true);
 
 
-        /** Removes all templates that belong to a specific Resource Group from the ParticleSystemManager.
-
+        /** Removes all templates that belong to a secific Resource Group from the ParticleSystemManager.
+        @remarks
             This method removes all templates that belong in a particular resource group from the ParticleSystemManager.
         @param resourceGroup
             Resource group to delete templates for
@@ -203,7 +209,7 @@ namespace Ogre {
         void removeTemplatesByResourceGroup(const String& resourceGroup);
 
         /** Create a new particle system template. 
-
+        @remarks
             This method is similar to the addTemplate method, except this just creates a new template
             and returns a pointer to it to be populated. Use this when you don't already have a system
             to add as a template and just want to create a new template which you will build up in-place.
@@ -217,14 +223,14 @@ namespace Ogre {
         ParticleSystem* createTemplate(const String& name, const String& resourceGroup);
 
         /** Retrieves a particle system template for possible modification. 
-
+        @remarks
             Modifying a template does not affect the settings on any ParticleSystems already created
             from this template.
         */
         ParticleSystem* getTemplate(const String& name);
 
         /** Internal method for creating a new emitter from a factory.
-
+        @remarks
             Used internally by the engine to create new ParticleEmitter instances from named
             factories. Applications should use the ParticleSystem::addEmitter method instead, 
             which calls this method to create an instance.
@@ -236,7 +242,7 @@ namespace Ogre {
         ParticleEmitter* _createEmitter(const String& emitterType, ParticleSystem* psys);
 
         /** Internal method for destroying an emitter.
-
+        @remarks
             Because emitters are created by factories which may allocate memory from separate heaps,
             the memory allocated must be freed from the same place. This method is used to ask the factory
             to destroy the instance passed in as a pointer.
@@ -246,7 +252,7 @@ namespace Ogre {
         void _destroyEmitter(ParticleEmitter* emitter);
 
         /** Internal method for creating a new affector from a factory.
-
+        @remarks
             Used internally by the engine to create new ParticleAffector instances from named
             factories. Applications should use the ParticleSystem::addAffector method instead, 
             which calls this method to create an instance.
@@ -258,7 +264,7 @@ namespace Ogre {
         ParticleAffector* _createAffector(const String& affectorType, ParticleSystem* psys);
 
         /** Internal method for destroying an affector.
-
+        @remarks
             Because affectors are created by factories which may allocate memory from separate heaps,
             the memory allocated must be freed from the same place. This method is used to ask the factory
             to destroy the instance passed in as a pointer.
@@ -268,7 +274,7 @@ namespace Ogre {
         void _destroyAffector(ParticleAffector* affector);
 
         /** Internal method for creating a new renderer from a factory.
-
+        @remarks
             Used internally by the engine to create new ParticleSystemRenderer instances from named
             factories. Applications should use the ParticleSystem::setRenderer method instead, 
             which calls this method to create an instance.
@@ -278,7 +284,7 @@ namespace Ogre {
         ParticleSystemRenderer* _createRenderer(const String& rendererType);
 
         /** Internal method for destroying a renderer.
-
+        @remarks
             Because renderer are created by factories which may allocate memory from separate heaps,
             the memory allocated must be freed from the same place. This method is used to ask the factory
             to destroy the instance passed in as a pointer.
@@ -288,11 +294,18 @@ namespace Ogre {
         void _destroyRenderer(ParticleSystemRenderer* renderer);
 
         /** Init method to be called by OGRE system.
-
+        @remarks
             Due to dependencies between various objects certain initialisation tasks cannot be done
             on construction. OGRE will call this method when the rendering subsystem is initialised.
         */
         void _initialise(void);
+
+        /// @copydoc ScriptLoader::getScriptPatterns
+        const StringVector& getScriptPatterns(void) const;
+        /// @copydoc ScriptLoader::parseScript
+        void parseScript(DataStreamPtr& stream, const String& groupName);
+        /// @copydoc ScriptLoader::getLoadingOrder
+        Real getLoadingOrder(void) const;
 
         typedef MapIterator<ParticleAffectorFactoryMap> ParticleAffectorFactoryIterator;
         typedef MapIterator<ParticleEmitterFactoryMap> ParticleEmitterFactoryIterator;
@@ -320,6 +333,22 @@ namespace Ogre {
         static ParticleSystemManager& getSingleton(void);
         /// @copydoc Singleton::getSingleton()
         static ParticleSystemManager* getSingletonPtr(void);
+
+    };
+
+    /** Factory object for creating ParticleSystem instances */
+    class _OgreExport ParticleSystemFactory : public MovableObjectFactory
+    {
+    protected:
+        MovableObject* createInstanceImpl(const String& name, const NameValuePairList* params);
+    public:
+        ParticleSystemFactory() {}
+        ~ParticleSystemFactory() {}
+        
+        static String FACTORY_TYPE_NAME;
+
+        const String& getType(void) const;
+        void destroyInstance( MovableObject* obj);  
 
     };
     /** @} */

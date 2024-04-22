@@ -74,7 +74,7 @@ namespace Ogre
     D3D11VideoModeList* D3D11Driver::getVideoModeList()
     {
         if(!mVideoModeList)
-            mVideoModeList = std::make_shared<D3D11VideoModeList>(getDeviceAdapter());
+            mVideoModeList = SharedPtr<D3D11VideoModeList>(OGRE_NEW_T(D3D11VideoModeList, MEMCATEGORY_GENERAL)(getDeviceAdapter()), SPFM_DELETE_T);
 
         return mVideoModeList.get();
     }

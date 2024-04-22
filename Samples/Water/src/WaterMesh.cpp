@@ -45,9 +45,10 @@ WaterMesh::WaterMesh(const String& inMeshName, Real planeSize, int inComplexity)
     mesh = MeshManager::getSingleton().createManual(meshName,
         ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     subMesh = mesh->createSubMesh();
+    subMesh->useSharedVertices=false;
 
     // Vertex buffers
-    subMesh->createVertexData();
+    subMesh->vertexData = new VertexData();
     subMesh->vertexData->vertexStart = 0;
     subMesh->vertexData->vertexCount = numVertices;
 

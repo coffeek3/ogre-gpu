@@ -232,13 +232,6 @@ namespace Ogre
         mEmitted = emitted;
     }
     //-----------------------------------------------------------------------
-    static float sampleSphereUniform(const float& maxAngle)
-    {
-        float cosMax = -std::cos(maxAngle) + 1; // for maxAngle = pi, cosMax = 2
-        // see https://corysimon.github.io/articles/uniformdistn-on-sphere/
-        return std::acos(1 - cosMax * Math::UnitRandom());
-    }
-
     void ParticleEmitter::genEmissionDirection( const Vector3 &particlePos, Vector3& destVector )
     {
         if( mUseDirPositionRef )
@@ -249,7 +242,7 @@ namespace Ogre
             if (mAngle != Radian(0))
             {
                 // Randomise angle
-                Radian angle(sampleSphereUniform(mAngle.valueRadians()));
+                Radian angle = Math::UnitRandom() * mAngle;
 
                 // Randomise direction
                 destVector = particleDir.randomDeviant( angle );
@@ -265,7 +258,7 @@ namespace Ogre
             if (mAngle != Radian(0))
             {
                 // Randomise angle
-                Radian angle(sampleSphereUniform(mAngle.valueRadians()));
+                Radian angle = Math::UnitRandom() * mAngle;
 
                 // Randomise direction
                 destVector = mDirection.randomDeviant(angle, mUp);
@@ -312,18 +305,10 @@ namespace Ogre
     {
         if (mEnabled)
         {
-            if(mDurationMax < 0)
-            {
-                // single-shot burst
-                setEnabled(false);
-                return mEmissionRate;
-            }
-
-            unsigned short intRequest = (unsigned short)mRemainder;
-            mRemainder -= intRequest;
-
             // Keep fractions, otherwise a high frame rate will result in zero emissions!
             mRemainder += mEmissionRate * timeElapsed;
+            unsigned short intRequest = (unsigned short)mRemainder;
+            mRemainder -= intRequest;
 
             // Check duration
             if (mDurationMax)
@@ -363,17 +348,20 @@ namespace Ogre
 
     }
     //-----------------------------------------------------------------------
-    void ParticleEmitter::genEmissionColour(RGBA& destColour)
+    void ParticleEmitter::genEmissionColour(ColourValue& destColour)
     {
         if (mColourRangeStart != mColourRangeEnd)
         {
             // Randomise
-            ColourValue t(Math::UnitRandom(), Math::UnitRandom(), Math::UnitRandom(), Math::UnitRandom());
-            destColour = (mColourRangeStart + t * (mColourRangeEnd - mColourRangeStart)).getAsBYTE();
+            //Real t = Math::UnitRandom();
+            destColour.r = mColourRangeStart.r + (Math::UnitRandom() * (mColourRangeEnd.r - mColourRangeStart.r));
+            destColour.g = mColourRangeStart.g + (Math::UnitRandom() * (mColourRangeEnd.g - mColourRangeStart.g));
+            destColour.b = mColourRangeStart.b + (Math::UnitRandom() * (mColourRangeEnd.b - mColourRangeStart.b));
+            destColour.a = mColourRangeStart.a + (Math::UnitRandom() * (mColourRangeEnd.a - mColourRangeStart.a));
         }
         else
         {
-            destColour = mColourRangeStart.getAsBYTE();
+            destColour = mColourRangeStart;
         }
     }
     //-----------------------------------------------------------------------
@@ -556,7 +544,6 @@ namespace Ogre
     void ParticleEmitter::setEnabled(bool enabled)
     {
         mEnabled = enabled;
-        mRemainder = 1.0f; // make sure we emit a particle on next update. Turns emission rate to (t0;r] interval
         // Reset duration & repeat
         initDurationRepeat();
     }
@@ -686,28 +673,32 @@ namespace Ogre
     //-----------------------------------------------------------------------
     ParticleEmitterFactory::~ParticleEmitterFactory()
     {
-        OGRE_IGNORE_DEPRECATED_BEGIN
         // Destroy all emitters
-        for (auto& e : mEmitters)
+        std::vector<ParticleEmitter*>::iterator i;
+        for (i = mEmitters.begin(); i != mEmitters.end(); ++i)
         {
-            OGRE_DELETE e;
+            OGRE_DELETE (*i);
         }
             
         mEmitters.clear();
-        OGRE_IGNORE_DEPRECATED_END
+
     }
     //-----------------------------------------------------------------------
     void ParticleEmitterFactory::destroyEmitter(ParticleEmitter* e)        
     {
-        delete e;
-        OGRE_IGNORE_DEPRECATED_BEGIN
-        auto i = std::find(std::begin(mEmitters), std::end(mEmitters), e);
-        if (i != std::end(mEmitters)) {
-            mEmitters.erase(i);
+        std::vector<ParticleEmitter*>::iterator i;
+        for (i = mEmitters.begin(); i != mEmitters.end(); ++i)
+        {
+            if ((*i) == e)
+            {
+                mEmitters.erase(i);
+                OGRE_DELETE e;
+                break;
+            }
         }
-        OGRE_IGNORE_DEPRECATED_END
     }
 
     //-----------------------------------------------------------------------
+
 }
 

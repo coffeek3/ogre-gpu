@@ -29,7 +29,7 @@ THE SOFTWARE.
 
 #include "OgreShaderPrerequisites.h"
 #include "OgreShaderSubRenderState.h"
-#include "OgreVector.h"
+#include "OgreVector4.h"
 
 using namespace Ogre;
 using namespace RTShader;
@@ -53,27 +53,27 @@ public:
     /** 
     @see SubRenderState::getType.
     */
-    const String& getType() const override;
+    virtual const String& getType() const;
 
     /** 
     @see SubRenderState::getType.
     */
-    int getExecutionOrder() const override;
+    virtual int getExecutionOrder() const;
 
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList) override;
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
     */
-    void copyFrom(const SubRenderState& rhs) override;
+    virtual void copyFrom(const SubRenderState& rhs);
 
     /** 
     @see SubRenderState::preAddToRenderState.
     */
-    bool preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass) override;
+    virtual bool preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass);
 
     /** 
     Set the fog properties this fog sub render state should emulate.
@@ -92,17 +92,17 @@ protected:
     /** 
     @see SubRenderState::resolveParameters.
     */
-    bool resolveParameters(ProgramSet* programSet) override;
+    virtual bool resolveParameters(ProgramSet* programSet);
 
     /** 
     @see SubRenderState::resolveDependencies.
     */
-    bool resolveDependencies(ProgramSet* programSet) override;
+    virtual bool resolveDependencies(ProgramSet* programSet);
 
     /** 
     @see SubRenderState::addFunctionInvocations.
     */
-    bool addFunctionInvocations(ProgramSet* programSet) override;
+    virtual bool addFunctionInvocations(ProgramSet* programSet);
 
 // Attributes.
 protected:  
@@ -158,7 +158,7 @@ public:
     /** 
     @see SubRenderStateFactory::getType.
     */
-    const String&   getType() const override;
+    virtual const String&   getType() const;
 
     /** Set the name of the texture to use as a background for the fog */
     const String& getBackgroundTextureName() const { return mBackgroundTextureName; }
@@ -170,7 +170,7 @@ protected:
     /** 
     @see SubRenderStateFactory::createInstanceImpl.
     */
-    SubRenderState* createInstanceImpl() override;
+    virtual SubRenderState* createInstanceImpl();
 
 private:
     String mBackgroundTextureName;

@@ -38,7 +38,7 @@ class HeatVisionLogic : public ListenerFactoryLogic
 {
  protected:
     /** @copydoc ListenerFactoryLogic::createListener */
-    Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance) override;
+    virtual Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance);
 };
 
 /// The compositor logic for the HDR compositor.
@@ -46,7 +46,7 @@ class HDRLogic : public ListenerFactoryLogic
 {
  protected:
     /** @copydoc ListenerFactoryLogic::createListener */
-    Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance) override;
+    virtual Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance);
 };
 
 /// The compositor logic for the gaussian blur compositor.
@@ -54,7 +54,7 @@ class GaussianBlurLogic : public ListenerFactoryLogic
 {
  protected:
     /** @copydoc ListenerFactoryLogic::createListener */
-    Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance) override;
+    virtual Ogre::CompositorInstance::Listener* createListener(Ogre::CompositorInstance* instance);
 };
 
 #endif

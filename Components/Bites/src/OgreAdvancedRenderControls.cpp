@@ -1,7 +1,9 @@
-// This file is part of the OGRE project.
-// It is subject to the license terms in the LICENSE file found in the top-level directory
-// of this distribution and at https://www.ogre3d.org/licensing.
-// SPDX-License-Identifier: MIT
+/*
+ * AdvancedRenderControls.cpp
+ *
+ *  Created on: 24.12.2016
+ *      Author: pavel
+ */
 
 #include "OgreAdvancedRenderControls.h"
 #include "OgreTextureManager.h"
@@ -156,14 +158,11 @@ bool AdvancedRenderControls::keyPressed(const KeyboardEvent& evt) {
             Ogre::Viewport* mainVP = mCamera->getViewport();
             const Ogre::String& curMaterialScheme = mainVP->getMaterialScheme();
 
-            if (curMaterialScheme == Ogre::MSN_DEFAULT)
-            {
-                mainVP->setMaterialScheme(Ogre::MSN_SHADERGEN);
+            if (curMaterialScheme == Ogre::MaterialManager::DEFAULT_SCHEME_NAME) {
+                mainVP->setMaterialScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
                 mDetailsPanel->setParamValue(11, "On");
-            }
-            else if (curMaterialScheme == Ogre::MSN_SHADERGEN)
-            {
-                mainVP->setMaterialScheme(Ogre::MSN_DEFAULT);
+            } else if (curMaterialScheme == Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME) {
+                mainVP->setMaterialScheme(Ogre::MaterialManager::DEFAULT_SCHEME_NAME);
                 mDetailsPanel->setParamValue(11, "Off");
             }
         }
@@ -175,12 +174,13 @@ bool AdvancedRenderControls::keyPressed(const KeyboardEvent& evt) {
 
         //![rtss_per_pixel]
         // Grab the scheme render state.
-        Ogre::RTShader::RenderState* schemRenderState = mShaderGenerator->getRenderState(Ogre::MSN_SHADERGEN);
+        Ogre::RTShader::RenderState* schemRenderState =
+            mShaderGenerator->getRenderState(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
 
-        // Add per vertex lighting sub render state to the global scheme render state.
-        // It will override the default lighting sub render state.
+        // Add per pixel lighting sub render state to the global scheme render state.
+        // It will override the default FFP lighting sub render state.
         if (useFFPLighting) {
-            auto perPixelLightModel = mShaderGenerator->createSubRenderState(Ogre::RTShader::SRS_PER_VERTEX_LIGHTING);
+            auto perPixelLightModel = mShaderGenerator->createSubRenderState<Ogre::RTShader::FFPLighting>();
 
             schemRenderState->addTemplateSubRenderState(perPixelLightModel);
         }
@@ -188,15 +188,18 @@ bool AdvancedRenderControls::keyPressed(const KeyboardEvent& evt) {
 
         // Search the per pixel sub render state and remove it.
         else {
-            if (auto srs = schemRenderState->getSubRenderState(Ogre::RTShader::SRS_PER_VERTEX_LIGHTING))
-            {
-                schemRenderState->removeSubRenderState(srs);
+            for (auto srs : schemRenderState->getTemplateSubRenderStateList()) {
+                // This is the per pixel sub render state -> remove it.
+                if (dynamic_cast<Ogre::RTShader::FFPLighting*>(srs)) {
+                    schemRenderState->removeTemplateSubRenderState(srs);
+                    break;
+                }
             }
         }
 
         // Invalidate the scheme in order to re-generate all shaders based technique related to this
         // scheme.
-        mShaderGenerator->invalidateScheme(Ogre::MSN_SHADERGEN);
+        mShaderGenerator->invalidateScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
 
         // Update UI.
         if (!useFFPLighting)
@@ -227,11 +230,11 @@ bool AdvancedRenderControls::keyPressed(const KeyboardEvent& evt) {
 
         // Invalidate the scheme in order to re-generate all shaders based technique related to this
         // scheme.
-        mShaderGenerator->invalidateScheme(Ogre::MSN_SHADERGEN);
+        mShaderGenerator->invalidateScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
     }
 #endif // INCLUDE_RTSHADER_SYSTEM
 
-    return InputListener::keyPressed(evt);
+    return true;
 }
 
 void AdvancedRenderControls::frameRendered(const Ogre::FrameEvent& evt) {

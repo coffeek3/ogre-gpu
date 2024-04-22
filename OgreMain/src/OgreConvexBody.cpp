@@ -58,11 +58,12 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void ConvexBody::_destroyPool()
     {
-        OGRE_LOCK_MUTEX(msFreePolygonsMutex);
+            OGRE_LOCK_MUTEX(msFreePolygonsMutex);
         
-        for (auto *p : msFreePolygons)
+        for (PolygonList::iterator i = msFreePolygons.begin(); 
+            i != msFreePolygons.end(); ++i)
         {
-            OGRE_DELETE_T(p, Polygon, MEMCATEGORY_SCENE_CONTROL);
+            OGRE_DELETE_T(*i, Polygon, MEMCATEGORY_SCENE_CONTROL);
         }
         msFreePolygons.clear();
     }
@@ -91,7 +92,7 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void ConvexBody::freePolygon(Polygon* poly)
     {
-        OGRE_LOCK_MUTEX(msFreePolygonsMutex);
+            OGRE_LOCK_MUTEX(msFreePolygonsMutex);
         msFreePolygons.push_back(poly);
     }
     //-----------------------------------------------------------------------
@@ -454,9 +455,10 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void ConvexBody::reset( void )
     {
-        for (auto *p : mPolygons)
+        for (PolygonList::iterator it = mPolygons.begin(); 
+            it != mPolygons.end(); ++it)
         {
-            freePolygon(p);
+            freePolygon(*it);
         }
         mPolygons.clear();
     }
@@ -1198,6 +1200,14 @@ namespace Ogre
         }
 
         return false; // not found!
+    }
+    //-----------------------------------------------------------------------
+    void ConvexBody::logInfo( void ) const
+    {
+        StringStream ssOut( std::stringstream::out );
+        ssOut << *this;
+        
+        Ogre::LogManager::getSingleton().logMessage( Ogre::LML_NORMAL, ssOut.str()  );
     }
 }
 

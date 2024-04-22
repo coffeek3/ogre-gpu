@@ -59,6 +59,7 @@ namespace Ogre {
     {
         removeAllTemplates(true); // Destroy all templates
         OGRE_LOCK_AUTO_MUTEX;
+        ResourceGroupManager::getSingleton()._unregisterScriptLoader(this);
         // delete billboard factory
         if (mBillboardRendererFactory)
         {
@@ -74,6 +75,22 @@ namespace Ogre {
             mFactory = 0;
         }
 
+    }
+    //-----------------------------------------------------------------------
+    const StringVector& ParticleSystemManager::getScriptPatterns(void) const
+    {
+        return mScriptPatterns;
+    }
+    //-----------------------------------------------------------------------
+    Real ParticleSystemManager::getLoadingOrder(void) const
+    {
+        /// Load late
+        return 1000.0f;
+    }
+    //-----------------------------------------------------------------------
+    void ParticleSystemManager::parseScript(DataStreamPtr& stream, const String& groupName)
+    {
+        ScriptCompilerManager::getSingleton().parseScript(stream, groupName);
     }
     //-----------------------------------------------------------------------
     void ParticleSystemManager::addEmitterFactory(ParticleEmitterFactory* factory)
@@ -94,7 +111,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void ParticleSystemManager::addRendererFactory(ParticleSystemRendererFactory* factory)
     {
-        OGRE_LOCK_AUTO_MUTEX ;
+            OGRE_LOCK_AUTO_MUTEX ;
         String name = factory->getType();
         mRendererFactories[name] = factory;
         LogManager::getSingleton().logMessage("Particle Renderer Type '" + name + "' registered");
@@ -222,6 +239,11 @@ namespace Ogre {
         
     }
     //-----------------------------------------------------------------------
+    void ParticleSystemManager::destroySystemImpl(ParticleSystem* sys)
+    {
+        OGRE_DELETE sys;
+    }
+    //-----------------------------------------------------------------------
     ParticleEmitter* ParticleSystemManager::_createEmitter(
         const String& emitterType, ParticleSystem* psys)
     {
@@ -231,7 +253,8 @@ namespace Ogre {
 
         if (pFact == mEmitterFactories.end())
         {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot find emitter type '" + emitterType + "'");
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot find requested emitter type.", 
+                "ParticleSystemManager::_createEmitter");
         }
 
         return pFact->second->createEmitter(psys);
@@ -264,7 +287,8 @@ namespace Ogre {
 
         if (pFact == mAffectorFactories.end())
         {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot find affector type '" + affectorType + "'");
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot find requested affector type.", 
+                "ParticleSystemManager::_createAffector");
         }
 
         return pFact->second->createAffector(psys);
@@ -354,7 +378,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
-    const String MOT_PARTICLE_SYSTEM = "ParticleSystem";
+    String ParticleSystemFactory::FACTORY_TYPE_NAME = "ParticleSystem";
     //-----------------------------------------------------------------------
     MovableObject* ParticleSystemFactory::createInstanceImpl( const String& name, 
             const NameValuePairList* params)
@@ -395,7 +419,15 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     const String& ParticleSystemFactory::getType(void) const
     {
-        return MOT_PARTICLE_SYSTEM;
+        return FACTORY_TYPE_NAME;
+    }
+    //-----------------------------------------------------------------------
+    void ParticleSystemFactory::destroyInstance( MovableObject* obj) 
+    {
+        // use manager
+        ParticleSystemManager::getSingleton().destroySystemImpl(
+            static_cast<ParticleSystem*>(obj));
+
     }
     //-----------------------------------------------------------------------
 }

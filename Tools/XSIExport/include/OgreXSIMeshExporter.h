@@ -29,7 +29,8 @@ THE SOFTWARE.
 #define __XSIMESHEXPORTER_H__
 
 #include "OgrePrerequisites.h"
-#include "OgreVector.h"
+#include "OgreVector2.h"
+#include "OgreVector3.h"
 #include "OgreColourValue.h"
 #include "OgreMesh.h"
 #include "OgreProgressiveMesh.h"
@@ -70,7 +71,7 @@ namespace Ogre {
 
         
         /** Build an OGRe mesh ready for export.
-
+        @remarks
             Every PolygonMesh object is exported as a different SubMesh. Other
             object types are ignored.
         @param mergeSubMeshes Whether to merge submeshes with the same material
@@ -299,8 +300,8 @@ namespace Ogre {
 
         /** Try to look up an existing vertex with the same information, or
             create a new one.
-
-            Note that we build up the list of unique position indexes that are
+        @remarks
+            Note that we buid up the list of unique position indexes that are
             actually used by each ProtoSubMesh as we go. When new positions
             are found, they are added and a remap entry created to take account
             of the fact that there may be extra vertices created in between, or

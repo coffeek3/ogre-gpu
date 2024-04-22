@@ -40,7 +40,7 @@ namespace Ogre {
     *  @{
     */
     /** Specialisation of HighLevelGpuProgram to provide support for nVidia's CG language.
-
+    @remarks
         Cg can be used to compile common, high-level, C-like code down to assembler
         language for both GL and Direct3D, for multiple graphics cards. You must
         supply a list of profiles which your program must support using
@@ -51,23 +51,31 @@ namespace Ogre {
     class CgProgram : public HighLevelGpuProgram
     {
     public:
+        /// Command object for setting entry point
+        class CmdEntryPoint : public ParamCommand
+        {
+        public:
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
+        };
         /// Command object for setting profiles
         class CmdProfiles : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /// Command object for setting compilation arguments
         class CmdArgs : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
     protected:
 
+        static CmdEntryPoint msCmdEntryPoint;
         static CmdProfiles msCmdProfiles;
         static CmdArgs msCmdArgs;
 
@@ -75,14 +83,14 @@ namespace Ogre {
         CGcontext mCgContext;
         /** Internal load implementation, must be implemented by subclasses.
         */
-        void loadFromSource(void) override;
+        void loadFromSource(void);
         /** Internal method for creating an appropriate low-level program from this
         high-level program, must be implemented by subclasses. */
-        void createLowLevelImpl(void) override;
+        void createLowLevelImpl(void);
         /// Internal unload implementation, must be implemented by subclasses
-        void unloadHighLevelImpl(void) override;
+        void unloadHighLevelImpl(void);
         /// Populate the passed parameters with name->index map, must be overridden
-        void buildConstantDefinitions() override;
+        void buildConstantDefinitions() const;
 
         /// Load the high-level part in a thread-safe way, required for delegate functionality
         void loadHighLevelSafe();
@@ -93,6 +101,7 @@ namespace Ogre {
         void mapTypeAndElementSize(CGtype cgType, bool isRegisterCombiner, GpuConstantDefinition& def) const;
 
         StringVector mProfiles;
+        String mEntryPoint;
         String mSelectedProfile;
         String mProgramString;
         CGprofile mSelectedCgProfile;
@@ -138,26 +147,26 @@ namespace Ogre {
         /** Gets the Cg profiles which can be supported by the program. */
         const StringVector& getProfiles(void) const { return mProfiles; }
         /// Overridden from GpuProgram
-        bool isSupported(void) const override;
+        bool isSupported(void) const;
         /// Overridden from GpuProgram
-        const String& getLanguage(void) const override;
+        const String& getLanguage(void) const;
 
-        GpuProgramParametersSharedPtr createParameters() override;
-        GpuProgram* _getBindingDelegate() override;
+        GpuProgramParametersSharedPtr createParameters();
+        GpuProgram* _getBindingDelegate();
 
-        bool isSkeletalAnimationIncluded(void) const override;
-        bool isMorphAnimationIncluded(void) const override;
-        bool isPoseAnimationIncluded(void) const override;
-        bool isVertexTextureFetchRequired(void) const override;
-        const GpuProgramParametersPtr& getDefaultParameters(void) override;
-        bool hasDefaultParameters(void) const override;
-        bool getPassSurfaceAndLightStates(void) const override;
-        bool getPassFogStates(void) const override;
-        bool getPassTransformStates(void) const override;
-        bool hasCompileError(void) const override;
-        void resetCompileError(void) override;
+        bool isSkeletalAnimationIncluded(void) const;
+        bool isMorphAnimationIncluded(void) const;
+        bool isPoseAnimationIncluded(void) const;
+        bool isVertexTextureFetchRequired(void) const;
+        GpuProgramParametersSharedPtr getDefaultParameters(void);
+        bool hasDefaultParameters(void) const;
+        bool getPassSurfaceAndLightStates(void) const;
+        bool getPassFogStates(void) const;
+        bool getPassTransformStates(void) const;
+        bool hasCompileError(void) const;
+        void resetCompileError(void);
         size_t getSize(void) const;
-        void touch(void) override;
+        void touch(void);
     };
     /** @} */
     /** @} */

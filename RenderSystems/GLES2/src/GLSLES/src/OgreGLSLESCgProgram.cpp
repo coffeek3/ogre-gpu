@@ -35,6 +35,7 @@ THE SOFTWARE.
 namespace Ogre {
 
     //-----------------------------------------------------------------------
+    GLSLESCgProgram::CmdEntryPoint GLSLESCgProgram::msCmdEntryPoint;
     GLSLESCgProgram::CmdProfiles GLSLESCgProgram::msCmdProfiles;
     //-----------------------------------------------------------------------
     // for use with Hlsl2Glsl_SetUserAttributeNames to map ogre att names
@@ -90,7 +91,7 @@ namespace Ogre {
     GLSLESCgProgram::GLSLESCgProgram(ResourceManager* creator, 
         const String& name, ResourceHandle handle,
         const String& group, bool isManual, ManualResourceLoader* loader)
-        : GLSLESProgram(creator, name, handle, group, isManual, loader)
+        : GLSLESProgram(creator, name, handle, group, isManual, loader) 
     {
 
         // Add parameter "entry_point" and "profiles" to the material serializer dictionary
@@ -99,11 +100,18 @@ namespace Ogre {
             setupBaseParamDictionary();
             ParamDictionary* dict = getParamDictionary();
 
+            dict->addParameter(ParameterDef("entry_point", 
+                "The entry point for the Cg program.",
+                PT_STRING),&msCmdEntryPoint);
             dict->addParameter(ParameterDef("profiles", 
                 "Space-separated list of Cg profiles supported by this profile.",
                 PT_STRING),&msCmdProfiles);
 
         }
+
+        // Manually assign language now since we use it immediately
+        mSyntaxCode = "cg";
+        
     }
     //---------------------------------------------------------------------------
     GLSLESCgProgram::~GLSLESCgProgram()
@@ -153,7 +161,7 @@ namespace Ogre {
             // find following newline (or EOF)
             size_t newLineAfter = inSource.find("\n", afterRegisterPos);
             // find register file string container
-            String endDelimiter = "\"";
+            String endDelimeter = "\"";
             size_t startIt = inSource.find("\"", afterRegisterPos);
             if (startIt == String::npos || startIt > newLineAfter)
             {
@@ -168,14 +176,14 @@ namespace Ogre {
                 }
                 else
                 {
-                    endDelimiter = ")";
+                    endDelimeter = ")";
                 }
             }
-            size_t endIt = inSource.find(endDelimiter, startIt+1);
+            size_t endIt = inSource.find(endDelimeter, startIt+1);
             if (endIt == String::npos || endIt <= startIt)
             {
                 OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR,
-                    "Badly formed register directive (expected " + endDelimiter + ") in file "
+                    "Badly formed register directive (expected " + endDelimeter + ") in file "
                     + mFilename + ": " + inSource.substr(registerPos, newLineAfter-registerPos),
                     "GLSLESCgProgram::deleteRegisterFromCg");
             }
@@ -200,7 +208,6 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void GLSLESCgProgram::loadFromSource( void )
     {
-        GLSLESProgram::prepareImpl(); // loads + preprocesses source
 
         // check if syntax is supported
         if (!isSyntaxSupported()) 
@@ -212,8 +219,15 @@ namespace Ogre {
             return;
         }
 
+
+        // add a #define so we can control some cg code in shaders
+        mSource = "#define OPENGL_ES_2\n" + mSource;
+
+        // resolve includes
+        String sourceToUse = _resolveIncludes(mSource, this, mFilename);
+
         // delete ": register(xx)" that hlsl2glsl doesn't know to handle
-        String sourceToUse = deleteRegisterFromCg(sourceToUse);
+        sourceToUse = deleteRegisterFromCg(sourceToUse);
 
 
         // select the program type
@@ -318,6 +332,15 @@ namespace Ogre {
             }
         }
         return syntaxSupported;
+    }
+    //-----------------------------------------------------------------------
+    String GLSLESCgProgram::CmdEntryPoint::doGet(const void *target) const
+    {
+        return static_cast<const GLSLESCgProgram*>(target)->getEntryPoint();
+    }
+    void GLSLESCgProgram::CmdEntryPoint::doSet(void *target, const String& val)
+    {
+        static_cast<GLSLESCgProgram*>(target)->setEntryPoint(val);
     }
     //-----------------------------------------------------------------------
     String GLSLESCgProgram::CmdProfiles::doGet(const void *target) const

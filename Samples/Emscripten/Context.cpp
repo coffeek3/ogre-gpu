@@ -224,5 +224,5 @@ void Context::setup() {
 
     mCurrentSample = new Sample_Character();
     mCurrentSample->setShaderGenerator(mShaderGenerator);
-    mCurrentSample->_setup(this);
+    mCurrentSample->_setup(mWindow, mFSLayer, mOverlaySystem);
 }

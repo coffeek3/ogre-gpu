@@ -1,6 +1,4 @@
-#ifdef GL_ES
-precision mediump float;
-#endif
+#version 120
 
 uniform float size_value;
 uniform float time;

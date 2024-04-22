@@ -51,9 +51,10 @@ namespace Ogre
         if( technique )
         {
             GpuProgramParametersSharedPtr vertexParam = technique->getPass(0)->getVertexProgramParameters();
-            for(auto& it : vertexParam->getConstantDefinitions().map)
+            GpuConstantDefinitionIterator itor = vertexParam->getConstantDefinitionIterator();
+            while( itor.hasMoreElements() )
             {
-                const GpuConstantDefinition &constDef = it.second;
+                const GpuConstantDefinition &constDef = itor.getNext();
                 if(((constDef.constType == GCT_MATRIX_3X4 ||
                     constDef.constType == GCT_MATRIX_4X3 ||             //OGL GLSL bitches without this
                     constDef.constType == GCT_MATRIX_2X4 ||
@@ -91,11 +92,12 @@ namespace Ogre
                         if((retVal < 3 && entry->paramType == GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY_3x4) ||
                             (retVal < 2 && entry->paramType == GpuProgramParameters::ACT_WORLD_DUALQUATERNION_ARRAY_2x4))
                         {
-                            LogManager::getSingleton().logWarning( "InstanceBatchShader: Mesh '" +
-                                        mMeshReference->getName() + "' using material '" +
-                                        mMaterial->getName() + "'. The amount of possible "
+                            LogManager::getSingleton().logMessage( "InstanceBatchShader: Mesh " +
+                                        mMeshReference->getName() + " using material " +
+                                        mMaterial->getName() + " contains many bones. The amount of "
                                         "instances per batch is very low. Performance benefits will "
-                                        "be minimal, if any. It might be even slower!");
+                                        "be minimal, if any. It might be even slower!",
+                                        LML_NORMAL );
                         }
 
                         return retVal;
@@ -103,8 +105,10 @@ namespace Ogre
                 }
             }
 
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS,
-                        "Material '" + mMaterial->getName() + "' does not support hardware skinning");
+            //Reaching here means material is supported, but malformed
+            OGRE_EXCEPT( Exception::ERR_INVALIDPARAMS, 
+            "Material '" + mMaterial->getName() + "' is malformed for this instancing technique",
+            "InstanceBatchShader::calculateMaxNumInstances");
         }
 
         //Reaching here the material is just unsupported.
@@ -197,6 +201,7 @@ namespace Ogre
                 }
             }
 
+            vertexBuffer->unlock();
         }
     }
     //-----------------------------------------------------------------------
@@ -273,27 +278,31 @@ namespace Ogre
             char *startBuf = baseBuf;
 
             //Copy and repeat
-            for (uint8 j = 0; j < uint8(mInstancesPerBatch); ++j)
+            for( uint8 j=0; j<uint8(mInstancesPerBatch); ++j )
             {
                 //Repeat source
                 baseBuf = startBuf;
 
-                for (size_t k = 0; k < baseVertexData->vertexCount; ++k)
+                for( size_t k=0; k<baseVertexData->vertexCount; ++k )
                 {
-                    for (auto& vl : veList)
+                    VertexDeclaration::VertexElementList::const_iterator it = veList.begin();
+                    VertexDeclaration::VertexElementList::const_iterator en = veList.end();
+
+                    while( it != en )
                     {
-                        switch (vl.getSemantic())
+                        switch( it->getSemantic() )
                         {
                         case VES_BLEND_INDICES:
-                        *(thisBuf + vl.getOffset() + 0) = *(baseBuf + vl.getOffset() + 0) + j * numBones;
-                        *(thisBuf + vl.getOffset() + 1) = *(baseBuf + vl.getOffset() + 1) + j * numBones;
-                        *(thisBuf + vl.getOffset() + 2) = *(baseBuf + vl.getOffset() + 2) + j * numBones;
-                        *(thisBuf + vl.getOffset() + 3) = *(baseBuf + vl.getOffset() + 3) + j * numBones;
+                        *(thisBuf + it->getOffset() + 0) = *(baseBuf + it->getOffset() + 0) + j * numBones;
+                        *(thisBuf + it->getOffset() + 1) = *(baseBuf + it->getOffset() + 1) + j * numBones;
+                        *(thisBuf + it->getOffset() + 2) = *(baseBuf + it->getOffset() + 2) + j * numBones;
+                        *(thisBuf + it->getOffset() + 3) = *(baseBuf + it->getOffset() + 3) + j * numBones;
                             break;
                         default:
-                            memcpy( thisBuf + vl.getOffset(), baseBuf + vl.getOffset(), vl.getSize() );
+                            memcpy( thisBuf + it->getOffset(), baseBuf + it->getOffset(), it->getSize() );
                             break;
                         }
+                        ++it;
                     }
                     thisBuf += baseVertexData->vertexDeclaration->getVertexSize(i);
                     baseBuf += baseVertexData->vertexDeclaration->getVertexSize(i);
@@ -304,20 +313,18 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void InstanceBatchShader::getWorldTransforms( Matrix4* xform ) const
     {
-        if (MeshManager::getBonesUseObjectSpace())
-        {
-            *xform = Affine3::IDENTITY;
-            xform++;
-        }
+        InstancedEntityVec::const_iterator itor = mInstancedEntities.begin();
+        InstancedEntityVec::const_iterator end  = mInstancedEntities.end();
 
-        for (auto *e : mInstancedEntities)
+        while( itor != end )
         {
-            xform += e->getTransforms(xform);
+            xform += (*itor)->getTransforms( xform );
+            ++itor;
         }
     }
     //-----------------------------------------------------------------------
     unsigned short InstanceBatchShader::getNumWorldTransforms(void) const
     {
-        return uint16(mNumWorldMatrices) + uint16(MeshManager::getBonesUseObjectSpace());
+        return uint16(mNumWorldMatrices);
     }
 }

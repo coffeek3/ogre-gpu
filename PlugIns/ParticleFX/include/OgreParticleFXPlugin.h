@@ -29,7 +29,6 @@ THE SOFTWARE.
 #define __ParticleFXPlugin_H__
 
 #include "OgrePlugin.h"
-#include "OgreParticleFXPrerequisites.h"
 #include "OgreParticleAffectorFactory.h"
 #include "OgreParticleEmitterFactory.h"
 
@@ -37,26 +36,26 @@ namespace Ogre
 {
 
     /** Plugin instance for ParticleFX Manager */
-    class _OgreParticleFXExport ParticleFXPlugin : public Plugin
+    class ParticleFXPlugin : public Plugin
     {
     public:
         ParticleFXPlugin();
 
 
         /// @copydoc Plugin::getName
-        const String& getName() const override;
+        const String& getName() const;
 
         /// @copydoc Plugin::install
-        void install() override;
+        void install();
 
         /// @copydoc Plugin::initialise
-        void initialise() override;
+        void initialise();
 
         /// @copydoc Plugin::shutdown
-        void shutdown() override;
+        void shutdown();
 
         /// @copydoc Plugin::uninstall
-        void uninstall() override;
+        void uninstall();
     protected:
         std::vector<ParticleEmitterFactory*> mEmitterFactories;
         std::vector<ParticleAffectorFactory*> mAffectorFactories;

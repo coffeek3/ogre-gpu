@@ -26,72 +26,11 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 #include "OgreStableHeaders.h"
+#include "OgreLight.h"
 #include "OgreEdgeListBuilder.h"
 #include "OgreOptimisedUtil.h"
 
 namespace Ogre {
-    ShadowRenderable::ShadowRenderable(MovableObject* parent, const HardwareIndexBufferSharedPtr& indexBuffer,
-                                   const VertexData* vertexData, bool createSeparateLightCap,
-                                   bool isLightCap)
-    : mLightCap(0), mParent(parent)
-    {
-        // Initialise render op
-        mRenderOp.indexData = OGRE_NEW IndexData();
-        mRenderOp.indexData->indexBuffer = indexBuffer;
-        mRenderOp.indexData->indexStart = 0;
-        // index start and count are sorted out later
-
-        // Create vertex data which just references position component (and 2 component)
-        mRenderOp.vertexData = OGRE_NEW VertexData();
-        // Map in position data
-        mRenderOp.vertexData->vertexDeclaration->addElement(0,0,VET_FLOAT3, VES_POSITION);
-        ushort origPosBind =
-            vertexData->vertexDeclaration->findElementBySemantic(VES_POSITION)->getSource();
-        mPositionBuffer = vertexData->vertexBufferBinding->getBuffer(origPosBind);
-        mRenderOp.vertexData->vertexBufferBinding->setBinding(0, mPositionBuffer);
-        // Map in w-coord buffer (if present)
-        if(vertexData->hardwareShadowVolWBuffer)
-        {
-            mRenderOp.vertexData->vertexDeclaration->addElement(1,0,VET_FLOAT1, VES_TEXTURE_COORDINATES, 0);
-            mWBuffer = vertexData->hardwareShadowVolWBuffer;
-            mRenderOp.vertexData->vertexBufferBinding->setBinding(1, mWBuffer);
-        }
-        // Use same vertex start as input
-        mRenderOp.vertexData->vertexStart = vertexData->vertexStart;
-
-        if (isLightCap)
-        {
-            // Use original vertex count, no extrusion
-            mRenderOp.vertexData->vertexCount = vertexData->vertexCount;
-        }
-        else
-        {
-            // Vertex count must take into account the doubling of the buffer,
-            // because second half of the buffer is the extruded copy
-            mRenderOp.vertexData->vertexCount = vertexData->vertexCount * 2;
-
-            if (createSeparateLightCap)
-            {
-                // Create child light cap
-                mLightCap = OGRE_NEW ShadowRenderable(parent, indexBuffer, vertexData, false, true);
-            }
-        }
-    }
-    ShadowRenderable::~ShadowRenderable()
-    {
-        delete mLightCap;
-        delete mRenderOp.indexData;
-        delete mRenderOp.vertexData;
-    }
-    void ShadowRenderable::rebindIndexBuffer(const HardwareIndexBufferSharedPtr& indexBuffer)
-    {
-        mRenderOp.indexData->indexBuffer = indexBuffer;
-        if (mLightCap) mLightCap->rebindIndexBuffer(indexBuffer);
-    }
-    void ShadowRenderable::getWorldTransforms(Matrix4* xform) const
-    {
-        *xform = mParent->_getParentNodeFullTransform();
-    }
     const LightList& ShadowRenderable::getLights(void) const 
     {
         // return empty
@@ -101,10 +40,10 @@ namespace Ogre {
     // ------------------------------------------------------------------------
     void ShadowCaster::clearShadowRenderableList(ShadowRenderableList& shadowRenderables)
     {
-        for(auto & shadowRenderable : shadowRenderables)
+        for(ShadowRenderableList::iterator si = shadowRenderables.begin(), siend = shadowRenderables.end(); si != siend; ++si)
         {
-            OGRE_DELETE shadowRenderable;
-            shadowRenderable = 0;
+            OGRE_DELETE *si;
+            *si = 0;
         }
         shadowRenderables.clear();
     }
@@ -186,6 +125,7 @@ namespace Ogre {
         // or when light position is too close to light cap bound.
         bool useMcGuire = edgeData->edgeGroups.size() <= 1 && 
             (lightType == Light::LT_DIRECTIONAL || isBoundOkForMcGuire(getLightCapBounds(), light->getDerivedPosition()));
+        EdgeData::EdgeGroupList::const_iterator egi, egiend;
         ShadowRenderableList::const_iterator si;
 
         // pre-count the size of index data we need since it makes a big perf difference
@@ -193,11 +133,18 @@ namespace Ogre {
         size_t preCountIndexes = 0;
 
         si = shadowRenderables.begin();
-        for (auto& eg : edgeData->edgeGroups)
+        egiend = edgeData->edgeGroups.end();
+        for (egi = edgeData->edgeGroups.begin(); egi != egiend; ++egi, ++si)
         {
+            const EdgeData::EdgeGroup& eg = *egi;
             bool  firstDarkCapTri = true;
-            for (auto& edge :  eg.edges)
+
+            EdgeData::EdgeList::const_iterator i, iend;
+            iend = eg.edges.end();
+            for (i = eg.edges.begin(); i != iend; ++i)
             {
+                const EdgeData::Edge& edge = *i;
+
                 // Silhouette edge, when two tris has opposite light facing, or
                 // degenerate edge where only tri 1 is valid and the tri light facing
                 char lightFacing = edgeData->triangleLightFacings[edge.triIndex[0]];
@@ -279,7 +226,6 @@ namespace Ogre {
                     }
                 }
             }
-            ++si;
         }
         // End pre-count
         
@@ -320,8 +266,10 @@ namespace Ogre {
         // Iterate over the groups and form renderables for each based on their
         // lightFacing
         si = shadowRenderables.begin();
-        for (auto& eg : edgeData->edgeGroups)
+        egiend = edgeData->edgeGroups.end();
+        for (egi = edgeData->edgeGroups.begin(); egi != egiend; ++egi, ++si)
         {
+            const EdgeData::EdgeGroup& eg = *egi;
             // Initialise the index start for this shadow renderable
             IndexData* indexData = (*si)->getRenderOperationForUpdate()->indexData;
 
@@ -337,8 +285,12 @@ namespace Ogre {
             bool  firstDarkCapTri = true;
             unsigned short darkCapStart = 0;
 
-            for (auto& edge : eg.edges)
+            EdgeData::EdgeList::const_iterator i, iend;
+            iend = eg.edges.end();
+            for (i = eg.edges.begin(); i != iend; ++i)
             {
+                const EdgeData::Edge& edge = *i;
+
                 // Silhouette edge, when two tris has opposite light facing, or
                 // degenerate edge where only tri 1 is valid and the tri light facing
                 char lightFacing = edgeData->triangleLightFacings[edge.triIndex[0]];
@@ -486,7 +438,6 @@ namespace Ogre {
             // update index count for current index data (either this shadow renderable or its light cap)
             indexData->indexCount = numIndices - indexData->indexStart;
 
-            ++si;
         }
 
         // In debug mode, check we didn't overrun the index buffer

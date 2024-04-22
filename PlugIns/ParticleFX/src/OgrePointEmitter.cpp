@@ -64,6 +64,12 @@ namespace Ogre {
         pParticle->mTimeToLive = pParticle->mTotalTimeToLive = genEmissionTTL();
         
     }
+    //-----------------------------------------------------------------------
+    unsigned short PointEmitter::_getEmissionCount(Real timeElapsed)
+    {
+        // Use basic constant emission 
+        return genConstantEmissionCount(timeElapsed);
+    }
 }
 
 

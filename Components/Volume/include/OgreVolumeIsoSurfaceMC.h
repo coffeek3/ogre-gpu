@@ -29,7 +29,8 @@ THE SOFTWARE.
 #define __Ogre_Volume_IsoSurfaceMC_H__
 
 #include "OgreVolumeIsoSurface.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
+#include "OgreVector4.h"
 #include <float.h>
 
 namespace Ogre {
@@ -108,11 +109,11 @@ namespace Volume {
         
         /** Overridden from IsoSurface.
         */
-        void addMarchingCubesTriangles(const Vector3 *corners, const Vector4 *volumeValues, MeshBuilder *mb) const override;
+        virtual void addMarchingCubesTriangles(const Vector3 *corners, const Vector4 *volumeValues, MeshBuilder *mb) const;
         
         /** Overridden from IsoSurface.
         */
-        void addMarchingSquaresTriangles(const Vector3 *corners, const Vector4 *volumeValues, const size_t *indices, const Real maxDistance, MeshBuilder *mb) const override;
+        virtual void addMarchingSquaresTriangles(const Vector3 *corners, const Vector4 *volumeValues, const size_t *indices, const Real maxDistance, MeshBuilder *mb) const;
     };
     /** @} */
     /** @} */

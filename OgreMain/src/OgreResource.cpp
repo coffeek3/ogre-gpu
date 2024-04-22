@@ -42,28 +42,13 @@ namespace Ogre
     Resource::~Resource() 
     { 
     }
-    Resource& Resource::operator=(const Resource& rhs)
-    {
-        mName = rhs.mName;
-        mGroup = rhs.mGroup;
-        mCreator = rhs.mCreator;
-        mIsManual = rhs.mIsManual;
-        mLoader = rhs.mLoader;
-        mHandle = rhs.mHandle;
-        mSize = rhs.mSize;
-
-        mLoadingState.store(rhs.mLoadingState.load());
-        mIsBackgroundLoaded = rhs.mIsBackgroundLoaded;
-
-        return *this;
-    }
     //-----------------------------------------------------------------------
     void Resource::escalateLoading()
     {
         // Just call load as if this is the background thread, locking on
         // load status will prevent race conditions
         load(true);
-        _fireLoadingComplete();
+        _fireLoadingComplete(true);
     }
     //-----------------------------------------------------------------------
     void Resource::prepare(bool background)
@@ -144,7 +129,7 @@ namespace Ogre
 
         // Fire events (if not background)
         if (!background)
-            _firePreparingComplete();
+            _firePreparingComplete(false);
 
 
     }
@@ -215,11 +200,7 @@ namespace Ogre
 
             if (mIsManual)
             {
-                if (old==LOADSTATE_UNLOADED && mLoader)
-                    mLoader->prepareResource(this);
-
                 preLoadImpl();
-
                 // Load from manual loader
                 if (mLoader)
                 {
@@ -285,18 +266,24 @@ namespace Ogre
 
         // Fire events, if not background
         if (!background)
-            _fireLoadingComplete();
+            _fireLoadingComplete(false);
 
 
     }
     //---------------------------------------------------------------------
     size_t Resource::calculateSize(void) const
     {
-        size_t memSize = 0; // sizeof(*this) should be called by deriving classes
+        size_t memSize = 0;
+        memSize += sizeof(ResourceManager);
+        memSize += sizeof(ManualResourceLoader);
+        memSize += sizeof(ResourceHandle);
         memSize += mName.size() * sizeof(char);
         memSize += mGroup.size() * sizeof(char);
         memSize += mOrigin.size() * sizeof(char);
-        memSize += sizeof(void*) * mListenerList.size();
+        memSize += sizeof(size_t) * 2;
+        memSize += sizeof(bool) * 2;
+        memSize += sizeof(Listener) * mListenerList.size();
+        memSize += sizeof(AtomicScalar<LoadingState>);
 
         return memSize;
     }
@@ -385,34 +372,39 @@ namespace Ogre
         mListenerList.erase(lis);
     }
     //-----------------------------------------------------------------------
-    void Resource::_fireLoadingComplete(bool unused)
+    void Resource::_fireLoadingComplete(bool wasBackgroundLoaded)
     {
         // Lock the listener list
-        OGRE_LOCK_MUTEX(mListenerListMutex);
-        for (auto& l : mListenerList)
+            OGRE_LOCK_MUTEX(mListenerListMutex);
+        for (ListenerList::iterator i = mListenerList.begin();
+            i != mListenerList.end(); ++i)
         {
-            l->loadingComplete(this);
+            (*i)->loadingComplete(this);
         }
     }
     //-----------------------------------------------------------------------
-    void Resource::_firePreparingComplete(bool unused)
+    void Resource::_firePreparingComplete(bool wasBackgroundLoaded)
     {
         // Lock the listener list
-        OGRE_LOCK_MUTEX(mListenerListMutex);
-        for (auto& l : mListenerList)
+            OGRE_LOCK_MUTEX(mListenerListMutex);
+        for (ListenerList::iterator i = mListenerList.begin();
+            i != mListenerList.end(); ++i)
         {
-            l->preparingComplete(this);
+            (*i)->preparingComplete(this);
         }
     }
     //-----------------------------------------------------------------------
     void Resource::_fireUnloadingComplete(void)
     {
         // Lock the listener list
-        OGRE_LOCK_MUTEX(mListenerListMutex);
-        for (auto& l : mListenerList)
-        {
-            l->unloadingComplete(this);
-        }
+            OGRE_LOCK_MUTEX(mListenerListMutex);
+            for (ListenerList::iterator i = mListenerList.begin();
+                i != mListenerList.end(); ++i)
+            {
+
+                (*i)->unloadingComplete(this);
+
+            }
     }
 
 }

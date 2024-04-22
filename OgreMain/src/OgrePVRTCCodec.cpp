@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include "OgrePVRTCCodec.h"
 #include "OgreImage.h"
 
+#define FOURCC(c0, c1, c2, c3) (c0 | (c1 << 8) | (c2 << 16) | (c3 << 24))
 #define PVR_TEXTURE_FLAG_TYPE_MASK  0xff
 
 namespace Ogre {
@@ -138,10 +139,24 @@ namespace Ogre {
     { 
     }
     //---------------------------------------------------------------------
-    void PVRTCCodec::decode(const DataStreamPtr& stream, const Any& output) const
+    DataStreamPtr PVRTCCodec::encode(const MemoryDataStreamPtr& input,
+                                     const Codec::CodecDataPtr& pData) const
     {
-        Image* image = any_cast<Image*>(output);
-
+        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+                    "PVRTC encoding not supported",
+                    "PVRTCCodec::encode" ) ;
+    }
+    //---------------------------------------------------------------------
+    void PVRTCCodec::encodeToFile(const MemoryDataStreamPtr& input, const String& outFileName,
+                                  const Codec::CodecDataPtr& pData) const
+    {
+        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+                    "PVRTC encoding not supported",
+                    "PVRTCCodec::encodeToFile" ) ;
+    }
+    //---------------------------------------------------------------------
+    Codec::DecodeResult PVRTCCodec::decode(const DataStreamPtr& stream) const
+    {
         // Assume its a pvr 2 header
         PVRTCTexHeaderV2 headerV2;
         stream->read(&headerV2, sizeof(PVRTCTexHeaderV2));
@@ -149,8 +164,7 @@ namespace Ogre {
 
         if (PVR2_MAGIC == headerV2.pvrTag)
         {           
-            decodeV2(stream, image);
-            return;
+            return decodeV2(stream);
         }
 
         // Try it as pvr 3 header
@@ -160,8 +174,7 @@ namespace Ogre {
 
         if (PVR3_MAGIC == headerV3.version)
         {
-            decodeV3(stream, image);
-            return;
+            return decodeV3(stream);
         }
 
         
@@ -169,10 +182,13 @@ namespace Ogre {
                         "This is not a PVR2 / PVR3 file!", "PVRTCCodec::decode");
     }
     //---------------------------------------------------------------------    
-    void PVRTCCodec::decodeV2(const DataStreamPtr& stream, Image* image)
+    Codec::DecodeResult PVRTCCodec::decodeV2(const DataStreamPtr& stream) const
     {
         PVRTCTexHeaderV2 header;
         uint32 flags = 0, formatFlags = 0;
+        size_t numFaces = 1; // Assume one face until we know otherwise
+
+        ImageData *imgData = OGRE_NEW ImageData();
 
         // Read the PVRTC header
         stream->read(&header, sizeof(PVRTCTexHeaderV2));
@@ -185,33 +201,53 @@ namespace Ogre {
         uint32 bitmaskAlpha = header.bitmaskAlpha;
         flipEndian(&bitmaskAlpha, sizeof(uint32));
 
-        PixelFormat format = PF_UNKNOWN;
         if (formatFlags == kPVRTextureFlagTypePVRTC_4 || formatFlags == kPVRTextureFlagTypePVRTC_2)
         {
             if (formatFlags == kPVRTextureFlagTypePVRTC_4)
             {
-                format = bitmaskAlpha ? PF_PVRTC_RGBA4 : PF_PVRTC_RGB4;
+                imgData->format = bitmaskAlpha ? PF_PVRTC_RGBA4 : PF_PVRTC_RGB4;
             }
             else if (formatFlags == kPVRTextureFlagTypePVRTC_2)
             {
-                format = bitmaskAlpha ? PF_PVRTC_RGBA2 : PF_PVRTC_RGB2;
+                imgData->format = bitmaskAlpha ? PF_PVRTC_RGBA2 : PF_PVRTC_RGB2;
             }
-        }
-        else
-        {
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Invalid format");
+
+            imgData->depth = 1;
+            imgData->width = header.width;
+            imgData->height = header.height;
+            imgData->num_mipmaps = static_cast<uint8>(header.numMipmaps);
+
+            // PVRTC is a compressed format
+            imgData->flags |= IF_COMPRESSED;
         }
 
         // Calculate total size from number of mipmaps, faces and size
-        image->create(format, header.width, header.height, 1, 1, header.numMipmaps);
-        stream->read(image->getData(), image->getSize());
+        imgData->size = Image::calculateSize(imgData->num_mipmaps, numFaces, 
+                                             imgData->width, imgData->height, imgData->depth, imgData->format);
+
+        // Bind output buffer
+        MemoryDataStreamPtr output(OGRE_NEW MemoryDataStream(imgData->size));
+
+        // Now deal with the data
+        void *destPtr = output->getPtr();
+        stream->read(destPtr, imgData->size);
+        destPtr = static_cast<void*>(static_cast<uchar*>(destPtr));
+
+        DecodeResult ret;
+        ret.first = output;
+        ret.second = CodecDataPtr(imgData);
+
+        return ret;
     }
     //---------------------------------------------------------------------    
-    void PVRTCCodec::decodeV3(const DataStreamPtr& stream, Image* image)
+    Codec::DecodeResult PVRTCCodec::decodeV3(const DataStreamPtr& stream) const
     {
         PVRTCTexHeaderV3 header;
         PVRTCMetadata metadata;
         uint32 flags = 0;
+        size_t numFaces = 1; // Assume one face until we know otherwise
+
+        ImageData *imgData = OGRE_NEW ImageData();
 
         // Read the PVRTC header
         stream->read(&header, sizeof(PVRTCTexHeaderV3));
@@ -223,26 +259,25 @@ namespace Ogre {
         }
 
         // Identify the pixel format
-        PixelFormat format = PF_UNKNOWN;
         switch (header.pixelFormat)
         {
             case kPVRTC1_PF_2BPP_RGB:
-                format = PF_PVRTC_RGB2;
+                imgData->format = PF_PVRTC_RGB2;
                 break;
             case kPVRTC1_PF_2BPP_RGBA:
-                format = PF_PVRTC_RGBA2;
+                imgData->format = PF_PVRTC_RGBA2;
                 break;
             case kPVRTC1_PF_4BPP_RGB:
-                format = PF_PVRTC_RGB4;
+                imgData->format = PF_PVRTC_RGB4;
                 break;
             case kPVRTC1_PF_4BPP_RGBA:
-                format = PF_PVRTC_RGBA4;
+                imgData->format = PF_PVRTC_RGBA4;
                 break;
             case kPVRTC2_PF_2BPP:
-                format = PF_PVRTC2_2BPP;
+                imgData->format = PF_PVRTC2_2BPP;
                 break;
             case kPVRTC2_PF_4BPP:
-                format = PF_PVRTC2_4BPP;
+                imgData->format = PF_PVRTC2_4BPP;
                 break;
         }
 
@@ -250,25 +285,43 @@ namespace Ogre {
         flags = header.flags;
         flipEndian(&flags, sizeof(uint32));
 
+        imgData->depth = header.depth;
+        imgData->width = header.width;
+        imgData->height = header.height;
+        imgData->num_mipmaps = static_cast<uint8>(header.mipMapCount);
+
+        // PVRTC is a compressed format
+        imgData->flags |= IF_COMPRESSED;
+
+        if(header.numFaces == 6)
+            imgData->flags |= IF_CUBEMAP;
+
+        if(header.depth > 1)
+            imgData->flags |= IF_3D_TEXTURE;
+
         // Calculate total size from number of mipmaps, faces and size
-        image->create(format, header.width, header.height, header.depth, header.numFaces, header.mipMapCount);
+        imgData->size = Image::calculateSize(imgData->num_mipmaps, numFaces, 
+                                             imgData->width, imgData->height, imgData->depth, imgData->format);
+
+        // Bind output buffer
+        MemoryDataStreamPtr output(OGRE_NEW MemoryDataStream(imgData->size));
 
         // Now deal with the data
-        void *destPtr = image->getData();
+        void *destPtr = output->getPtr();
         
-        uint width = image->getWidth();
-        uint height = image->getHeight();
-        uint depth = image->getDepth();
+        uint width = imgData->width;
+        uint height = imgData->height;
+        uint depth = imgData->depth;
 
         // All mips for a surface, then each face
-        for(size_t mip = 0; mip <= image->getNumMipmaps(); ++mip)
+        for(size_t mip = 0; mip <= imgData->num_mipmaps; ++mip)
         {
             for(size_t surface = 0; surface < header.numSurfaces; ++surface)
             {
-                for(size_t i = 0; i < image->getNumFaces(); ++i)
+                for(size_t i = 0; i < numFaces; ++i)
                 {
                     // Load directly
-                    size_t pvrSize = PixelUtil::getMemorySize(width, height, depth, format);
+                    size_t pvrSize = PixelUtil::getMemorySize(width, height, depth, imgData->format);
                     stream->read(destPtr, pvrSize);
                     destPtr = static_cast<void*>(static_cast<uchar*>(destPtr) + pvrSize);
                 }
@@ -279,11 +332,31 @@ namespace Ogre {
             if(height!=1) height /= 2;
             if(depth!=1) depth /= 2;
         }
+
+        DecodeResult ret;
+        ret.first = output;
+        ret.second = CodecDataPtr(imgData);
+
+        return ret;
     }
     //---------------------------------------------------------------------    
     String PVRTCCodec::getType() const 
     {
         return mType;
+    }
+    //---------------------------------------------------------------------    
+    void PVRTCCodec::flipEndian(void * pData, size_t size, size_t count)
+    {
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+		Bitwise::bswapChunks(pData, size, count);
+#endif
+    }
+    //---------------------------------------------------------------------    
+    void PVRTCCodec::flipEndian(void * pData, size_t size)
+    {
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+        Bitwise::bswapBuffer(pData, size);
+#endif
     }
     //---------------------------------------------------------------------
     String PVRTCCodec::magicNumberToFileExt(const char *magicNumberPtr, size_t maxbytes) const

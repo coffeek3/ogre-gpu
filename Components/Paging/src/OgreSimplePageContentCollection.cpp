@@ -44,8 +44,8 @@ namespace Ogre
     //---------------------------------------------------------------------
     SimplePageContentCollection::~SimplePageContentCollection()
     {
-        for (auto & i : mContentList)
-            delete i;
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            delete *i;
         mContentList.clear();
     }
     //---------------------------------------------------------------------
@@ -68,29 +68,29 @@ namespace Ogre
     {
         stream.writeChunkBegin(SUBCLASS_CHUNK_ID, SUBCLASS_CHUNK_VERSION);
 
-        for (auto & i : mContentList)
-            i->save(stream);
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->save(stream);
 
         stream.writeChunkEnd(SUBCLASS_CHUNK_ID);
     }
     //---------------------------------------------------------------------
     void SimplePageContentCollection::frameStart(Real timeSinceLastFrame)
     {
-        for (auto & i : mContentList)
-            i->frameStart(timeSinceLastFrame);
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->frameStart(timeSinceLastFrame);
 
     }
     //---------------------------------------------------------------------
     void SimplePageContentCollection::frameEnd(Real timeElapsed)
     {
-        for (auto & i : mContentList)
-            i->frameEnd(timeElapsed);
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->frameEnd(timeElapsed);
     }
     //---------------------------------------------------------------------
     void SimplePageContentCollection::notifyCamera(Camera* cam)
     {
-        for (auto & i : mContentList)
-            i->notifyCamera(cam);
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->notifyCamera(cam);
     }
     //---------------------------------------------------------------------
     bool SimplePageContentCollection::prepare(StreamSerialiser& stream)
@@ -99,8 +99,8 @@ namespace Ogre
             return false;
 
         bool ret = true;
-        for (auto & i : mContentList)
-            ret = i->prepare(stream) && ret;
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            ret = (*i)->prepare(stream) && ret;
 
 
         stream.readChunkEnd(SUBCLASS_CHUNK_ID);
@@ -111,22 +111,22 @@ namespace Ogre
     //---------------------------------------------------------------------
     void SimplePageContentCollection::load()
     {
-        for (auto & i : mContentList)
-            i->load();
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->load();
 
     }
     //---------------------------------------------------------------------
     void SimplePageContentCollection::unload()
     {
-        for (auto & i : mContentList)
-            i->unload();
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->unload();
 
     }
     //---------------------------------------------------------------------
     void SimplePageContentCollection::unprepare()
     {
-        for (auto & i : mContentList)
-            i->unprepare();
+        for (ContentList::iterator i = mContentList.begin(); i != mContentList.end(); ++i)
+            (*i)->unprepare();
     }
     //---------------------------------------------------------------------
     //---------------------------------------------------------------------

@@ -17,8 +17,14 @@ set (HEADER_FILES
 	${PROJECT_SOURCE_DIR}/Samples/Common/include/SdkSample.h
 )
 
+set(SOURCE_FILES ${PROJECT_SOURCE_DIR}/Samples/Browser/src/SampleBrowser.cpp)
+
 # Get the list of configured samples
 get_property(OGRE_SAMPLES_LIST GLOBAL PROPERTY "OGRE_SAMPLES_LIST")
+
+if (APPLE_IOS)
+  set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/SampleBrowser.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
+endif ()
 
 if (APPLE AND APPLE_IOS)
   set(HEADER_FILES ${HEADER_FILES}
@@ -28,7 +34,10 @@ elseif (APPLE)
   set(HEADER_FILES ${HEADER_FILES}
 	${PROJECT_SOURCE_DIR}/Samples/Common/misc/SampleBrowser_OSX.icns
   )
-endif ()
+elseif (ANDROID)
+  set(HEADER_FILES ${HEADER_FILES}
+    ${PROJECT_SOURCE_DIR}/Samples/Browser/include/SampleBrowser_Android.h)
+endif (APPLE AND APPLE_IOS)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)  
 
@@ -41,8 +50,9 @@ if (WINDOWS_STORE OR WINDOWS_PHONE)
     set(SHORT_NAME ${EXE_NAME})
     set(PACKAGE_GUID "ef31484f-4f23-4b9f-8748-af5482696ae5")
     set(APP_MANIFEST_NAME Package.appxmanifest)
+    string(SUBSTRING ${MSVC_VERSION} 0 2 MSVC_SHORT)
     configure_file(
-        ${OGRE_TEMPLATES_DIR}/Package_vc1900.WindowsStore.appxmanifest.in
+        ${OGRE_TEMPLATES_DIR}/Package_vc${MSVC_SHORT}00.WindowsStore.appxmanifest.in
         ${CMAKE_CURRENT_BINARY_DIR}/${APP_MANIFEST_NAME}
         @ONLY)
 
@@ -60,7 +70,9 @@ if (WINDOWS_STORE OR WINDOWS_PHONE)
 
         ${PROJECT_BINARY_DIR}/inst/bin/resources.cfg
         ${PROJECT_BINARY_DIR}/inst/bin/plugins.cfg
+        ${PROJECT_BINARY_DIR}/inst/bin/quakemap.cfg
         ${PROJECT_BINARY_DIR}/inst/bin/samples.cfg
+        ${PROJECT_BINARY_DIR}/inst/bin/tests.cfg
 
         ${PROJECT_SOURCE_DIR}/Samples/Common/misc.winrt/Logo.png
         ${PROJECT_SOURCE_DIR}/Samples/Common/misc.winrt/SmallLogo.png
@@ -81,7 +93,9 @@ if (WINDOWS_STORE OR WINDOWS_PHONE)
         ${CMAKE_CURRENT_BINARY_DIR}/SplashScreen.png
         ${CMAKE_CURRENT_BINARY_DIR}/resources.cfg
         ${CMAKE_CURRENT_BINARY_DIR}/plugins.cfg
+        ${CMAKE_CURRENT_BINARY_DIR}/quakemap.cfg
         ${CMAKE_CURRENT_BINARY_DIR}/samples.cfg
+        ${CMAKE_CURRENT_BINARY_DIR}/tests.cfg
     )
     set_property(SOURCE ${CONTENT_FILES} PROPERTY VS_DEPLOYMENT_CONTENT 1)
 
@@ -108,13 +122,10 @@ if (ANDROID)
     add_ndk_native_app_glue_library()
 
     include_directories(${PROJECT_SOURCE_DIR}/RenderSystems/GLSupport/include)
-    set(SOURCE_FILES
-      ${PROJECT_SOURCE_DIR}/Samples/Browser/src/gestureDetector.cpp
-      ${PROJECT_SOURCE_DIR}/Samples/Browser/src/android_main.cpp)
+    set(SOURCE_FILES ${SOURCE_FILES} ${PROJECT_SOURCE_DIR}/Samples/Browser/src/gestureDetector.cpp)
 
     add_library(SampleBrowser SHARED ${HEADER_FILES} ${SOURCE_FILES} ${RESOURCE_FILES})
 else()
-    set(SOURCE_FILES ${PROJECT_SOURCE_DIR}/Samples/Browser/src/main.cpp)
     add_executable(SampleBrowser WIN32 ${HEADER_FILES} ${SOURCE_FILES} ${RESOURCE_FILES})
 endif()
 
@@ -157,7 +168,7 @@ if (WINDOWS_STORE OR WINDOWS_PHONE)
 endif()
 
 if (APPLE)
-	set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
+	set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/src/SampleBrowser.cpp PROPERTIES COMPILE_FLAGS "-x objective-c++")
 
 	# On OS X, create .app bundle
 	set_property(TARGET SampleBrowser PROPERTY MACOSX_BUNDLE TRUE)
@@ -173,41 +184,71 @@ if (APPLE)
       COMMAND ditto ${PROJECT_SOURCE_DIR}/Samples/Common/misc/*.png ${OGRE_SAMPLE_CONTENTS_PATH}/
       COMMAND ditto ${PROJECT_BINARY_DIR}/bin/*.cfg ${OGRE_SAMPLE_CONTENTS_PATH}/
     )
-    add_custom_command(TARGET SampleBrowser POST_BUILD
-      COMMAND mkdir ARGS -p ${PROJECT_BINARY_DIR}/lib/$(CONFIGURATION)/
-      COMMAND ditto ${PROJECT_SOURCE_DIR}/Media ${OGRE_SAMPLE_CONTENTS_PATH}/Media
-      COMMAND ditto ${PROJECT_SOURCE_DIR}/Samples/Media ${OGRE_SAMPLE_CONTENTS_PATH}/Media
-    )
+    if(OGRE_SDK_BUILD)
+	    add_custom_command(TARGET SampleBrowser POST_BUILD
+          COMMAND mkdir ARGS -p ${PROJECT_BINARY_DIR}/lib/$(CONFIGURATION)/
+	      COMMAND ditto ${PROJECT_BINARY_DIR}/Media ${OGRE_SAMPLE_CONTENTS_PATH}/Media
+	    )
+    else()
+        add_custom_command(TARGET SampleBrowser POST_BUILD
+          COMMAND mkdir ARGS -p ${PROJECT_BINARY_DIR}/lib/$(CONFIGURATION)/
+          COMMAND ditto ${PROJECT_SOURCE_DIR}/Samples/Media ${OGRE_SAMPLE_CONTENTS_PATH}/Media
+        )
+    endif(OGRE_SDK_BUILD)
   else()
 
-    set_target_properties(SampleBrowser
-      PROPERTIES BUILD_WITH_INSTALL_RPATH 1
-      INSTALL_RPATH "@executable_path/../Frameworks;${OGREDEPS_PATH}/lib"
-    )
+    include_directories(
+        ${PROJECT_SOURCE_DIR}/RenderSystems/GL/include
+        ${PROJECT_SOURCE_DIR}/RenderSystems/GL/include/OSX
+        )
 
 	target_link_libraries(SampleBrowser ${OPENGL_gl_LIBRARY} ${CoreVideo_LIBRARIES})
+
+   set_target_properties(SampleBrowser PROPERTIES
+        LINK_FLAGS "-framework IOKit -framework Cocoa -framework Carbon -framework CoreVideo -framework ApplicationServices")
+
+    # Add the path where the Ogre framework was found, if it has been found somewhere
+    if(NOT ${OGRE_FRAMEWORK_PATH} STREQUAL "" AND OGRE_SDK_BUILD)
+      set_target_properties(SampleBrowser PROPERTIES
+        COMPILE_FLAGS "-F${OGRE_FRAMEWORK_PATH}"
+        LINK_FLAGS "-F${OGRE_FRAMEWORK_PATH} -framework IOKit -framework Cocoa -framework Carbon -framework OpenGL -framework CoreVideo"
+      )
+    endif()
 	# also, symlink frameworks so .app is standalone
 	# NOTE: $(CONFIGURATION) is not resolvable at CMake run time, it's only 
 	# valid at build time (hence parenthesis rather than braces)
-  # PLATFORM_NAME is set by us in ConfigTargets
 	
-    set(OGRE_OSX_BUILD_CONFIGURATION "${PLATFORM_NAME}/$(CONFIGURATION)")
+    set(OGRE_OSX_BUILD_CONFIGURATION "$(PLATFORM_NAME)/$(CONFIGURATION)")
+    set(OGRE_BUILT_FRAMEWORK "$(PLATFORM_NAME)/$(CONFIGURATION)")
 	set (OGRE_SAMPLE_CONTENTS_PATH 
 		${PROJECT_BINARY_DIR}/bin/$(CONFIGURATION)/SampleBrowser.app/Contents)
 	add_custom_command(TARGET SampleBrowser POST_BUILD
 		COMMAND mkdir ARGS -p ${OGRE_SAMPLE_CONTENTS_PATH}/Frameworks
-		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework ${OGRE_SAMPLE_CONTENTS_PATH}/Frameworks/
+		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/lib/${OGRE_BUILT_FRAMEWORK}/Ogre.framework ${OGRE_SAMPLE_CONTENTS_PATH}/Frameworks/
 		COMMAND ln ARGS -s -f ${Cg_LIBRARY_REL}                                             ${OGRE_SAMPLE_CONTENTS_PATH}/Frameworks/
 		)
 	# now cfg files
+	if(OGRE_SDK_BUILD)
+	add_custom_command(TARGET SampleBrowser POST_BUILD
+		COMMAND mkdir ARGS -p ${OGRE_SAMPLE_CONTENTS_PATH}/Resources
+		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/macosx/plugins.cfg   ${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
+		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/macosx/resources.cfg ${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
+		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/macosx/samples.cfg   ${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
+		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/macosx/quakemap.cfg  ${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
+		COMMAND ln ARGS -s -f ${PROJECT_SOURCE_DIR}/Media                    ${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
+		COMMAND ditto ${PROJECT_SOURCE_DIR}/Samples/Common/misc/SampleBrowser_OSX.icns ${OGRE_SAMPLE_CONTENTS_PATH}/Resources
+		)
+	else()
 	add_custom_command(TARGET SampleBrowser POST_BUILD
 		COMMAND mkdir ARGS -p ${OGRE_SAMPLE_CONTENTS_PATH}/Resources
 		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/plugins.cfg 		${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
 		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/resources.cfg 		${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
 		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/samples.cfg   		${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
+		COMMAND ln ARGS -s -f ${PROJECT_BINARY_DIR}/bin/quakemap.cfg  		${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
 		COMMAND ln ARGS -s -f ${PROJECT_SOURCE_DIR}/Samples/Media     		${OGRE_SAMPLE_CONTENTS_PATH}/Resources/
 		COMMAND ditto ${PROJECT_SOURCE_DIR}/Samples/Common/misc/SampleBrowser_OSX.icns ${OGRE_SAMPLE_CONTENTS_PATH}/Resources
 		)
+	endif()
 
 	# now plugins
 	add_custom_command(TARGET SampleBrowser POST_BUILD
@@ -215,13 +256,13 @@ if (APPLE)
 		COMMAND mkdir ARGS -p ${OGRE_SAMPLE_CONTENTS_PATH}/Plugins)
 
     set(FRAMEWORKS OgreOverlay
-		    OgreBites
-        OgreBullet
+		OgreBites
         OgrePaging
         OgreProperty
         OgreRTShaderSystem
         OgreTerrain
         OgreVolume
+        OgreHLMS
         OgreMeshLodGenerator
         Plugin_BSPSceneManager
         Plugin_CgProgramManager
@@ -229,21 +270,16 @@ if (APPLE)
         Plugin_OctreeZone
         Plugin_ParticleFX
         Plugin_PCZSceneManager
-        Plugin_DotScene
         Codec_STBI
         Codec_FreeImage
         RenderSystem_GL
         RenderSystem_GL3Plus
-        RenderSystem_Metal
     )
 
     foreach(FWK ${FRAMEWORKS})
-      if(TARGET ${FWK})
-        add_custom_command(TARGET SampleBrowser POST_BUILD
-          COMMAND ln -s -f
-          ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/${FWK}.framework
-          ${OGRE_SAMPLE_CONTENTS_PATH}/Frameworks/${FWK}.framework)
-      endif()
+	add_custom_command(TARGET SampleBrowser POST_BUILD
+        COMMAND ARGS if [ -d ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/${FWK}.framework ]\; then ln -s -f ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/${FWK}.framework ${OGRE_SAMPLE_CONTENTS_PATH}/Frameworks/${FWK}.framework\; fi
+		)
     endforeach(FWK)
 
 	# Add links for the sample plugins
@@ -285,8 +321,6 @@ endif(ANDROID)
 
 if (OGRE_INSTALL_SAMPLES)
 	ogre_install_target(SampleBrowser "" FALSE)
-  install(FILES ${PROJECT_BINARY_DIR}/inst/bin/samples.cfg DESTINATION "${OGRE_CFG_INSTALL_PATH}")
-
 	if (OGRE_INSTALL_PDB)
 		# install debug pdb files
 		install(FILES $<TARGET_PDB_FILE:SampleBrowser>

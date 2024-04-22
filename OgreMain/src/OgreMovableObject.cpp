@@ -28,6 +28,7 @@ THE SOFTWARE.
 #include "OgreStableHeaders.h"
 
 #include "OgreTagPoint.h"
+#include "OgreLight.h"
 #include "OgreEntity.h"
 #include "OgreLodListener.h"
 
@@ -75,7 +76,22 @@ namespace Ogre {
             mListener->objectDestroyed(this);
         }
 
-        detachFromParent(); // this should never throw, if it does terminating is the thing to do
+        if (mParentNode)
+        {
+            // detach from parent
+            if (mParentIsTagPoint)
+            {
+                // May be we are a LOD entity which not in the parent entity child object list,
+                // call this method could safely ignore this case.
+                static_cast<TagPoint*>(mParentNode)->getParentEntity()->detachObjectFromBone(this);
+            }
+            else
+            {
+                // May be we are a LOD entity which not in the parent node child object list,
+                // call this method could safely ignore this case.
+                static_cast<SceneNode*>(mParentNode)->detachObject(this);
+            }
+        }
     }
     //-----------------------------------------------------------------------
     void MovableObject::_notifyAttached(Node* parent, bool isTagPoint)
@@ -185,12 +201,15 @@ namespace Ogre {
 
             if (cam->getUseRenderingDistance() && mUpperDistance > 0)
             {
-                Real rad = getBoundingRadiusScaled();
-                Real squaredDist = mParentNode->getSquaredViewDepth(cam->getLodCamera());
+                Real rad = getBoundingRadius();
+                Real squaredDepth = mParentNode->getSquaredViewDepth(cam->getLodCamera());
+
+                const Vector3& scl = mParentNode->_getDerivedScale();
+                Real factor = std::max(std::max(scl.x, scl.y), scl.z);
 
                 // Max distance to still render
-                Real maxDist = mUpperDistance + rad;
-                if (squaredDist > Math::Sqr(maxDist))
+                Real maxDist = mUpperDistance + rad * factor;
+                if (squaredDepth > Math::Sqr(maxDist))
                 {
                     mBeyondFarDistance = true;
                 }
@@ -273,14 +292,6 @@ namespace Ogre {
         // fallback
         return Affine3::IDENTITY;
     }
-
-    Real MovableObject::getBoundingRadiusScaled() const
-    {
-        const Vector3& scl = mParentNode->_getDerivedScale();
-        Real factor = std::max(std::max(std::abs(scl.x), std::abs(scl.y)), std::abs(scl.z));
-        return getBoundingRadius() * factor;
-    }
-
     //-----------------------------------------------------------------------
     const AxisAlignedBox& MovableObject::getWorldBoundingBox(bool derive) const
     {
@@ -298,7 +309,9 @@ namespace Ogre {
     {
         if (derive)
         {
-            mWorldBoundingSphere.setRadius(getBoundingRadiusScaled());
+            const Vector3& scl = mParentNode->_getDerivedScale();
+            Real factor = std::max(std::max(scl.x, scl.y), scl.z);
+            mWorldBoundingSphere.setRadius(getBoundingRadius() * factor);
             mWorldBoundingSphere.setCenter(mParentNode->_getDerivedPosition());
         }
         return mWorldBoundingSphere;
@@ -334,7 +347,10 @@ namespace Ogre {
             {
                 mLightListUpdated = frame;
 
-                sn->findLights(mLightList, getBoundingRadiusScaled(), this->getLightMask());
+                const Vector3& scl = mParentNode->_getDerivedScale();
+                Real factor = std::max(std::max(scl.x, scl.y), scl.z);
+
+                sn->findLights(mLightList, this->getBoundingRadius() * factor, this->getLightMask());
             }
         }
         else
@@ -345,12 +361,13 @@ namespace Ogre {
         return mLightList;
     }
     //-----------------------------------------------------------------------
-    const ShadowRenderableList& MovableObject::getShadowVolumeRenderableList(
-        const Light* light, const HardwareIndexBufferPtr& indexBuffer, size_t& indexBufferUsedSize,
-        float extrusionDist, int flags)
+    ShadowCaster::ShadowRenderableListIterator MovableObject::getShadowVolumeRenderableIterator(
+        ShadowTechnique shadowTechnique, const Light* light, 
+        HardwareIndexBufferSharedPtr* indexBuffer, size_t* indexBufferUsedSize,
+        bool inExtrudeVertices, Real extrusionDist, unsigned long flags )
     {
         static ShadowRenderableList dummyList;
-        return dummyList;
+        return ShadowRenderableListIterator(dummyList.begin(), dummyList.end());
     }
     //-----------------------------------------------------------------------
     const AxisAlignedBox& MovableObject::getLightCapBounds(void) const
@@ -423,7 +440,7 @@ namespace Ogre {
 
         }
         void visit(Renderable* rend, ushort lodIndex, bool isDebug, 
-            Any* pAny = 0) override
+            Any* pAny = 0)
         {
             Technique* tech = rend->getTechnique();
             bool techReceivesShadows = tech && tech->getParent()->getReceiveShadows();

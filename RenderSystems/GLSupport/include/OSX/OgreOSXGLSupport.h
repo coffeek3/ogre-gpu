@@ -30,7 +30,6 @@ THE SOFTWARE.
 #define OGRE_OSXGLSupport_H
 
 #include "OgreGLNativeSupport.h"
-#include <CoreFoundation/CoreFoundation.h>
 
 namespace Ogre
 {

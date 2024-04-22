@@ -61,26 +61,38 @@ namespace Ogre {
                 msColourCmd[i].mIndex   = i;
                 msTimeCmd[i].mIndex     = i;
 
-                dict->addParameter(StringUtil::format("colour%d", i), &msColourCmd[i]);
-                dict->addParameter(StringUtil::format("time%d", i), &msTimeCmd[i]);
+                StringStream stage;
+                stage << i;
+                String  colour_title    = String("colour") + stage.str();
+                String  time_title      = String("time") + stage.str();
+                String  colour_descr    = String("Stage ") + stage.str() + String(" colour.");
+                String  time_descr      = String("Stage ") + stage.str() + String(" time.");
+
+                dict->addParameter(ParameterDef(colour_title, colour_descr, PT_COLOURVALUE), &msColourCmd[i]);
+                dict->addParameter(ParameterDef(time_title,   time_descr,   PT_REAL),        &msTimeCmd[i]);
             }
         }
     }
     //-----------------------------------------------------------------------
     void ColourInterpolatorAffector::_affectParticles(ParticleSystem* pSystem, Real timeElapsed)
     {
-        for (auto p : pSystem->_getActiveParticles())
+        Particle*           p;
+        ParticleIterator    pi              = pSystem->_getIterator();
+
+
+        while (!pi.end())
         {
+            p = pi.getNext();
             const Real      life_time       = p->mTotalTimeToLive;
             Real            particle_time   = 1.0f - (p->mTimeToLive / life_time);
 
             if (particle_time <= mTimeAdj[0])
             {
-                p->mColour = mColourAdj[0].getAsBYTE();
+                p->mColour = mColourAdj[0];
             } else
             if (particle_time >= mTimeAdj[MAX_STAGES - 1])
             {
-                p->mColour = mColourAdj[MAX_STAGES-1].getAsBYTE();
+                p->mColour = mColourAdj[MAX_STAGES-1];
             } else
             {
                 for (int i=0;i<MAX_STAGES-1;i++)
@@ -89,8 +101,10 @@ namespace Ogre {
                     {
                         particle_time -= mTimeAdj[i];
                         particle_time /= (mTimeAdj[i+1]-mTimeAdj[i]);
-
-                        p->mColour = Math::lerp(mColourAdj[i], mColourAdj[i+1], particle_time).getAsBYTE();
+                        p->mColour.r = ((mColourAdj[i+1].r * particle_time) + (mColourAdj[i].r * (1.0f - particle_time)));
+                        p->mColour.g = ((mColourAdj[i+1].g * particle_time) + (mColourAdj[i].g * (1.0f - particle_time)));
+                        p->mColour.b = ((mColourAdj[i+1].b * particle_time) + (mColourAdj[i].b * (1.0f - particle_time)));
+                        p->mColour.a = ((mColourAdj[i+1].a * particle_time) + (mColourAdj[i].a * (1.0f - particle_time)));
                         break;
                     }
                 }
@@ -109,11 +123,6 @@ namespace Ogre {
         return mColourAdj[index];
     }
 
-	//-----------------------------------------------------------------------
-	void ColourInterpolatorAffector::_initParticle(Particle* pParticle)
-	{
-		pParticle->mColour = mColourAdj[0].getAsBYTE();
-	}
 
     //-----------------------------------------------------------------------
     void ColourInterpolatorAffector::setTimeAdjust(size_t index, Real time)

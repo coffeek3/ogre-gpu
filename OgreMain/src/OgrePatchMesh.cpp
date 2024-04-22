@@ -44,8 +44,10 @@ namespace Ogre {
             HardwareBuffer::Usage ibUsage,
             bool vbUseShadow, bool ibUseShadow) 
     {
-        setVertexBufferPolicy(vbUsage, vbUseShadow);
-        setIndexBufferPolicy(ibUsage, ibUseShadow);
+        mVertexBufferUsage = vbUsage;
+        mVertexBufferShadowBuffer = vbUseShadow;
+        mIndexBufferUsage = ibUsage;
+        mIndexBufferShadowBuffer = ibUseShadow;
 
         // Init patch builder
         // define the surface
@@ -82,29 +84,30 @@ namespace Ogre {
     void PatchMesh::loadImpl(void)
     {
         SubMesh* sm = this->createSubMesh();
-        sm->createVertexData();
+        sm->vertexData = OGRE_NEW VertexData();
+        sm->useSharedVertices = false;
 
         // Set up vertex buffer
         sm->vertexData->vertexStart = 0;
         sm->vertexData->vertexCount = mSurface.getRequiredVertexCount();
         sm->vertexData->vertexDeclaration = mDeclaration;
-        HardwareVertexBufferSharedPtr vbuf = getHardwareBufferManager()->
+        HardwareVertexBufferSharedPtr vbuf = HardwareBufferManager::getSingleton().
             createVertexBuffer(
                 mDeclaration->getVertexSize(0), 
                 sm->vertexData->vertexCount, 
-                getVertexBufferUsage(),
-                isVertexBufferShadowed());
+                mVertexBufferUsage, 
+                mVertexBufferShadowBuffer);
         sm->vertexData->vertexBufferBinding->setBinding(0, vbuf);
 
         // Set up index buffer
         sm->indexData->indexStart = 0;
         sm->indexData->indexCount = mSurface.getRequiredIndexCount();
-        sm->indexData->indexBuffer = getHardwareBufferManager()->
+        sm->indexData->indexBuffer = HardwareBufferManager::getSingleton().
             createIndexBuffer(
                 HardwareIndexBuffer::IT_16BIT, // only 16-bit indexes supported, patches shouldn't be bigger than that
                 sm->indexData->indexCount,
-                getIndexBufferUsage(),
-                isIndexBufferShadowed());
+                mIndexBufferUsage, 
+                mIndexBufferShadowBuffer);
         
         // Build patch
         mSurface.build(vbuf, 0, sm->indexData->indexBuffer, 0);

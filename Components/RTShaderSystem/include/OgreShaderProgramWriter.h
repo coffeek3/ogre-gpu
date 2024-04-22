@@ -36,8 +36,6 @@ THE SOFTWARE.
 namespace Ogre {
 namespace RTShader {
 
-class FunctionAtom;
-
 /** \addtogroup Optional
 *  @{
 */
@@ -54,9 +52,9 @@ class _OgreRTSSExport ProgramWriter : public RTShaderSystemAlloc
 {
 // Interface.
 public:
-    ProgramWriter();
+
     /** Class destructor */
-    virtual ~ProgramWriter();
+    virtual ~ProgramWriter  () {}
 
 
     /** Write the program shader source code.
@@ -78,30 +76,6 @@ protected:
 
     /** Write a function title. */
     void                writeFunctionTitle          (std::ostream& os, Function* function);
-
-    /** Write a uniform parameter. */
-    void writeSamplerParameter(std::ostream& os, const UniformParameterPtr& parameter);
-
-    /** Write a undecorated/ local parameter. */
-    void writeParameter(std::ostream& os, const ParameterPtr& parameter);
-
-    /** Write a function parameter. */
-    void writeParameterSemantic(std::ostream& os, const ParameterPtr& parameter);
-
-    void redirectGlobalWrites(std::ostream& os, FunctionAtom* func, const ShaderParameterList& inputs,
-                              const UniformParameterList& uniform);
-
-    /** Write the program dependencies. */
-    void writeProgramDependencies(std::ostream& os, Program* program);
-
-    typedef std::map<GpuConstantType, const char*> GpuConstTypeToStringMap;
-    typedef std::map<Parameter::Semantic, const char*> ParamSemanticToStringMap;
-    // Map between GPU constant type to string value.
-    GpuConstTypeToStringMap mGpuConstTypeMap;
-    // Map between parameter semantic to string value.
-    ParamSemanticToStringMap mParamSemanticMap;
-
-    std::set<String> mLocalRenames;
 };
 
 /** @} */

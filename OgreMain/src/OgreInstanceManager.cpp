@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include "OgreInstanceBatchHW_VTF.h"
 #include "OgreInstanceBatchShader.h"
 #include "OgreInstanceBatchVTF.h"
+#include "OgreIteratorWrappers.h"
 
 namespace Ogre
 {
@@ -60,30 +61,53 @@ namespace Ogre
     InstanceManager::~InstanceManager()
     {
         //Remove all batches from all materials we created
-        for (auto& i : mInstanceBatches)
+        InstanceBatchMap::const_iterator itor = mInstanceBatches.begin();
+        InstanceBatchMap::const_iterator end  = mInstanceBatches.end();
+
+        while( itor != end )
         {
-            for (auto *it : i.second)
-                OGRE_DELETE it;
+            InstanceBatchVec::const_iterator it = itor->second.begin();
+            InstanceBatchVec::const_iterator en = itor->second.end();
+
+            while( it != en )
+                OGRE_DELETE *it++;
+
+            ++itor;
         }
     }
     //----------------------------------------------------------------------
     void InstanceManager::setInstancesPerBatch( size_t instancesPerBatch )
     {
-        OgreAssert(mInstanceBatches.empty(), "can only be changed before building the batch");
+        if( !mInstanceBatches.empty() )
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Instances per batch can only be changed before"
+                        " building the batch.", "InstanceManager::setInstancesPerBatch");
+        }
+
         mInstancesPerBatch = instancesPerBatch;
     }
 
     //----------------------------------------------------------------------
     void InstanceManager::setMaxLookupTableInstances( size_t maxLookupTableInstances )
     {
-        OgreAssert(mInstanceBatches.empty(), "can only be changed before building the batch");
+        if( !mInstanceBatches.empty() )
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Instances per batch can only be changed before"
+                " building the batch.", "InstanceManager::setMaxLookupTableInstances");
+        }
+
         mMaxLookupTableInstances = maxLookupTableInstances;
     }
     
     //----------------------------------------------------------------------
     void InstanceManager::setNumCustomParams( unsigned char numCustomParams )
     {
-        OgreAssert(mInstanceBatches.empty(), "can only be changed before building the batch");
+        if( !mInstanceBatches.empty() )
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "setNumCustomParams can only be changed before"
+                " building the batch.", "InstanceManager::setNumCustomParams");
+        }
+
         mNumCustomParams = numCustomParams;
     }
     //----------------------------------------------------------------------
@@ -155,10 +179,15 @@ namespace Ogre
     inline InstanceBatch* InstanceManager::getFreeBatch( const String &materialName )
     {
         InstanceBatchVec &batchVec = mInstanceBatches[materialName];
-        for (auto *b : batchVec)
+
+        InstanceBatchVec::const_reverse_iterator itor = batchVec.rbegin();
+        InstanceBatchVec::const_reverse_iterator end  = batchVec.rend();
+
+        while( itor != end )
         {
-            if(!b->isBatchFull())
-                return b;
+            if( !(*itor)->isBatchFull() )
+                return *itor;
+            ++itor;
         }
 
         //None found, or they're all full
@@ -233,7 +262,6 @@ namespace Ogre
             mInstancesPerBatch = std::min( maxInstPerBatch, mInstancesPerBatch );
             batch->_setInstancesPerBatch( mInstancesPerBatch );
 
-            OgreAssert(mInstancesPerBatch, "unsupported instancing technique");
             //TODO: Create a "merge" function that merges all submeshes into one big submesh
             //instead of just sending submesh #0
 
@@ -342,22 +370,31 @@ namespace Ogre
         _updateDirtyBatches();
 
         //Do this for every material
-        for (auto& b : mInstanceBatches)
+        InstanceBatchMap::iterator itor = mInstanceBatches.begin();
+        InstanceBatchMap::iterator end  = mInstanceBatches.end();
+
+        while( itor != end )
         {
             InstanceBatch::InstancedEntityVec   usedEntities;
             InstanceBatch::CustomParamsVec      usedParams;
-            usedEntities.reserve(b.second.size() * mInstancesPerBatch );
+            usedEntities.reserve( itor->second.size() * mInstancesPerBatch );
 
             //Collect all Instanced Entities being used by _all_ batches from this material
-            for (auto *it : b.second)
+            InstanceBatchVec::iterator it = itor->second.begin();
+            InstanceBatchVec::iterator en = itor->second.end();
+
+            while( it != en )
             {
                 //Don't collect instances from static batches, we assume they're correctly set
                 //Plus, we don't want to put InstancedEntities from non-static into static batches
-                if (!it->isStatic())
-                    it->getInstancedEntitiesInUse(usedEntities, usedParams);
+                if( !(*it)->isStatic() )
+                    (*it)->getInstancedEntitiesInUse( usedEntities, usedParams );
+                ++it;
             }
 
-            defragmentBatches(optimizeCulling, usedEntities, usedParams, b.second );
+            defragmentBatches( optimizeCulling, usedEntities, usedParams, itor->second );
+
+            ++itor;
         }
     }
     //-----------------------------------------------------------------------
@@ -368,10 +405,15 @@ namespace Ogre
         if( materialName == BLANKSTRING )
         {
             //Setup all existing materials
-            for (auto& i : mInstanceBatches)
+            InstanceBatchMap::iterator itor = mInstanceBatches.begin();
+            InstanceBatchMap::iterator end  = mInstanceBatches.end();
+
+            while( itor != end )
             {
-                mBatchSettings[i.first].setting[id] = value;
-                applySettingToBatches( id, value, i.second );
+                mBatchSettings[itor->first].setting[id] = value;
+                applySettingToBatches( id, value, itor->second );
+
+                ++itor;
             }
         }
         else
@@ -397,38 +439,47 @@ namespace Ogre
         //Return default
         return BatchSettings().setting[id];
     }
-    bool InstanceManager::hasSettings(const String& materialName) const
-    {
-        return mBatchSettings.find(materialName) != mBatchSettings.end();
-    }
     //-----------------------------------------------------------------------
     void InstanceManager::applySettingToBatches( BatchSettingId id, bool value,
                                                  const InstanceBatchVec &container )
     {
-        for (auto *s : container)
+        InstanceBatchVec::const_iterator itor = container.begin();
+        InstanceBatchVec::const_iterator end  = container.end();
+
+        while( itor != end )
         {
-            switch(id)
+            switch( id )
             {
             case CAST_SHADOWS:
-                s->setCastShadows(value);
+                (*itor)->setCastShadows( value );
                 break;
             case SHOW_BOUNDINGBOX:
-                s->getParentSceneNode()->showBoundingBox(value);
+                (*itor)->getParentSceneNode()->showBoundingBox( value );
                 break;
             default:
                 break;
             }
+            ++itor;
         }
     }
     //-----------------------------------------------------------------------
     void InstanceManager::setBatchesAsStaticAndUpdate( bool bStatic )
     {
-        for (auto& b : mInstanceBatches)
+        InstanceBatchMap::iterator itor = mInstanceBatches.begin();
+        InstanceBatchMap::iterator end  = mInstanceBatches.end();
+
+        while( itor != end )
         {
-            for (auto *it : b.second)
+            InstanceBatchVec::iterator it = itor->second.begin();
+            InstanceBatchVec::iterator en = itor->second.end();
+
+            while( it != en )
             {
-                it->setStaticAndUpdate(bStatic);
+                (*it)->setStaticAndUpdate( bStatic );
+                ++it;
             }
+
+            ++itor;
         }
     }
     //-----------------------------------------------------------------------
@@ -442,10 +493,15 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void InstanceManager::_updateDirtyBatches(void)
     {
-        for (auto *d : mDirtyBatches)
+        InstanceBatchVec::const_iterator itor = mDirtyBatches.begin();
+        InstanceBatchVec::const_iterator end  = mDirtyBatches.end();
+
+        while( itor != end )
         {
-            d->_updateBounds();
+            (*itor)->_updateBounds();
+            ++itor;
         }
+
         mDirtyBatches.clear();
     }
     //-----------------------------------------------------------------------
@@ -454,7 +510,7 @@ namespace Ogre
     typedef std::map<uint32, uint32> IndicesMap;
 
     template< typename TIndexType >
-    void collectUsedIndices(IndicesMap& indicesMap, IndexData* idxData)
+    IndicesMap getUsedIndices(IndexData* idxData)
     {
         HardwareBufferLockGuard indexLock(idxData->indexBuffer,
                                           idxData->indexStart * sizeof(TIndexType),
@@ -462,40 +518,33 @@ namespace Ogre
                                           HardwareBuffer::HBL_READ_ONLY);
         TIndexType *data = (TIndexType*)indexLock.pData;
 
-        for (size_t i = 0; i < idxData->indexCount; i++)
+        IndicesMap indicesMap;
+        for (size_t i = 0; i < idxData->indexCount; i++) 
         {
             TIndexType index = data[i];
-            if (indicesMap.find(index) == indicesMap.end())
+            if (indicesMap.find(index) == indicesMap.end()) 
             {
                 //We need to guarantee that the size is read before an entry is added, hence these are on separate lines.
                 uint32 size = (uint32)(indicesMap.size());
                 indicesMap[index] = size;
             }
         }
+
+        return indicesMap;
     }
     //-----------------------------------------------------------------------
     template< typename TIndexType >
-    void copyIndexBuffer(IndexData* idxData, const IndicesMap& indicesMap, uint32 indexStart)
+    void copyIndexBuffer(IndexData* idxData, IndicesMap& indicesMap)
     {
-        size_t start = std::max(indexStart, idxData->indexStart);
-        size_t count = idxData->indexCount - (start - idxData->indexStart);
-
-        //We get errors if we try to lock a zero size buffer.
-        if (count == 0) {
-            return;
-        }
         HardwareBufferLockGuard indexLock(idxData->indexBuffer,
-                                          start * sizeof(TIndexType),
-                                          count * sizeof(TIndexType),
+                                          idxData->indexStart * sizeof(TIndexType),
+                                          idxData->indexCount * sizeof(TIndexType),
                                           HardwareBuffer::HBL_NORMAL);
         TIndexType *data = (TIndexType*)indexLock.pData;
 
-        for (size_t i = 0; i < count; i++)
+        for (uint32 i = 0; i < idxData->indexCount; i++) 
         {
-            //Access data and write on two separate lines, to avoid compiler confusion.
-            auto originalPos = data[i];
-            auto indexEntry = indicesMap.find(originalPos);
-            data[i] = (TIndexType)(indexEntry->second);
+            data[i] = (TIndexType)indicesMap[data[i]];
         }
     }
     //-----------------------------------------------------------------------
@@ -503,6 +552,8 @@ namespace Ogre
     {
         // Retrieve data to copy bone assignments
         const Mesh::VertexBoneAssignmentList& boneAssignments = mesh->getBoneAssignments();
+        Mesh::VertexBoneAssignmentList::const_iterator it = boneAssignments.begin();
+        Mesh::VertexBoneAssignmentList::const_iterator end = boneAssignments.end();
         size_t curVertexOffset = 0;
 
         // Access shared vertices
@@ -514,22 +565,9 @@ namespace Ogre
 
             IndexData *indexData = subMesh->indexData;
             HardwareIndexBuffer::IndexType idxType = indexData->indexBuffer->getType();
-            IndicesMap indicesMap;
-            if (idxType == HardwareIndexBuffer::IT_16BIT) {
-                collectUsedIndices<uint16>(indicesMap, indexData);
-            } else {
-                collectUsedIndices<uint32>(indicesMap, indexData);
-            }
+            IndicesMap indicesMap = (idxType == HardwareIndexBuffer::IT_16BIT) ? getUsedIndices<uint16>(indexData) :
+                                                                                 getUsedIndices<uint32>(indexData);
 
-            //Also collect indices for all LOD faces.
-            for (auto& lodIndex : subMesh->mLodFaceList) {
-                //Typically the LOD indices would use the same buffer type as the main index. But we'll check to make extra sure.
-                if (lodIndex->indexBuffer->getType() == HardwareIndexBuffer::IT_16BIT) {
-                    collectUsedIndices<uint16>(indicesMap, lodIndex);
-                } else {
-                    collectUsedIndices<uint32>(indicesMap, lodIndex);
-                }
-            }
 
             VertexData *newVertexData = new VertexData();
             newVertexData->vertexCount = indicesMap.size();
@@ -546,10 +584,12 @@ namespace Ogre
                 HardwareBufferLockGuard oldLock(sharedVertexBuffer, 0, sharedVertexData->vertexCount * vertexSize, HardwareBuffer::HBL_READ_ONLY);
                 HardwareBufferLockGuard newLock(newVertexBuffer, 0, newVertexData->vertexCount * vertexSize, HardwareBuffer::HBL_NORMAL);
 
-                for (auto& id : indicesMap)
+                IndicesMap::iterator indIt = indicesMap.begin();
+                IndicesMap::iterator endIndIt = indicesMap.end();
+                for (; indIt != endIndIt; ++indIt)
                 {
-                    memcpy((uint8*)newLock.pData + vertexSize * id.second,
-                           (uint8*)oldLock.pData + vertexSize * id.first, vertexSize);
+                    memcpy((uint8*)newLock.pData + vertexSize * indIt->second,
+                           (uint8*)oldLock.pData + vertexSize * indIt->first, vertexSize);
                 }
 
                 newVertexData->vertexBufferBinding->setBinding(bufIdx, newVertexBuffer);
@@ -557,47 +597,26 @@ namespace Ogre
 
             if (idxType == HardwareIndexBuffer::IT_16BIT)
             {
-                copyIndexBuffer<uint16>(indexData, indicesMap, 0);
+                copyIndexBuffer<uint16>(indexData, indicesMap);
             }
             else
             {
-                copyIndexBuffer<uint32>(indexData, indicesMap, 0);
+                copyIndexBuffer<uint32>(indexData, indicesMap);
             }
 
-            //Need to adjust all of the LOD faces too.
-            size_t lastIndexEnd = 0;
-            for (size_t i = 0; i < subMesh->mLodFaceList.size(); ++i) {
-				auto lodIndex = subMesh->mLodFaceList[i];
-				//When using "generated" mesh lods, the indices are shared, so that index[n] would overlap with
-				//index[n]. We need to take this into account to make sure we don't process data twice (with incorrect
-				//data as a result). We check if the index either is the first one, or if it has a different buffer
-				//than the previous one we processed. Since the overlap seems to be progressing we only need to keep
-				// track of the last used index.
-                if (i == 0 || lodIndex->indexBuffer != subMesh->mLodFaceList[i - 1]->indexBuffer) {
-                    lastIndexEnd = 0;
-                }
-
-                //Typically the LOD indices would use the same buffer type as the main index. But we'll check to make extra sure.
-                if (lodIndex->indexBuffer->getType() == HardwareIndexBuffer::IT_16BIT) {
-                    copyIndexBuffer<uint16>(lodIndex, indicesMap, lastIndexEnd);
-                } else {
-                    copyIndexBuffer<uint32>(lodIndex, indicesMap, lastIndexEnd);
-                }
-                lastIndexEnd = lodIndex->indexStart + lodIndex->indexCount;
-			}
-
             // Store new attributes
-            subMesh->resetVertexData(newVertexData);
+            subMesh->useSharedVertices = false;
+            subMesh->vertexData = newVertexData;
 
             // Transfer bone assignments to the submesh
             size_t offset = curVertexOffset + newVertexData->vertexCount;
-            for (auto& b : boneAssignments)
+            for (; it != end; ++it)
             {
-                size_t vertexIdx = b.first;
+                size_t vertexIdx = (*it).first;
                 if (vertexIdx > offset)
                     break;
 
-                VertexBoneAssignment boneAssignment = b.second;
+                VertexBoneAssignment boneAssignment = (*it).second;
                 boneAssignment.vertexIndex = static_cast<unsigned int>(boneAssignment.vertexIndex - curVertexOffset);
                 subMesh->addBoneAssignment(boneAssignment);
             }
@@ -605,23 +624,9 @@ namespace Ogre
         }
 
         // Release shared vertex data
-        mesh->resetVertexData();
+        delete mesh->sharedVertexData;
+        mesh->sharedVertexData = NULL;
         mesh->clearBoneAssignments();
-
-        if( mesh->isEdgeListBuilt() )
-        {
-            mesh->freeEdgeList();
-            mesh->buildEdgeList();
-        }
     }
     //-----------------------------------------------------------------------
-    InstanceManager::InstanceBatchIterator InstanceManager::getInstanceBatchIterator( const String &materialName ) const
-    {
-        InstanceBatchMap::const_iterator it = mInstanceBatches.find( materialName );
-        if(it != mInstanceBatches.end())
-            return InstanceBatchIterator( it->second.begin(), it->second.end() );
-
-        OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Cannot create instance batch iterator. "
-                    "Material " + materialName + " cannot be found");
-    }
 }

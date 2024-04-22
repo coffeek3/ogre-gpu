@@ -49,31 +49,49 @@ ProgramWriterManager& ProgramWriterManager::getSingleton(void)
 //-----------------------------------------------------------------------
 ProgramWriterManager::ProgramWriterManager()
 {
-    // Add standard shader writer factories
-#if OGRE_PLATFORM != OGRE_PLATFORM_ANDROID
-    addProgramWriter("glsl", new GLSLProgramWriter());
-    addProgramWriter("hlsl", new CGProgramWriter());
-#endif
-    addProgramWriter("glslang", new GLSLProgramWriter());
-    addProgramWriter("glsles", new GLSLESProgramWriter());
+
 }
 //-----------------------------------------------------------------------
 ProgramWriterManager::~ProgramWriterManager()
 {
-    for(auto& it : mProgramWriters)
-    {
-        delete it.second;
-    }
+
 }
 //-----------------------------------------------------------------------
-void ProgramWriterManager::addProgramWriter(const String& lang, ProgramWriter* writer)
+void ProgramWriterManager::addFactory(ProgramWriterFactory* factory)
 {
-    mProgramWriters[lang] = writer;
+    mFactories[factory->getTargetLanguage()] = factory;
+}
+//-----------------------------------------------------------------------
+void ProgramWriterManager::removeFactory(ProgramWriterFactory* factory)
+{
+    // Remove only if equal to registered one, since it might overridden
+    // by other plugins
+    FactoryMap::iterator it = mFactories.find(factory->getTargetLanguage());
+    if (it != mFactories.end() && it->second == factory)
+    {
+        mFactories.erase(it);
+    }
 }
 //-----------------------------------------------------------------------
 bool ProgramWriterManager::isLanguageSupported(const String& lang)
 {
-    return mProgramWriters.find(lang) != mProgramWriters.end();
+    FactoryMap::iterator i = mFactories.find(lang);
+
+    return i != mFactories.end();
 }
+//-----------------------------------------------------------------------
+ProgramWriter* ProgramWriterManager::createProgramWriter( const String& language)
+{
+    FactoryMap::iterator it = mFactories.find(language);
+
+    if (it != mFactories.end())
+    {
+        return (it->second)->create();
+    }
+
+    OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
+                "No ShaderProgramWriter for language '" + language + "' found");
+}
+
 }
 }

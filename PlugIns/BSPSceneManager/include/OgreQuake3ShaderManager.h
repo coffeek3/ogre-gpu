@@ -74,13 +74,13 @@ namespace Ogre {
         virtual ~Quake3ShaderManager();
 
         /** @copydoc ScriptLoader::getScriptPatterns */
-        const StringVector& getScriptPatterns(void) const override;
+        const StringVector& getScriptPatterns(void) const;
 
         /** @copydoc ScriptLoader::parseScript */
-        void parseScript(DataStreamPtr& stream, const String& groupName) override;
+        void parseScript(DataStreamPtr& stream, const String& groupName);
 
         /** @copydoc ScriptLoader::getLoadingOrder */
-        Real getLoadingOrder(void) const override;
+        Real getLoadingOrder(void) const;
 
         /** Create implementation. */
         Quake3Shader* create(const String& name);

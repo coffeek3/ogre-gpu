@@ -33,7 +33,6 @@ THE SOFTWARE.
 #include "OgreConfigFile.h"
 #include "OgrePlatform.h"
 #include "OgreBitesConfigDialog.h"
-#include <SdkSample.h>
 
 #include <iostream>
 
@@ -42,10 +41,12 @@ THE SOFTWARE.
 #include <windows.h>
 #endif
 
+#ifdef OGRE_STATIC_LIB
 #include "VTestPlugin.h"
 #include "PlayPenTestPlugin.h"
+#endif
 
-TestContext::TestContext(int argc, char** argv) : OgreBites::SampleContext(), mSuccess(true), mTimestep(0.01f), mBatch(0)
+TestContext::TestContext(int argc, char** argv) : OgreBites::SampleContext(), mSuccess(true), mTimestep(0.01f), mCurrentTest(0), mBatch(0)
 {
     Ogre::UnaryOptionList unOpt;
     Ogre::BinaryOptionList binOpt;
@@ -83,12 +84,6 @@ TestContext::TestContext(int argc, char** argv) : OgreBites::SampleContext(), mS
     mSummaryOutputDir = binOpt["-o"];
     mHelp = unOpt["-h"] || unOpt["--help"];
 
-    if(mForceConfig)
-    {
-        OgreBites::ApplicationContext ctx(OGRE_VERSION_NAME);
-        ctx.runRenderingSettingsDialog();
-    }
-
     if(mReferenceSetPath.empty())
         mReferenceSetPath = mOutputDir;
 }
@@ -103,11 +98,11 @@ TestContext::~TestContext()
 
 void TestContext::setup()
 {
-    mRoot->initialise(false);
+    NameValuePairList miscParams;
+    mRoot->initialise(false, "OGRE Sample Browser");
 
     // Standard setup.
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
-    NameValuePairList miscParams;
     CGSize modeSize = [[UIScreen mainScreen] currentMode].size;
     uint w = modeSize.width / [UIScreen mainScreen].scale;
     uint h = modeSize.height / [UIScreen mainScreen].scale;
@@ -121,12 +116,21 @@ void TestContext::setup()
     miscParams["retainedBacking"] = StringConverter::toString(true);
     mWindow = mRoot->createRenderWindow("OGRE Sample Browser", w, h, true, &miscParams);
 #else
-    auto desc = mRoot->getRenderSystem()->getRenderWindowDescription();
-    desc.name = "OGRE VTest Context";
-    mWindow = mRoot->createRenderWindow(desc);
-#endif
+    Ogre::ConfigOptionMap ropts = mRoot->getRenderSystem()->getConfigOptions();
 
-    mWindows.push_back({mWindow});
+    size_t w, h;
+
+    std::istringstream mode(ropts["Video Mode"].currentValue);
+    Ogre::String token;
+    mode >> w; // width
+    mode >> token; // 'x' as seperator between width and height
+    mode >> h; // height
+
+    miscParams["FSAA"] = ropts["FSAA"].currentValue;
+    miscParams["vsync"] = ropts["VSync"].currentValue;
+
+    mWindow = mRoot->createRenderWindow("OGRE Sample Browser", w, h, false, &miscParams);
+#endif
 
     mWindow->setDeactivateOnFocusChange(false);
     
@@ -137,8 +141,44 @@ void TestContext::setup()
     Ogre::TextureManager::getSingleton().setDefaultNumMipmaps(5);
     mRoot->addFrameListener(this);
 
-    mPluginNameMap["VTests"]       = new VTestPlugin();
-    mPluginNameMap["PlayPenTests"] = new PlaypenTestPlugin();
+    // Get the path and list of test plugins from the config file.
+    Ogre::ConfigFile testConfig;
+    testConfig.load(mFSLayer->getConfigFilePath("tests.cfg"));
+    mPluginDirectory = Ogre::FileSystemLayer::resolveBundlePath(testConfig.getSetting("TestFolder"));
+
+#if OGRE_PLATFORM != OGRE_PLATFORM_APPLE && OGRE_PLATFORM != OGRE_PLATFORM_APPLE_IOS
+    if (mPluginDirectory.empty()) mPluginDirectory = ".";   // user didn't specify plugins folder, try current one
+#endif
+
+    // add slash or backslash based on platform
+    char lastChar = mPluginDirectory[mPluginDirectory.length() - 1];
+    if (lastChar != '/' && lastChar != '\\')
+    {
+#if OGRE_PLATFORM == OGRE_PLATFORM_WIN32 || (OGRE_PLATFORM == OGRE_PLATFORM_WINRT)
+        mPluginDirectory += "\\";
+#elif OGRE_PLATFORM == OGRE_PLATFORM_LINUX
+        mPluginDirectory += "/";
+#endif
+    }
+
+    // Parse for the test sets and plugins that they're made up of.
+    ConfigFile::SettingsBySection_::const_iterator seci;
+    for(seci = testConfig.getSettingsBySection().begin(); seci != testConfig.getSettingsBySection().end(); ++seci) {
+        const ConfigFile::SettingsMultiMap& settings = seci->second;
+        Ogre::String setName = seci->first;
+        if (setName != "")
+        {
+            mTestSets[setName] = Ogre::StringVector();
+            Ogre::ConfigFile::SettingsMultiMap::const_iterator it = settings.begin();
+            for (; it != settings.end(); ++it)
+                mTestSets[setName].push_back(it->second);
+        }
+    }
+
+#ifdef OGRE_STATIC_LIB
+    mPluginNameMap["VTests"]       = (OgreBites::SamplePlugin *) OGRE_NEW VTestPlugin();
+    mPluginNameMap["PlayPenTests"] = (OgreBites::SamplePlugin *) OGRE_NEW PlaypenTestPlugin();
+#endif
 
     Ogre::String batchName = BLANKSTRING;
     time_t raw = time(0);
@@ -171,33 +211,89 @@ void TestContext::setup()
                            mWindow->getWidth(), mWindow->getHeight(), mOutputDir + batchName + "/");
     mBatch->comment = mComment;
 
-    OgreBites::Sample* firstTest = loadTests();
+    OgreBites::Sample* firstTest = loadTests(mTestSetName);
     if (firstTest)
         runSample(firstTest);
 }
 //-----------------------------------------------------------------------
 
-OgreBites::Sample* TestContext::loadTests()
+OgreBites::Sample* TestContext::loadTests(Ogre::String set)
 {
     OgreBites::Sample* startSample = 0;
+    Ogre::StringVector sampleList;
+
+    // Need support for static loading in here!!!!
 
     // load all of the plugins in the set
-    for(auto it : mPluginNameMap)
+    for (Ogre::StringVector::iterator it = mTestSets[set].begin(); it !=
+             mTestSets[set].end(); ++it)
     {
-        OgreBites::SampleSet newSamples = it.second->getSamples();
-        for (auto newSample : newSamples)
+        Ogre::String plugin = *it;
+
+        // try loading up the test plugin
+        try
         {
+#ifdef OGRE_STATIC_LIB
+            // in debug, remove any suffix
+            if(StringUtil::endsWith(plugin, "_d"))
+                plugin = plugin.substr(0, plugin.length()-2);
+
+            OgreBites::SamplePlugin *pluginInstance = (OgreBites::SamplePlugin *) mPluginNameMap[plugin];
+            if(pluginInstance)
+            {
+                //                OgreBites::SamplePlugin* sp = OGRE_NEW OgreBites::SamplePlugin(pluginInstance->getInfo()["Title"]);
+
+                //                sp->addSample(pluginInstance);
+                mRoot->installPlugin(pluginInstance);
+            }
+#else
+            mRoot->loadPlugin(mPluginDirectory + plugin);
+#endif
+        }
+        // if it fails, just return right away
+        catch (Ogre::Exception&)
+        {
+            return 0;
+        }
+
+        // grab the plugin and cast to SamplePlugin
+        Ogre::Plugin* p = mRoot->getInstalledPlugins().back();
+        OgreBites::SamplePlugin* sp = dynamic_cast<OgreBites::SamplePlugin*>(p);
+
+        // if something has gone wrong return null
+        if (!sp)
+            return 0;
+
+        // go through every sample (test) in the plugin...
+        OgreBites::SampleSet newSamples = sp->getSamples();
+        for (OgreBites::SampleSet::iterator j = newSamples.begin(); j != newSamples.end(); j++)
+        {
+            // skip it if using wrong rendersystem
+            Ogre::String rs = (*j)->getRequiredRenderSystem();
+            if(!rs.empty() && rs != mRoot->getRenderSystem()->getName())
+                continue;
+
             // capability check
             try
             {
-                newSample->testCapabilities(mRoot->getRenderSystem()->getCapabilities());
+                (*j)->testCapabilities(mRoot->getRenderSystem()->getCapabilities());
             }
             catch(Ogre::Exception&)
             {
                 continue;
             }
 
-            mTests.push_back(newSample);
+            mTests.push_back(*j);
+            Ogre::NameValuePairList& info = (*j)->getInfo();   // acquire custom sample info
+            Ogre::NameValuePairList::iterator k;
+
+            // give sample default title and category if none found
+            k= info.find("Title");
+            if (k == info.end() || k->second.empty()) info["Title"] = "Untitled";
+            k = info.find("Category");
+            if (k == info.end() || k->second.empty()) info["Category"] = "Unsorted";
+            k = info.find("Thumbnail");
+            if (k == info.end() || k->second.empty()) info["Thumbnail"] = "thumb_error.png";
         }
     }
 
@@ -212,16 +308,6 @@ OgreBites::Sample* TestContext::loadTests()
 }
 //-----------------------------------------------------------------------
 
-bool TestContext::frameRenderingQueued(const Ogre::FrameEvent& evt)
-{
-    // pass a fixed timestep along to the tests
-    Ogre::FrameEvent fixed_evt = Ogre::FrameEvent();
-    fixed_evt.timeSinceLastFrame = mTimestep;
-    fixed_evt.timeSinceLastEvent = mTimestep;
-
-    return mCurrentSample->frameRenderingQueued(fixed_evt);
-}
-
 bool TestContext::frameStarted(const Ogre::FrameEvent& evt)
 {
     pollEvents();
@@ -231,13 +317,17 @@ bool TestContext::frameStarted(const Ogre::FrameEvent& evt)
     fixed_evt.timeSinceLastFrame = mTimestep;
     fixed_evt.timeSinceLastEvent = mTimestep;
 
-    if (mCurrentSample) // if a test is running
+    if (mCurrentTest) // if a test is running
     {
         // track frame number for screenshot purposes
         ++mCurrentFrame;
 
         // regular update function
-        return mCurrentSample->frameStarted(fixed_evt);
+        return mCurrentTest->frameStarted(fixed_evt);
+    }
+    else if (mCurrentSample) // if a generic sample is running
+    {
+        return mCurrentSample->frameStarted(evt);
     }
     else
     {
@@ -255,21 +345,21 @@ bool TestContext::frameEnded(const Ogre::FrameEvent& evt)
     fixed_evt.timeSinceLastFrame = mTimestep;
     fixed_evt.timeSinceLastEvent = mTimestep;
 
-    if (mCurrentSample) // if a test is running
+    if (mCurrentTest) // if a test is running
     {
-        if (mCurrentSample->isScreenshotFrame(mCurrentFrame))
+        if (mCurrentTest->isScreenshotFrame(mCurrentFrame))
         {
             // take a screenshot
             Ogre::String filename = mOutputDir + mBatch->name + "/" +
-                    mCurrentSample->getInfo()["Title"] + "_" +
+                mCurrentTest->getInfo()["Title"] + "_" +
                 Ogre::StringConverter::toString(mCurrentFrame) + ".png";
             // remember the name of the shot, for later comparison purposes
-            mBatch->images.push_back(mCurrentSample->getInfo()["Title"] + "_" +
+            mBatch->images.push_back(mCurrentTest->getInfo()["Title"] + "_" +
                                      Ogre::StringConverter::toString(mCurrentFrame));
             mWindow->writeContentsToFile(filename);
         }
 
-        if (mCurrentSample->isDone())
+        if (mCurrentTest->isDone())
         {
             // continue onto the next test
             runSample(0);
@@ -278,7 +368,11 @@ bool TestContext::frameEnded(const Ogre::FrameEvent& evt)
         }
 
         // standard update function
-        return mCurrentSample->frameEnded(fixed_evt);
+        return mCurrentTest->frameEnded(fixed_evt);
+    }
+    else if (mCurrentSample) // if a generic sample is running
+    {
+        return mCurrentSample->frameEnded(evt);
     }
     else
     {
@@ -289,10 +383,14 @@ bool TestContext::frameEnded(const Ogre::FrameEvent& evt)
 }
 //-----------------------------------------------------------------------
 
-void TestContext::runSample(OgreBites::Sample* sampleToRun)
+void TestContext::runSample(OgreBites::Sample* s)
 {
     // reset frame timing
+    Ogre::ControllerManager::getSingleton().setFrameDelay(0);
+    Ogre::ControllerManager::getSingleton().setTimeFactor(1.f);
     mCurrentFrame = 0;
+
+    OgreBites::Sample* sampleToRun = s;
 
     // If a valid test is passed, then run it
     // If null, grab the next one from the deque
@@ -303,26 +401,49 @@ void TestContext::runSample(OgreBites::Sample* sampleToRun)
             sampleToRun = mTests.front();
     }
 
-    if(mCurrentSample)
-    {
-        mCurrentSample->_shutdown();
-        mCurrentSample = NULL;
-    }
+    // Check if this is a VisualTest
+    mCurrentTest = static_cast<VisualTest*>(sampleToRun);
 
     // Set things up to be deterministic
-    // Seed rand with a predictable value
-    srand(5); // 5 is completely arbitrary, the idea is simply to use a constant
-    // Give a fixed timestep for particles and other time-dependent things in OGRE
-    Ogre::ControllerManager::getSingleton().setFrameDelay(mTimestep);
-
-    if(sampleToRun)
-        LogManager::getSingleton().logMessage("----- Running Visual Test " + sampleToRun->getInfo()["Title"] + " -----");
-    SampleContext::runSample(sampleToRun);
-
-    if(auto sdkSample = dynamic_cast<OgreBites::SdkSample*>(sampleToRun))
+    if (mCurrentTest)
     {
-        sdkSample->_removeTrays();
+        // Seed rand with a predictable value
+        srand(5); // 5 is completely arbitrary, the idea is simply to use a constant
+
+        // Give a fixed timestep for particles and other time-dependent things in OGRE
+        Ogre::ControllerManager::getSingleton().setFrameDelay(mTimestep);
+        LogManager::getSingleton().logMessage("----- Running Visual Test " + mCurrentTest->getInfo()["Title"] + " -----");
     }
+
+#ifdef INCLUDE_RTSHADER_SYSTEM
+    if (sampleToRun) {
+        sampleToRun->setShaderGenerator(mShaderGenerator);
+    }
+#endif
+
+    SampleContext::runSample(sampleToRun);
+}
+//-----------------------------------------------------------------------
+
+void TestContext::createRoot()
+{
+    // note that we use a separate config file here
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+    mRoot = Ogre::Root::getSingletonPtr();
+#else
+    Ogre::String pluginsPath = Ogre::BLANKSTRING;
+#ifndef OGRE_STATIC_LIB
+    pluginsPath = mFSLayer->getConfigFilePath("plugins.cfg");
+#endif
+    // we use separate config and log files for the tests
+    mRoot = OGRE_NEW Ogre::Root(pluginsPath, mFSLayer->getWritablePath("ogretests.cfg"),
+                                mFSLayer->getWritablePath("ogretests.log"));
+#endif
+
+#ifdef OGRE_STATIC_LIB
+    mStaticPluginLoader.load();
+#endif
+    mOverlaySystem = OGRE_NEW Ogre::OverlaySystem();
 }
 //-----------------------------------------------------------------------
 
@@ -344,7 +465,7 @@ void TestContext::go(OgreBites::Sample* initialSample)
         std::cout<<"\t-d           Force config dialog.\n";
         std::cout<<"\t-h, --help   Show usage details.\n";
         std::cout<<"\t-m [comment] Optional comment.\n";
-        std::cout<<"\t-ts [name]   Name of the test set to use.\n";
+        std::cout<<"\t-ts [name]   Name of the test set to use (defined in tests.cfg).\n";
         std::cout<<"\t-c [name]    Name of the test result batch to compare against.\n";
         std::cout<<"\t-n [name]    Name for this result image set.\n";
         std::cout<<"\t-rs [name]   Render system to use.\n";
@@ -356,6 +477,15 @@ void TestContext::go(OgreBites::Sample* initialSample)
 
 bool TestContext::oneTimeConfig()
 {
+    // if forced, just do it and return
+    if(mForceConfig)
+    {
+        bool temp = mRoot->showConfigDialog(OgreBites::getNativeConfigDialog());
+        if(!temp)
+            mRoot->setRenderSystem(NULL);
+        return temp;
+    }
+
     // try restore
     bool restore = mRoot->restoreConfig();
 
@@ -364,16 +494,13 @@ bool TestContext::oneTimeConfig()
         mRoot->setRenderSystem(mRoot->getRenderSystemByName(mRenderSystemName));
     }
     else if(!restore) {
-        RenderSystem* rs = NULL;
+        // just select the first available render system
+        const RenderSystemList lstRend = Root::getSingleton().getAvailableRenderers();
+        RenderSystemList::const_iterator pRend = lstRend.begin();
 
-        const auto& allRS = Root::getSingleton().getAvailableRenderers();
+        mRoot->setRenderSystem(pRend != lstRend.end() ? *pRend : NULL);
 
-        if(mRenderSystemName != "SAVED")
-            rs = mRoot->getRenderSystemByName(mRenderSystemName);
-        else if(!allRS.empty())
-            rs = allRS.front(); // just select the first available
-
-        mRoot->setRenderSystem(rs);
+        RenderSystem* rs = mRoot->getRenderSystem();
 
         if(rs) {
             // set sane defaults
@@ -383,6 +510,9 @@ bool TestContext::oneTimeConfig()
             // test alpha to coverage and MSAA resolve
             rs->setConfigOption("FSAA", "2");
 
+            try {
+                rs->setConfigOption("Fixed Pipeline Enabled", "No");
+            } catch(...) {}
             try {
                 rs->setConfigOption("VSync", "No");
             } catch(...) {}
@@ -410,9 +540,9 @@ void TestContext::setupDirectories(Ogre::String batchName)
         // add a directory for the render system
         Ogre::String rsysName = Ogre::Root::getSingleton().getRenderSystem()->getName();
         // strip spaces from render system name
-        for (char i : rsysName)
-            if (i != ' ')
-                mOutputDir += i;
+        for (unsigned int i = 0;i < rsysName.size(); ++i)
+            if (rsysName[i] != ' ')
+                mOutputDir += rsysName[i];
         mOutputDir += "/";
         static_cast<Ogre::FileSystemLayer*>(mFSLayer)->createDirectory(mOutputDir);
     }
@@ -486,16 +616,16 @@ void TestContext::finishedTests()
             if(mSummaryOutputDir != "NONE")
             {
                 Ogre::String rs;
-                for(char j : mRenderSystemName)
-                    if(j!=' ')
-                        rs += j;
+                for(size_t j = 0; j < mRenderSystemName.size(); ++j)
+                    if(mRenderSystemName[j]!=' ')
+                        rs += mRenderSystemName[j];
 
                 CppUnitResultWriter cppunitWriter(*compareTo, *mBatch, results);
                 cppunitWriter.writeToFile(mSummaryOutputDir + "/TestResults_" + rs + ".xml");
             }
 
-            for(auto & result : results) {
-                mSuccess = mSuccess && result.passed;
+            for(size_t i = 0; i < results.size(); i++) {
+                mSuccess = mSuccess && results[i].passed;
             }
         }
 

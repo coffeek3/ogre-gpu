@@ -53,7 +53,7 @@ public:
     void importLodConfig(Ogre::LodConfig* config, const Ogre::String& filename);
     void importLodConfig(Ogre::LodConfig* config, DataStreamPtr& stream);
 
-private:
+protected:
 
     enum LodConfigChunkID {
         LCCID_FILE_HEADER = 0x300,

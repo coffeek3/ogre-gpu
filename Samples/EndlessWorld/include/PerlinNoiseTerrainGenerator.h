@@ -19,7 +19,7 @@ public:
     PerlinNoiseTerrainGenerator(const Real& alpha = 3.3, const Real& beta = 2.2, int iterationNum = 10, const Real& cycle = 128, const Real& heightScale = 4);
 
     /// Define terrain
-    void define( Ogre::TerrainGroup* terrainGroup, long x, long y ) override;
+    virtual void define( Ogre::TerrainGroup* terrainGroup, long x, long y );
     /// Random terrain origin point to make it looks different
     void randomize();
 private:

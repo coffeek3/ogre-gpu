@@ -55,9 +55,7 @@ namespace Ogre
     mShowPortals(false),
     mZoneFactoryManager(0),
     mActiveCameraZone(0)
-    {
-        addShadowTextureListener(this);
-    }
+    { }
 
     PCZSceneManager::~PCZSceneManager()
     {
@@ -323,18 +321,42 @@ namespace Ogre
 
     SceneNode* PCZSceneManager::createSceneNodeImpl(void)
     {
-        auto ret = new PCZSceneNode(this);
-        // create any zone-specific data necessary
-        createZoneSpecificNodeData(ret);
-        return ret;
+        return OGRE_NEW PCZSceneNode(this);
     }
 
     SceneNode* PCZSceneManager::createSceneNodeImpl(const String& name)
     {
-        auto ret = new PCZSceneNode(this, name);
+        return OGRE_NEW PCZSceneNode(this, name);
+    }
+
+    SceneNode * PCZSceneManager::createSceneNode( void )
+    {
+        SceneNode * on = createSceneNodeImpl();
+        mSceneNodes.push_back(on);
+
         // create any zone-specific data necessary
-        createZoneSpecificNodeData(ret);
-        return ret;
+        createZoneSpecificNodeData((PCZSceneNode*)on);
+        // return pointer to the node
+        return on;
+    }
+
+    SceneNode * PCZSceneManager::createSceneNode( const String &name )
+    {
+        // Check name not used
+        if (hasSceneNode(name))
+        {
+            OGRE_EXCEPT(
+                Exception::ERR_DUPLICATE_ITEM,
+                "A scene node with the name " + name + " already exists",
+                "PCZSceneManager::createSceneNode" );
+        }
+        SceneNode * on = createSceneNodeImpl( name );
+        mSceneNodes.push_back(on);
+
+        // create any zone-specific data necessary
+        createZoneSpecificNodeData((PCZSceneNode*)on);
+        // return pointer to the node
+        return on;
     }
 
     // Create a camera for the scene
@@ -395,7 +417,21 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void PCZSceneManager::clearScene(void)
     {
-        SceneManager::clearScene();
+        destroyAllStaticGeometry();
+        destroyAllMovableObjects();
+
+        // Clear root node of all children
+        getRootSceneNode()->removeAllChildren();
+        getRootSceneNode()->detachAllObjects();
+
+        // Delete all SceneNodes, except root that is
+        for (SceneNodeList::iterator i = mSceneNodes.begin();
+            i != mSceneNodes.end(); ++i)
+        {
+            OGRE_DELETE *i;
+        }
+        mSceneNodes.clear();
+        mAutoTrackingSceneNodes.clear();
 
         // delete all the zones
         for (ZoneMap::iterator j = mZones.begin();
@@ -405,6 +441,15 @@ namespace Ogre
         }
         mZones.clear();
         mDefaultZone = 0;
+
+        // Clear animations
+        destroyAllAnimations();
+
+        mSkyRenderer.clear();
+
+        // Clear render queue, empty completely
+        if (mRenderQueue)
+            mRenderQueue->clear(true);
 
         // re-initialize
         init(mDefaultZoneTypeName, mDefaultZoneFileName);
@@ -444,17 +489,17 @@ namespace Ogre
     /* enable/disable sky rendering */
     void PCZSceneManager::enableSky(bool onoff)
     {
-        if (getSkyBoxNode())
+        if (mSkyRenderer.mSkyBoxNode)
         {
-            setSkyBoxEnabled(onoff);
+            mSkyRenderer.mSkyBoxEnabled = onoff;
         }
-        else if (getSkyDomeNode())
+        else if (mSkyRenderer.mSkyDomeNode)
         {
-            setSkyDomeEnabled(onoff);
+            mSkyRenderer.mSkyDomeEnabled = onoff;
         }
-        else if (getSkyPlaneNode())
+        else if (mSkyRenderer.mSkyPlaneNode)
         {
-            setSkyPlaneEnabled(onoff);
+            mSkyRenderer.mSkyPlaneEnabled = onoff;
         }
     }
 
@@ -466,22 +511,22 @@ namespace Ogre
             // if no zone specified, use default zone
             zone = mDefaultZone;
         }
-        if (auto node = (PCZSceneNode*)getSkyBoxNode())
+        if (mSkyRenderer.mSkyBoxNode)
         {
-            node->setHomeZone(zone);
-            node->anchorToHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyBoxNode)->setHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyBoxNode)->anchorToHomeZone(zone);
             zone->setHasSky(true);
         }
-        if (auto node = (PCZSceneNode*)getSkyDomeNode())
+        if (mSkyRenderer.mSkyDomeNode)
         {
-            node->setHomeZone(zone);
-            node->anchorToHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyDomeNode)->setHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyDomeNode)->anchorToHomeZone(zone);
             zone->setHasSky(true);
         }
-        if (auto node = (PCZSceneNode*)getSkyPlaneNode())
+        if (mSkyRenderer.mSkyPlaneNode)
         {
-            node->setHomeZone(zone);
-            node->anchorToHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyPlaneNode)->setHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyPlaneNode)->anchorToHomeZone(zone);
             zone->setHasSky(true);
         }
         
@@ -878,6 +923,24 @@ namespace Ogre
         pczsn->setHomeZone(zone);
     }
 
+    // (optional) post processing for any scene node found visible for the frame
+    void PCZSceneManager::_alertVisibleObjects( void )
+    {
+        OGRE_EXCEPT( Exception::ERR_NOT_IMPLEMENTED,
+            "Function doesn't do as advertised",
+            "PCZSceneManager::_alertVisibleObjects" );
+
+//        NodeList::iterator it = mVisible.begin();
+//
+//        while ( it != mVisible.end() )
+//        {
+//            SceneNode * node = *it;
+//            // this is where you would do whatever you wanted to the visible node
+//            // but right now, it does nothing.
+//            ++it;
+//        }
+    }
+
     //-----------------------------------------------------------------------
     Light* PCZSceneManager::createLight(const String& name)
     {
@@ -960,22 +1023,86 @@ namespace Ogre
             }
         } // release lock on lights collection
 
-        updateCachedLightInfos(camera);
+        // from here on down this function is same as Ogre::SceneManager
+
+        // Update lights affecting frustum if changed
+        if (mCachedLightInfos != mTestLightInfos)
+        {
+            mLightsAffectingFrustum.resize(mTestLightInfos.size());
+            LightInfoList::const_iterator i;
+            LightList::iterator j = mLightsAffectingFrustum.begin();
+            for (i = mTestLightInfos.begin(); i != mTestLightInfos.end(); ++i, ++j)
+            {
+                *j = i->light;
+                // add cam distance for sorting if texture shadows
+                if (isShadowTechniqueTextureBased())
+                {
+                    (*j)->_calcTempSquareDist(camera->getDerivedPosition());
+                }
+            }
+
+            // Sort the lights if using texture shadows, since the first 'n' will be
+            // used to generate shadow textures and we should pick the most appropriate
+            if (isShadowTechniqueTextureBased())
+            {
+                // Allow a ShadowListener to override light sorting
+                // Reverse iterate so last takes precedence
+                bool overridden = false;
+                for (ListenerList::reverse_iterator ri = mListeners.rbegin();
+                    ri != mListeners.rend(); ++ri)
+                {
+                    overridden = (*ri)->sortLightsAffectingFrustum(mLightsAffectingFrustum);
+                    if (overridden)
+                        break;
+                }
+                if (!overridden)
+                {
+                    // default sort (stable to preserve directional light ordering
+                    std::stable_sort(
+                        mLightsAffectingFrustum.begin(), mLightsAffectingFrustum.end(), 
+                        lightsForShadowTextureLess());
+                }
+                
+            }
+
+            // Use swap instead of copy operator for efficiently
+            mCachedLightInfos.swap(mTestLightInfos);
+
+            // notify light dirty, so all movable objects will re-populate
+            // their light list next time
+            _notifyLightsDirty();
+        }
+
     }
     //---------------------------------------------------------------------
     void PCZSceneManager::ensureShadowTexturesCreated()
     {
-        SceneManager::ensureShadowTexturesCreated();
-        if (!isShadowTextureConfigDirty()) return;
+        bool shadowTextureConfigDirty = mShadowRenderer.mShadowTextureConfigDirty;
+        mShadowRenderer.ensureShadowTexturesCreated();
+        if (!shadowTextureConfigDirty) return;
 
-        for (auto cam : getShadowTextureCameras())
+        size_t count = mShadowRenderer.mShadowTextureCameras.size();
+        for (size_t i = 0; i < count; ++i)
         {
-            auto node = (PCZSceneNode*)cam->getParentSceneNode();
+            PCZSceneNode* node = (PCZSceneNode*)mSceneRoot->createChildSceneNode(
+                    mShadowRenderer.mShadowTextureCameras[i]->getName());
+            node->attachObject(mShadowRenderer.mShadowTextureCameras[i]);
             addPCZSceneNode(node, mDefaultZone);
         }
     }
     //---------------------------------------------------------------------
-    void PCZSceneManager::shadowTextureCasterPreViewProj(Light* light, Camera* camera, size_t iteration)
+    void PCZSceneManager::destroyShadowTextures(void)
+    {
+        size_t count = mShadowRenderer.mShadowTextureCameras.size();
+        for (size_t i = 0; i < count; ++i)
+        {
+            SceneNode* node = mShadowRenderer.mShadowTextureCameras[i]->getParentSceneNode();
+            mSceneRoot->removeAndDestroyChild(node);
+        }
+        SceneManager::destroyShadowTextures();
+    }
+    //---------------------------------------------------------------------
+    void PCZSceneManager::fireShadowTexturesPreCaster(Light* light, Camera* camera, size_t iteration)
     {
         PCZSceneNode* camNode = (PCZSceneNode*)camera->getParentSceneNode();
 
@@ -992,6 +1119,8 @@ namespace Ogre
             if (camNode->getHomeZone() != lightZone)
                 addPCZSceneNode(camNode, lightZone);
         }
+
+        SceneManager::fireShadowTexturesPreCaster(light, camera, iteration);
     }
 
     /* Attempt to automatically connect unconnected portals to proper target zones 
@@ -1106,8 +1235,8 @@ namespace Ogre
                                           getRenderQueue(),
                                           visibleBounds, 
                                           onlyShadowCasters,
-                                          getDisplaySceneNodes(),
-                                          getShowBoundingBoxes());
+                                          mDisplayNodes,
+                                          mShowBoundingBoxes);
     }
 
     void PCZSceneManager::findNodesIn( const AxisAlignedBox &box, 
@@ -1225,7 +1354,7 @@ namespace Ogre
     {
         if ( key == "ShowBoundingBoxes" )
         {
-            showBoundingBoxes(* static_cast < const bool * > ( val ));
+            mShowBoundingBoxes = * static_cast < const bool * > ( val );
             return true;
         }
 
@@ -1257,7 +1386,7 @@ namespace Ogre
         if ( key == "ShowBoundingBoxes" )
         {
 
-            * static_cast < bool * > ( val ) = getShowBoundingBoxes();
+            * static_cast < bool * > ( val ) = mShowBoundingBoxes;
             return true;
         }
         if ( key == "ShowPortals" )
@@ -1340,10 +1469,22 @@ namespace Ogre
     //-----------------------------------------------------------------------
     const String PCZSceneManagerFactory::FACTORY_TYPE_NAME = "PCZSceneManager";
     //-----------------------------------------------------------------------
+    void PCZSceneManagerFactory::initMetaData(void) const
+    {
+        mMetaData.typeName = FACTORY_TYPE_NAME;
+        mMetaData.worldGeometrySupported = false;
+    }
+    //-----------------------------------------------------------------------
     SceneManager* PCZSceneManagerFactory::createInstance(
         const String& instanceName)
     {
         return OGRE_NEW PCZSceneManager(instanceName);
     }
+    //-----------------------------------------------------------------------
+    void PCZSceneManagerFactory::destroyInstance(SceneManager* instance)
+    {
+        OGRE_DELETE instance;
+    }
+
 
 }

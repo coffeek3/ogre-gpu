@@ -66,7 +66,7 @@ GLGpuProgram::~GLGpuProgram()
     unload(); 
 }
 
-bool GLGpuProgramBase::isAttributeValid(VertexElementSemantic semantic, uint index)
+bool GLGpuProgram::isAttributeValid(VertexElementSemantic semantic, uint index)
 {
     // default implementation
     switch(semantic)
@@ -85,6 +85,19 @@ bool GLGpuProgramBase::isAttributeValid(VertexElementSemantic semantic, uint ind
     }
 
     return false;
+}
+
+//-----------------------------------------------------------------------------
+size_t GLGpuProgram::calculateSize(void) const
+{
+    size_t memSize = 0;
+
+    // Delegate Names
+    memSize += sizeof(GLuint);
+    memSize += sizeof(GLenum);
+    memSize += GpuProgram::calculateSize();
+    
+    return memSize;
 }
 
 GLArbGpuProgram::GLArbGpuProgram(ResourceManager* creator, const String& name, 
@@ -119,7 +132,7 @@ void GLArbGpuProgram::bindProgramParameters(GpuProgramParametersSharedPtr params
     GLenum type = getProgramType();
     
     // only supports float constants
-    GpuLogicalBufferStructPtr floatStruct = params->getLogicalBufferStruct();
+    GpuLogicalBufferStructPtr floatStruct = params->getFloatLogicalBufferStruct();
 
     for (GpuLogicalIndexUseMap::const_iterator i = floatStruct->map.begin();
         i != floatStruct->map.end(); ++i)
@@ -137,6 +150,20 @@ void GLArbGpuProgram::bindProgramParameters(GpuProgramParametersSharedPtr params
             }
         }
     }
+}
+
+void GLArbGpuProgram::bindProgramPassIterationParameters(GpuProgramParametersSharedPtr params)
+{
+    if (params->hasPassIterationNumber())
+    {
+        GLenum type = getProgramType();
+
+        size_t physicalIndex = params->getPassIterationNumberIndex();
+        size_t logicalIndex = params->getFloatLogicalIndexForPhysicalIndex(physicalIndex);
+        const float* pFloat = params->getFloatPointer(physicalIndex);
+        glProgramLocalParameter4fvARB(type, (GLuint)logicalIndex, pFloat);
+    }
+
 }
 
 void GLArbGpuProgram::unloadImpl(void)

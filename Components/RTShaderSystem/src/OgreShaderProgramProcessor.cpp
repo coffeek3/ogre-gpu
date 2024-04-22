@@ -35,81 +35,56 @@ ProgramProcessor::ProgramProcessor()
 {
     mMaxTexCoordSlots = 16;
     mMaxTexCoordFloats = mMaxTexCoordSlots * 4;
-
+    
 }
 
 //-----------------------------------------------------------------------------
 ProgramProcessor::~ProgramProcessor()
 {
-
-}
-
-//-----------------------------------------------------------------------------
-bool ProgramProcessor::preCreateGpuPrograms(ProgramSet* programSet)
-{
-    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
-    Program* fsProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
-    Function* vsMain   = vsProgram->getEntryPointFunction();
-    Function* fsMain   = fsProgram->getEntryPointFunction();
-
-    // Compact vertex shader outputs.
-    return compactVsOutputs(vsMain, fsMain);
-}
-
-
-bool ProgramProcessor::postCreateGpuPrograms(ProgramSet* programSet)
-{
-    // Bind vertex auto parameters.
-    for(auto type : {GPT_VERTEX_PROGRAM, GPT_FRAGMENT_PROGRAM})
-        bindAutoParameters(programSet->getCpuProgram(type), programSet->getGpuProgram(type));
-
-    if(ShaderGenerator::getSingleton().getTargetLanguage().find("glsl") == String::npos)
-        return true;
-
-    for(auto type : {GPT_VERTEX_PROGRAM, GPT_FRAGMENT_PROGRAM})
-        bindTextureSamplers(programSet->getCpuProgram(type), programSet->getGpuProgram(type));
-
-    return true;
+    
 }
 
 //-----------------------------------------------------------------------------
 void ProgramProcessor::bindAutoParameters(Program* pCpuProgram, GpuProgramPtr pGpuProgram)
 {
     GpuProgramParametersSharedPtr pGpuParams = pGpuProgram->getDefaultParameters();
+    const UniformParameterList& progParams = pCpuProgram->getParameters();
+    UniformParameterConstIterator itParams;
 
-    for (const auto& p : pCpuProgram->getParameters())
+    for (itParams=progParams.begin(); itParams != progParams.end(); ++itParams)
     {
-        const GpuConstantDefinition* gpuConstDef = pGpuParams->_findNamedConstantDefinition(p->getName());
-
+        const UniformParameterPtr pCurParam = *itParams;
+        const GpuConstantDefinition* gpuConstDef = pGpuParams->_findNamedConstantDefinition(pCurParam->getName());
+    
         if (gpuConstDef != NULL)
         {
             // Handle auto parameters.
-            if (p->isAutoConstantParameter())
+            if (pCurParam->isAutoConstantParameter())
             {
-                if (p->isAutoConstantRealParameter())
-                {
-                    pGpuParams->setNamedAutoConstantReal(p->getName(),
-                        p->getAutoConstantType(),
-                        p->getAutoConstantRealData());
-
+                if (pCurParam->isAutoConstantRealParameter())
+                {                   
+                    pGpuParams->setNamedAutoConstantReal(pCurParam->getName(), 
+                        pCurParam->getAutoConstantType(), 
+                        pCurParam->getAutoConstantRealData());
+                                        
                 }
-                else if (p->isAutoConstantIntParameter())
-                {
-                    pGpuParams->setNamedAutoConstant(p->getName(),
-                        p->getAutoConstantType(),
-                        p->getAutoConstantIntData());
-                }
+                else if (pCurParam->isAutoConstantIntParameter())
+                {                   
+                    pGpuParams->setNamedAutoConstant(pCurParam->getName(), 
+                        pCurParam->getAutoConstantType(), 
+                        pCurParam->getAutoConstantIntData());                                   
+                }                       
             }
 
             // Case this is not auto constant - we have to update its variability ourself.
             else
-            {
-                gpuConstDef->variability |= p->getVariability();
+            {                           
+                gpuConstDef->variability |= pCurParam->getVariability();
 
                 // Update variability in the float map.
                 if (gpuConstDef->isSampler() == false)
                 {
-                    GpuLogicalBufferStructPtr floatLogical = pGpuParams->getLogicalBufferStruct();
+                    GpuLogicalBufferStructPtr floatLogical = pGpuParams->getFloatLogicalBufferStruct();
                     if (floatLogical.get())
                     {
                         for (GpuLogicalIndexUseMap::const_iterator i = floatLogical->map.begin(); i != floatLogical->map.end(); ++i)
@@ -121,28 +96,9 @@ void ProgramProcessor::bindAutoParameters(Program* pCpuProgram, GpuProgramPtr pG
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-void ProgramProcessor::bindTextureSamplers(Program* pCpuProgram, GpuProgramPtr pGpuProgram)
-{
-    if (StringConverter::parseBool(pGpuProgram->getParameter("has_sampler_binding")))
-        return;
-
-    GpuProgramParametersSharedPtr pGpuParams = pGpuProgram->getDefaultParameters();
-
-    // Bind the samplers.
-    for (const auto& pCurParam : pCpuProgram->getParameters())
-    {
-        if (pCurParam->isSampler() && pCurParam->isUsed())
-        {
-            // The optimizer may remove some unnecessary parameters, so we should ignore them
-            pGpuParams->setIgnoreMissingParams(true);
-            pGpuParams->setNamedConstant(pCurParam->getName(), pCurParam->getIndex());
-        }
+                }                                           
+            }       
+        }           
     }
 }
 
@@ -157,12 +113,12 @@ bool ProgramProcessor::compactVsOutputs(Function* vsMain, Function* fsMain)
     countVsTexcoordOutputs(vsMain, outTexCoordSlots, outTexCoordFloats);
 
     // Case the total number of used floats is bigger than maximum - nothing we can do.
-    if (outTexCoordFloats > mMaxTexCoordFloats)
+    if (outTexCoordFloats > mMaxTexCoordFloats) 
         return false;
 
     // Only one slot used -> nothing to compact.
-    if (outTexCoordSlots <= 1)
-        return true;
+    if (outTexCoordSlots <= 1)  
+        return true;    
 
     // Case compact policy is low and output slots are enough -> quit compacting process.
     if (ShaderGenerator::getSingleton().getVertexShaderOutputsCompactPolicy() == VSOCP_LOW && outTexCoordSlots <= mMaxTexCoordSlots)
@@ -182,14 +138,14 @@ bool ProgramProcessor::compactVsOutputs(Function* vsMain, Function* fsMain)
     ShaderParameterList vsSplitParams;
     ShaderParameterList fsSplitParams;
     bool hasMergedParameters = false;
-
+    
     mergeParameters(vsOutParamsTable, vsMergedParamsList, vsSplitParams);
 
-
+    
     // Check if any parameter has been merged - means at least two parameters takes the same slot.
-    for (auto & i : vsMergedParamsList)
+    for (unsigned int i=0; i < vsMergedParamsList.size(); ++i)
     {
-        if (i.getSourceParameterCount() > 1)
+        if (vsMergedParamsList[i].getSourceParameterCount() > 1)
         {
             hasMergedParameters = true;
             break;
@@ -209,7 +165,7 @@ bool ProgramProcessor::compactVsOutputs(Function* vsMain, Function* fsMain)
     generateLocalSplitParameters(vsMain, GPT_VERTEX_PROGRAM, vsMergedParamsList, vsSplitParams, vsLocalParamsMap);
     generateLocalSplitParameters(fsMain, GPT_FRAGMENT_PROGRAM, fsMergedParamsList, fsSplitParams, fsLocalParamsMap);
 
-
+    
     // Rebuild functions parameter lists.
     rebuildParameterList(vsMain, Operand::OPS_OUT, vsMergedParamsList);
     rebuildParameterList(fsMain, Operand::OPS_IN, fsMergedParamsList);
@@ -223,20 +179,27 @@ bool ProgramProcessor::compactVsOutputs(Function* vsMain, Function* fsMain)
 }
 
 //-----------------------------------------------------------------------------
-void ProgramProcessor::countVsTexcoordOutputs(Function* vsMain,
-                                              int& outTexCoordSlots,
+void ProgramProcessor::countVsTexcoordOutputs(Function* vsMain, 
+                                              int& outTexCoordSlots, 
                                               int& outTexCoordFloats)
 {
     outTexCoordSlots = 0;
     outTexCoordFloats = 0;
 
+
+    const ShaderParameterList& vsOutputs = vsMain->getOutputParameters();
+    ShaderParameterConstIterator it    = vsOutputs.begin();
+    ShaderParameterConstIterator itEnd = vsOutputs.end();
+
     // Grab vertex shader output information.
-    for (const auto& p : vsMain->getOutputParameters())
+    for (; it != itEnd; ++it)
     {
-        if (p->getSemantic() == Parameter::SPS_TEXTURE_COORDINATES)
+        const ParameterPtr curParam = *it;
+
+        if (curParam->getSemantic() == Parameter::SPS_TEXTURE_COORDINATES)
         {
             outTexCoordSlots++;
-            outTexCoordFloats += getParameterFloatCount(p->getType());
+            outTexCoordFloats += getParameterFloatCount(curParam->getType());
         }
     }
 }
@@ -244,27 +207,32 @@ void ProgramProcessor::countVsTexcoordOutputs(Function* vsMain,
 //-----------------------------------------------------------------------------
 void ProgramProcessor::buildTexcoordTable(const ShaderParameterList& paramList, ShaderParameterList outParamsTable[4])
 {
-    for (const auto& p : paramList)
+    ShaderParameterConstIterator it    = paramList.begin();
+    ShaderParameterConstIterator itEnd = paramList.end();
+
+    for (; it != itEnd; ++it)
     {
-        if (p->getSemantic() == Parameter::SPS_TEXTURE_COORDINATES)
+        const ParameterPtr curParam = *it;
+
+        if (curParam->getSemantic() == Parameter::SPS_TEXTURE_COORDINATES)
         {
 
-            switch (p->getType())
+            switch (curParam->getType())
             {
             case GCT_FLOAT1:
-                outParamsTable[0].push_back(p);
+                outParamsTable[0].push_back(curParam);
                 break;
 
             case GCT_FLOAT2:
-                outParamsTable[1].push_back(p);
+                outParamsTable[1].push_back(curParam);
                 break;
 
             case GCT_FLOAT3:
-                outParamsTable[2].push_back(p);
+                outParamsTable[2].push_back(curParam);
                 break;
 
             case GCT_FLOAT4:
-                outParamsTable[3].push_back(p);
+                outParamsTable[3].push_back(curParam);
                 break;
             case GCT_SAMPLER1D:
             case GCT_SAMPLER2D:
@@ -299,22 +267,22 @@ void ProgramProcessor::buildTexcoordTable(const ShaderParameterList& paramList, 
 }
 
 //-----------------------------------------------------------------------------
-void ProgramProcessor::mergeParameters(ShaderParameterList paramsTable[4], MergeParameterList& mergedParams,
+void ProgramProcessor::mergeParameters(ShaderParameterList paramsTable[4], MergeParameterList& mergedParams, 
                                       ShaderParameterList& splitParams)
 {
     // Merge using the predefined combinations.
     mergeParametersByPredefinedCombinations(paramsTable, mergedParams);
 
     // Merge the reminders parameters if such left.
-    if (paramsTable[0].size() + paramsTable[1].size() +
-        paramsTable[2].size() + paramsTable[3].size() > 0)
+    if (paramsTable[0].size() + paramsTable[1].size() + 
+        paramsTable[2].size() + paramsTable[3].size() > 0)          
     {
         mergeParametersReminders(paramsTable, mergedParams, splitParams);
-    }
+    }   
 }
 
 //-----------------------------------------------------------------------------
-void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterList paramsTable[4],
+void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterList paramsTable[4], 
                                                                MergeParameterList& mergedParams)
 {
 
@@ -325,12 +293,14 @@ void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterLi
     }
 
     // Create the full used merged params - means FLOAT4 params that all of their components are used.
-    for (auto & curCombination : mParamMergeCombinations)
+    for (unsigned int i=0; i < mParamMergeCombinations.size(); ++i)
     {
+        const MergeCombination& curCombination = mParamMergeCombinations[i];
+
         // Case all parameters have been merged.
-        if (paramsTable[0].empty() && paramsTable[1].empty() &&
-            paramsTable[2].empty() && paramsTable[3].empty())
-            return;
+        if (paramsTable[0].size() + paramsTable[1].size() + 
+            paramsTable[2].size() + paramsTable[3].empty())     
+            return;     
 
         MergeParameter curMergeParam;
 
@@ -352,7 +322,7 @@ void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterLi
         int       reqSlots = 0;
 
         // Compute the required slots.
-
+        
         // Add all float3 since each one of them require one slot for himself.
         reqSlots += float3ParamCount;
 
@@ -363,7 +333,7 @@ void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterLi
                 "Invalid float2 reminder count.",
                 "ProgramProcessor::mergeParametersByPredefinedCombinations");
         }
-
+        
         reqSlots += float2ParamCount;
 
         // Compute how much space needed for the float1(s) that left -> at max it will be 3.
@@ -394,60 +364,62 @@ void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterLi
         }
 
         // Case maximum slot count will be exceeded -> fall back to full compaction.
-        if (curUsedSlots + reqSlots > mMaxTexCoordSlots)
-            return;
+        if (curUsedSlots + reqSlots > mMaxTexCoordSlots)        
+            return; 
 
-        MergeCombination simpleCombinations[6] =
+        MergeCombination simpleCombinations[6] = 
         {
             // Deal with the float3 parameters.
-            MergeCombination(
+            MergeCombination( 
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             1, Operand::OPM_ALL,
             0, Operand::OPM_ALL),
 
             // Deal with float2 + float1 combination.
-            MergeCombination(
+            MergeCombination( 
             1, Operand::OPM_ALL,
             1, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL),
 
             // Deal with the float2 parameter.
-            MergeCombination(
+            MergeCombination( 
             0, Operand::OPM_ALL,
             1, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL),
 
             // Deal with the 3 float1 combination.
-            MergeCombination(
+            MergeCombination( 
             3, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL),
 
             // Deal with the 2 float1 combination.
-            MergeCombination(
+            MergeCombination( 
             2, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL),
 
             // Deal with the 1 float1 combination.
-            MergeCombination(
+            MergeCombination( 
             1, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
             0, Operand::OPM_ALL,
-            0, Operand::OPM_ALL),
-
+            0, Operand::OPM_ALL),           
+            
         };
 
-        for (const auto & curCombination : simpleCombinations)
+        for (unsigned int i=0; i < 6; ++i)
         {
+            const MergeCombination& curCombination = simpleCombinations[i];
+
             // Case all parameters have been merged.
-            if (paramsTable[0].size() + paramsTable[1].size() + paramsTable[2].size() + paramsTable[3].empty())
-                break;
+            if (paramsTable[0].size() + paramsTable[1].size() + paramsTable[2].size() + paramsTable[3].empty())     
+                break;      
 
             MergeParameter curMergeParam;
 
@@ -461,8 +433,8 @@ void ProgramProcessor::mergeParametersByPredefinedCombinations(ShaderParameterLi
 }
 
 //-----------------------------------------------------------------------------
-bool ProgramProcessor::mergeParametersByCombination(const MergeCombination& combination,
-                                    ShaderParameterList paramsTable[4],
+bool ProgramProcessor::mergeParametersByCombination(const MergeCombination& combination, 
+                                    ShaderParameterList paramsTable[4], 
                                     MergeParameter* mergedParameter)
 {
     // Make sure we have enough parameters to combine.
@@ -477,7 +449,7 @@ bool ProgramProcessor::mergeParametersByCombination(const MergeCombination& comb
     // Create the new output parameter.
     for (int i=0; i < 4; ++i)
     {
-        ShaderParameterList& curParamList = paramsTable[i];
+        ShaderParameterList& curParamList = paramsTable[i];     
         int srcParameterTypeCount = static_cast<int>(combination.srcParameterTypeCount[i]);
         int srcParameterCount = 0;
 
@@ -497,8 +469,8 @@ bool ProgramProcessor::mergeParametersByCombination(const MergeCombination& comb
 //-----------------------------------------------------------------------------
 void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[4], MergeParameterList& mergedParams, ShaderParameterList& splitParams)
 {
-
-    // Handle reminders parameters - All of the parameters that could not packed perfectly.
+    
+    // Handle reminders parameters - All of the parameters that could not packed perfectly. 
     const size_t mergedParamsBaseIndex      = mergedParams.size();
     const size_t remindersFloatCount        = (1 * paramsTable[0].size()) + (2 * paramsTable[1].size()) + (3 * paramsTable[2].size()) + (4 * paramsTable[3].size());
     const size_t remindersFloatMod          = remindersFloatCount % 4;
@@ -513,7 +485,7 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
 
         for (unsigned int row=0; row < 4; ++row)
         {
-            ShaderParameterList& curParamList = paramsTable[3 - row];
+            ShaderParameterList& curParamList = paramsTable[3 - row];       
 
             // Case this list contains parameters -> pop it out and add to merged params.
             if (curParamList.size() > 0)
@@ -529,7 +501,7 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
     // Second pass -> merge the reminders parameters.
     for (unsigned int row=0; row < 4; ++row)
     {
-        ShaderParameterList& curParamList = paramsTable[3 - row];
+        ShaderParameterList& curParamList = paramsTable[3 - row];       
 
         // Merge the all the parameters of the current list.
         while (curParamList.size() > 0)
@@ -544,10 +516,10 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
             curSrcParameterFloats = srcParameterFloats;
             srcParameterComponents = getParameterMaskByType(srcParameter->getType());
 
-
+            
             // While this parameter has remaining components -> split it.
             while (curSrcParameterFloats > 0)
-            {
+            {           
                 for (unsigned int slot=0; slot < remindersTotalSlotCount && curSrcParameterFloats > 0; ++slot)
                 {
                     MergeParameter& curMergeParam = mergedParams[mergedParamsBaseIndex + slot];
@@ -558,8 +530,8 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
                     {
                         // Case current components of source parameter can go all into this slot without split.
                         if (srcParameterFloats < freeFloatCount && splitCount == 0)
-                        {
-                            curMergeParam.addSourceParameter(srcParameter, Operand::OPM_ALL);
+                        {                               
+                            curMergeParam.addSourceParameter(srcParameter, Operand::OPM_ALL);                           
                         }
 
                         // Case we have to split the current source parameter.
@@ -568,7 +540,7 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
                             int srcComponentsMask;
 
                             // Create the mask that tell us which part of the source component is added to the merged parameter.
-                            srcComponentsMask = getParameterMaskByFloatCount(freeFloatCount) << splitCount;
+                            srcComponentsMask = getParameterMaskByFloatCount(freeFloatCount) << splitCount;                         
 
                             // Add the partial source parameter to merged parameter.
                             curMergeParam.addSourceParameter(srcParameter, Operand::OpMask(srcComponentsMask & srcParameterComponents));
@@ -583,10 +555,10 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
                         else
                         {
                             curSrcParameterFloats -= freeFloatCount;
-                        }
+                        }                        
                     }
                 }
-            }
+            }                                   
 
             // Add to split params list.
             if (splitCount > 1)
@@ -595,15 +567,17 @@ void ProgramProcessor::mergeParametersReminders(ShaderParameterList paramsTable[
 
             curParamList.pop_back();
         }
-    }
+    }               
 }
 
 //-----------------------------------------------------------------------------
 void ProgramProcessor::rebuildParameterList(Function* func, int paramsUsage, MergeParameterList& mergedParams)
 {
     // Delete the old merged parameters.
-    for (auto & curMergeParameter : mergedParams)
+    for (unsigned int i=0; i < mergedParams.size(); ++i)
     {
+        MergeParameter& curMergeParameter = mergedParams[i];
+
         for (unsigned int j=0; j < curMergeParameter.getSourceParameterCount(); ++j)
         {
             ParameterPtr curSrcParam = curMergeParameter.getSourceParameter(j);
@@ -623,34 +597,35 @@ void ProgramProcessor::rebuildParameterList(Function* func, int paramsUsage, Mer
     for (unsigned int i=0; i < mergedParams.size(); ++i)
     {
         MergeParameter& curMergeParameter = mergedParams[i];
-
+        
         if (paramsUsage == Operand::OPS_OUT)
-        {
-            func->addOutputParameter(curMergeParameter.getDestinationParameter(i));
+        {           
+            func->addOutputParameter(curMergeParameter.getDestinationParameter(paramsUsage, i));
         }
         else if (paramsUsage == Operand::OPS_IN)
         {
-            func->addInputParameter(curMergeParameter.getDestinationParameter(i));
+            func->addInputParameter(curMergeParameter.getDestinationParameter(paramsUsage, i));
         }
     }
 }
 
 //-----------------------------------------------------------------------------
 void ProgramProcessor::generateLocalSplitParameters(Function* func, GpuProgramType progType,
-                                                   MergeParameterList& mergedParams,
+                                                   MergeParameterList& mergedParams, 
                                                    ShaderParameterList& splitParams, LocalParameterMap& localParamsMap)
 {
     // No split params created.
-    if (splitParams.empty())
-        return;
+    if (splitParams.empty())    
+        return; 
 
     // Create the local parameters + map from source to local.
-    for (const auto& srcParameter : splitParams)
+    for (unsigned int i=0; i < splitParams.size(); ++i)
     {
-        ParameterPtr localParameter = func->resolveLocalParameter(srcParameter->getType(), "lsplit_" + srcParameter->getName());
+        ParameterPtr srcParameter   = splitParams[i];
+        ParameterPtr localParameter = func->resolveLocalParameter("lsplit_" + srcParameter->getName(), srcParameter->getType());
 
-        localParamsMap[srcParameter.get()] = localParameter;
-    }
+        localParamsMap[srcParameter.get()] = localParameter;        
+    }   
 
     // Establish link between the local parameter to the merged parameter.
     for (unsigned int i=0; i < mergedParams.size(); ++i)
@@ -669,29 +644,29 @@ void ProgramProcessor::generateLocalSplitParameters(Function* func, GpuProgramTy
                 if (progType == GPT_VERTEX_PROGRAM)
                 {
                     FunctionAtom* curFuncInvocation = OGRE_NEW AssignmentAtom(FFP_VS_POST_PROCESS);
-
+                    
                     curFuncInvocation->pushOperand(itFind->second, Operand::OPS_IN, curMergeParameter.getSourceParameterMask(p));
-                    curFuncInvocation->pushOperand(curMergeParameter.getDestinationParameter(i), Operand::OPS_OUT, curMergeParameter.getDestinationParameterMask(p));
-                    func->addAtomInstance(curFuncInvocation);
+                    curFuncInvocation->pushOperand(curMergeParameter.getDestinationParameter(Operand::OPS_OUT, i), Operand::OPS_OUT, curMergeParameter.getDestinationParameterMask(p));     
+                    func->addAtomInstance(curFuncInvocation);       
                 }
                 else if (progType == GPT_FRAGMENT_PROGRAM)
                 {
                     FunctionAtom* curFuncInvocation = OGRE_NEW AssignmentAtom(FFP_PS_PRE_PROCESS);
-
-                    curFuncInvocation->pushOperand(curMergeParameter.getDestinationParameter(i), Operand::OPS_IN, curMergeParameter.getDestinationParameterMask(p));
+                    
+                    curFuncInvocation->pushOperand(curMergeParameter.getDestinationParameter(Operand::OPS_IN, i), Operand::OPS_IN, curMergeParameter.getDestinationParameterMask(p));       
                     curFuncInvocation->pushOperand(itFind->second, Operand::OPS_OUT, curMergeParameter.getSourceParameterMask(p));
-                    func->addAtomInstance(curFuncInvocation);
+                    func->addAtomInstance(curFuncInvocation);       
                 }
             }
         }
-    }
+    }               
 }
 
 //-----------------------------------------------------------------------------
 void ProgramProcessor::rebuildFunctionInvocations(const FunctionAtomInstanceList& funcAtomList,
                                                   MergeParameterList& mergedParams,
                                                   LocalParameterMap& localParamsMap)
-{
+{   
     ParameterOperandMap paramsRefMap;
 
     // Build reference map of source parameters.
@@ -709,11 +684,24 @@ void ProgramProcessor::rebuildFunctionInvocations(const FunctionAtomInstanceList
 //-----------------------------------------------------------------------------
 void ProgramProcessor::buildParameterReferenceMap(const FunctionAtomInstanceList& funcAtomList, ParameterOperandMap& paramsRefMap)
 {
-    for (const auto& func : funcAtomList)
+    
+    FunctionAtomInstanceConstIterator it    = funcAtomList.begin();
+    FunctionAtomInstanceConstIterator itEnd = funcAtomList.end();
+
+    for (; it != itEnd; ++it)
     {
-        for (Operand& curOperand : func->getOperandList())
+        // Deal only with function invocations.
+        FunctionInvocation* curFuncInvocation = dynamic_cast<FunctionInvocation*>(*it);
+        if (curFuncInvocation)
         {
-            paramsRefMap[curOperand.getParameter().get()].push_back(&curOperand);
+            FunctionInvocation::OperandVector& funcOperands = curFuncInvocation->getOperandList();
+
+            for (unsigned int op=0; op < funcOperands.size(); ++op)
+            {
+                Operand& curOperand = funcOperands[op];
+
+                paramsRefMap[curOperand.getParameter().get()].push_back(&curOperand);
+            }
         }
     }
 }
@@ -740,10 +728,11 @@ void ProgramProcessor::replaceParametersReferences(MergeParameterList& mergedPar
                 // Case the source parameter is fully contained within the destination merged parameter.
                 if (curMergeParameter.getSourceParameterMask(j) == Operand::OPM_ALL)
                 {
-                    dstParameter = curMergeParameter.getDestinationParameter(i);
+                    dstParameter = curMergeParameter.getDestinationParameter(Operand::OPS_INOUT, i);
 
-                    for (auto srcOperandPtr : srcParamRefs)
+                    for (unsigned int op=0; op < srcParamRefs.size(); ++op)
                     {
+                        Operand*  srcOperandPtr = srcParamRefs[op];
                         int       dstOpMask;
 
                         if (srcOperandPtr->getMask() == Operand::OPM_ALL)
@@ -755,7 +744,7 @@ void ProgramProcessor::replaceParametersReferences(MergeParameterList& mergedPar
                             }
                             else
                             {
-                                dstOpMask = getParameterMaskByType(curSrcParam->getType()) << paramBitMaskOffset;
+                                dstOpMask = getParameterMaskByType(curSrcParam->getType()) << paramBitMaskOffset;                           
                             }
                         }
                         else
@@ -763,15 +752,15 @@ void ProgramProcessor::replaceParametersReferences(MergeParameterList& mergedPar
                             dstOpMask = srcOperandPtr->getMask() << paramBitMaskOffset;
                         }
 
-                        // Replace the original source operand with a new operand the reference the new merged parameter.
+                        // Replace the original source operand with a new operand the reference the new merged parameter.                       
                         *srcOperandPtr = Operand(dstParameter, srcOperandPtr->getSemantic(), Operand::OpMask(dstOpMask));
                     }
                 }
-            }
+            }   
 
 
-            // Update the bit mask offset.
-            paramBitMaskOffset += getParameterFloatCount(curSrcParam->getType());
+            // Update the bit mask offset. 
+            paramBitMaskOffset += getParameterFloatCount(curSrcParam->getType());           
         }
     }
 }
@@ -779,22 +768,26 @@ void ProgramProcessor::replaceParametersReferences(MergeParameterList& mergedPar
 //-----------------------------------------------------------------------------
 void ProgramProcessor::replaceSplitParametersReferences(LocalParameterMap& localParamsMap, ParameterOperandMap& paramsRefMap)
 {
-    for (const auto& p : localParamsMap)
+    LocalParameterMap::iterator it    = localParamsMap.begin(); 
+    LocalParameterMap::iterator itEnd = localParamsMap.end(); 
+
+    for (; it != itEnd; ++it)
     {
-        Parameter* curSrcParam = p.first;
+        Parameter* curSrcParam = it->first;
         ParameterOperandMap::iterator itParamRefs = paramsRefMap.find(curSrcParam);
 
         if (itParamRefs != paramsRefMap.end())
         {
-            ParameterPtr dstParameter      = p.second;
+            ParameterPtr dstParameter      = it->second;
             OperandPtrVector& srcParamRefs = itParamRefs->second;
 
-            for (auto srcOperandPtr : srcParamRefs)
+            for (unsigned int op=0; op < srcParamRefs.size(); ++op)
             {
+                Operand*  srcOperandPtr = srcParamRefs[op];
                 Operand::OpMask dstOpMask;
 
                 if (srcOperandPtr->getMask() == Operand::OPM_ALL)
-                {
+                {                   
                     dstOpMask = getParameterMaskByType(curSrcParam->getType());
                 }
                 else
@@ -802,7 +795,7 @@ void ProgramProcessor::replaceSplitParametersReferences(LocalParameterMap& local
                     dstOpMask = srcOperandPtr->getMask();
                 }
 
-                // Replace the original source operand with a new operand the reference the new merged parameter.
+                // Replace the original source operand with a new operand the reference the new merged parameter.                       
                 *srcOperandPtr = Operand(dstParameter, srcOperandPtr->getSemantic(), dstOpMask);
             }
         }
@@ -877,21 +870,21 @@ void ProgramProcessor::buildMergeCombinations()
         0, Operand::OPM_ALL));
 
     mParamMergeCombinations.push_back(
-        MergeCombination(
+        MergeCombination( 
         4, Operand::OPM_ALL,
         0, Operand::OPM_ALL,
         0, Operand::OPM_ALL,
         0, Operand::OPM_ALL));
 
     mParamMergeCombinations.push_back(
-        MergeCombination(
+        MergeCombination( 
         0, Operand::OPM_ALL,
         2, Operand::OPM_ALL,
         0, Operand::OPM_ALL,
         0, Operand::OPM_ALL));
 
     mParamMergeCombinations.push_back(
-        MergeCombination(
+        MergeCombination( 
         0, Operand::OPM_ALL,
         0, Operand::OPM_ALL,
         0, Operand::OPM_ALL,
@@ -914,7 +907,7 @@ void ProgramProcessor::MergeParameter::addSourceParameter(ParameterPtr srcParam,
             "Merged parameter source parameters overflow",
             "MergeParameter::addSourceParameter");
     }
-
+    
     mSrcParameter[mSrcParameterCount]     = srcParam;
     mSrcParameterMask[mSrcParameterCount] = mask;
 
@@ -922,16 +915,16 @@ void ProgramProcessor::MergeParameter::addSourceParameter(ParameterPtr srcParam,
     {
         mDstParameterMask[mSrcParameterCount] = mask;
 
-        mUsedFloatCount += getParameterFloatCount(srcParam->getType());
+        mUsedFloatCount += getParameterFloatCount(srcParam->getType()); 
     }
     else
-    {
+    {       
         int srcParamFloatCount = Operand::getFloatCount(mask);
 
         mDstParameterMask[mSrcParameterCount] = Operand::OpMask(getParameterMaskByFloatCount(srcParamFloatCount) << mUsedFloatCount);
         mUsedFloatCount += srcParamFloatCount;
     }
-
+    
     mSrcParameterCount++;
 
 
@@ -952,13 +945,7 @@ int ProgramProcessor::MergeParameter::getUsedFloatCount()
 }
 
 //-----------------------------------------------------------------------------
-static ParameterPtr createTexcoordParam(GpuConstantType type, int index)
-{
-    return std::make_shared<Parameter>(type, StringUtil::format("vsTexcoord_%d", index),
-                                       Parameter::SPS_TEXTURE_COORDINATES, index, Parameter::SPC_UNKNOWN);
-}
-
-void ProgramProcessor::MergeParameter::createDestinationParameter(int index)
+void ProgramProcessor::MergeParameter::createDestinationParameter(int usage, int index)
 {
     GpuConstantType dstParamType = GCT_UNKNOWN;
 
@@ -982,14 +969,22 @@ void ProgramProcessor::MergeParameter::createDestinationParameter(int index)
 
     }
 
-    mDstParameter = createTexcoordParam(dstParamType, index);
+
+    if (usage == Operand::OPS_IN)
+    {
+        mDstParameter = ParameterFactory::createInTexcoord(dstParamType, index, Parameter::SPC_UNKNOWN);
+    }
+    else if (usage == Operand::OPS_OUT)
+    {
+        mDstParameter = ParameterFactory::createOutTexcoord(dstParamType, index, Parameter::SPC_UNKNOWN);
+    }
 }
 
 //-----------------------------------------------------------------------------
-Ogre::RTShader::ParameterPtr ProgramProcessor::MergeParameter::getDestinationParameter(int index)
+Ogre::RTShader::ParameterPtr ProgramProcessor::MergeParameter::getDestinationParameter(int usage, int index)
 {
     if (!mDstParameter)
-        createDestinationParameter(index);
+        createDestinationParameter(usage, index);
 
     return mDstParameter;
 }
@@ -1003,7 +998,7 @@ void ProgramProcessor::MergeParameter::clear()
         mSrcParameter[i].reset();
         mSrcParameterMask[i] = Operand::OPM_NONE;
         mDstParameterMask[i] = Operand::OPM_NONE;
-    }
+    }   
     mSrcParameterCount = 0;
     mUsedFloatCount = 0;
 }

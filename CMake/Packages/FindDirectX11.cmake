@@ -18,7 +18,7 @@ if(WIN32) # The only platform it makes sense to check for DirectX11 SDK
 	include(FindPkgMacros)
 	findpkg_begin(DirectX11)
 
-	if( MSVC AND NOT MSVC90 )
+	if( NOT MSVC90 )
 		# Windows 10.x SDK
 		get_filename_component(kit10_dir "[HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots;KitsRoot10]" REALPATH)
 		file(GLOB W10SDK_VERSIONS RELATIVE ${kit10_dir}/Include ${kit10_dir}/Include/10.*) 			# enumerate pre-release and not yet known release versions
@@ -84,11 +84,11 @@ if(WIN32) # The only platform it makes sense to check for DirectX11 SDK
 
 		# dlls are in DirectX11_ROOT_DIR/Developer Runtime/x64|x86
 		# lib files are in DirectX11_ROOT_DIR/Lib/x64|x86
-		if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		if(CMAKE_CL_64)
 			set(DirectX11_LIBPATH_SUFFIX "x64")
-		else(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		else(CMAKE_CL_64)
 			set(DirectX11_LIBPATH_SUFFIX "x86")
-		endif(CMAKE_SIZEOF_VOID_P EQUAL 8)
+		endif(CMAKE_CL_64)
 
 		# look for D3D11 components
 		find_path(DirectX11_INCLUDE_DIR NAMES d3d11.h HINTS ${DirectX11_INC_SEARCH_PATH})
@@ -127,5 +127,5 @@ if(WIN32) # The only platform it makes sense to check for DirectX11 SDK
 	endif () # Legacy Direct X SDK
 
 	findpkg_finish(DirectX11)
-
+	
 endif(WIN32)

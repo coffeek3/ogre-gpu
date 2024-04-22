@@ -40,7 +40,6 @@ namespace Ogre {
     class OverlayContainer;
     class OverlayElement;
     class OverlayElementFactory;
-    template <typename T> class MapIterator;
 
     /** \addtogroup Optional
     *  @{
@@ -59,24 +58,36 @@ namespace Ogre {
         typedef std::map<String, Overlay*> OverlayMap;
         typedef std::map<String, OverlayElement*> ElementMap;
         typedef std::map<String, OverlayElementFactory*> FactoryMap;
-    private:
+    protected:
         OverlayMap mOverlayMap;
         StringVector mScriptPatterns;
 
         int mLastViewportWidth, mLastViewportHeight;
-        float mPixelRatio;
+        OrientationMode mLastViewportOrientationMode;
 
         bool parseChildren( DataStreamPtr& chunk, const String& line, int& l,
             Overlay* pOverlay, bool isTemplate, OverlayContainer* parent = NULL);
 
         FactoryMap mFactories;
 
-        ElementMap mElements;
-
-        typedef std::set<String> LoadedScripts;
-        LoadedScripts mLoadedScripts;
+        ElementMap mInstances;
+        ElementMap mTemplates;
 
         std::unique_ptr<ScriptTranslatorManager> mTranslatorManager;
+
+        ElementMap& getElementMap(bool isTemplate);
+
+        OverlayElement* createOverlayElementImpl(const String& typeName, const String& instanceName, ElementMap& elementMap);
+
+        OverlayElement* getOverlayElementImpl(const String& name, ElementMap& elementMap);
+        
+        bool hasOverlayElementImpl(const String& name, ElementMap& elementMap);
+
+        void destroyOverlayElementImpl(const String& instanceName, ElementMap& elementMap);
+
+        void destroyOverlayElementImpl(OverlayElement* pInstance, ElementMap& elementMap);
+
+        void destroyAllOverlayElementsImpl(ElementMap& elementMap);
 
     public:
         OverlayManager();
@@ -88,17 +99,15 @@ namespace Ogre {
         void _restoreManualHardwareResources();
 
         /// @copydoc ScriptLoader::getScriptPatterns
-        const StringVector& getScriptPatterns(void) const override;
+        const StringVector& getScriptPatterns(void) const;
         /// @copydoc ScriptLoader::parseScript
-        void parseScript(DataStreamPtr& stream, const String& groupName) override;
+        void parseScript(DataStreamPtr& stream, const String& groupName);
         /// @copydoc ScriptLoader::getLoadingOrder
-        Real getLoadingOrder(void) const override;
-
-        void addOverlay(Overlay* overlay);
+        Real getLoadingOrder(void) const;
 
         /** Create a new Overlay. */
         Overlay* create(const String& name);
-        /** Retrieve an Overlay by name. For example, one defined in some .overlay file.
+        /** Retrieve an Overlay by name 
         @return A pointer to the Overlay, or 0 if not found
         */
         Overlay* getByName(const String& name);
@@ -121,51 +130,47 @@ namespace Ogre {
         int getViewportWidth(void) const;
         Real getViewportAspectRatio(void) const;
 
-       /** Sets the pixel ratio: how many viewport pixels represent a single overlay pixel (in one dimension).
-
-       By default this is an 1:1 mapping. However on HiDPI screens you want to increase that to scale up your Overlay.
-       @see RenderWindow::getViewPointToPixelScale */
-       void setPixelRatio(float ratio);
-       float getPixelRatio() const;
+        /** Gets the orientation mode of the destination viewport. */
+        OrientationMode getViewportOrientationMode(void) const;
 
         /** Creates a new OverlayElement of the type requested.
-
+        @remarks
         The type of element to create is passed in as a string because this
         allows plugins to register new types of component.
         @param typeName The type of element to create.
         @param instanceName The name to give the new instance.
         */
-        OverlayElement* createOverlayElement(const String& typeName, const String& instanceName, bool = false);
+        OverlayElement* createOverlayElement(const String& typeName, const String& instanceName, bool isTemplate = false);
 
         /** Gets a reference to an existing element. */
-        OverlayElement* getOverlayElement(const String& name, bool = false);
+        OverlayElement* getOverlayElement(const String& name, bool isTemplate = false);
 
         /** Tests if an element exists. */
-        bool hasOverlayElement(const String& name, bool = false);
+        bool hasOverlayElement(const String& name, bool isTemplate = false);
         
         /** Destroys a OverlayElement. 
-
+        @remarks
         Make sure you're not still using this in an Overlay. If in
         doubt, let OGRE destroy elements on shutdown.
         */
-        void destroyOverlayElement(const String& instanceName, bool = false);
+        void destroyOverlayElement(const String& instanceName, bool isTemplate = false);
 
         /** Destroys a OverlayElement. 
-
+        @remarks
         Make sure you're not still using this in an Overlay. If in
         doubt, let OGRE destroy elements on shutdown.
         */
-        void destroyOverlayElement(OverlayElement* pInstance, bool = false);
+        void destroyOverlayElement(OverlayElement* pInstance, bool isTemplate = false);
 
         /** Destroys all the OverlayElement  created so far.
-
+        @remarks
         Best to leave this to the engine to call internally, there
         should rarely be a need to call it yourself.
         */
-        void destroyAllOverlayElements(bool = false);
+        void destroyAllOverlayElements(bool isTemplate = false);
 
         /** Registers a new OverlayElementFactory with this manager.
-
+        @remarks
         Should be used by plugins or other apps wishing to provide
         a new OverlayElement subclass.
         */
@@ -176,8 +181,9 @@ namespace Ogre {
             return mFactories;
         }
 
-        OverlayElement* createOverlayElementFromTemplate(const String& templateName, const String& typeName, const String& instanceName, bool = false);
+        OverlayElement* createOverlayElementFromTemplate(const String& templateName, const String& typeName, const String& instanceName, bool isTemplate = false);
         /**
+        *  @remarks
         *  Creates a new OverlayElement object from the specified template name.  The new
         *  object's name, and all of it's children, will be instanceName/orignalName.
         */
@@ -185,8 +191,20 @@ namespace Ogre {
 
         OverlayElement* createOverlayElementFromFactory(const String& typeName, const String& instanceName);
 
-        /** Override standard Singleton retrieval.
+        typedef MapIterator<ElementMap> TemplateIterator;
+        /** Returns an iterator over all templates in this manager.*/
+        TemplateIterator getTemplateIterator ()
+        {
+            return TemplateIterator (mTemplates.begin (), mTemplates.end ()) ;
+        }
+        /* Returns whether the Element with the given name is a Template */
+        bool isTemplate (String strName) const {
+            return (mTemplates.find (strName) != mTemplates.end()) ;
+        }
 
+
+        /** Override standard Singleton retrieval.
+        @remarks
         Why do we do this? Well, it's because the Singleton
         implementation is in a .h file, which means it gets compiled
         into anybody who includes it. This is needed for the

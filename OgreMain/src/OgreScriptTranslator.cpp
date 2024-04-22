@@ -47,28 +47,24 @@ THE SOFTWARE.
 #include "OgreGpuProgramUsage.h"
 
 namespace Ogre{
-    static void applyTextureAliases(ScriptCompiler *compiler, const Material* mat, const NameValuePairList& aliasList)
+
+    static GpuProgramType translateIDToGpuProgramType(uint32 id)
     {
-        for (auto t : mat->getTechniques())
+        switch (id)
         {
-            for (auto p : t->getPasses())
-            {
-                for (auto tus : p->getTextureUnitStates())
-                {
-                    auto aliasIt = aliasList.find(tus->getName());
-                    if (aliasIt == aliasList.end())
-                        continue;
-
-                    ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::TEXTURE, aliasIt->second);
-                    compiler->_fireEvent(&evt, 0);
-
-                    if (tus->getNumFrames() > 1)
-                        tus->setAnimatedTextureName(evt.mName, tus->getNumFrames(),
-                                                    tus->getAnimationDuration());
-                    else
-                        tus->setTextureName(evt.mName, tus->getTextureType());
-                }
-            }
+        case ID_VERTEX_PROGRAM:
+        default:
+            return GPT_VERTEX_PROGRAM;
+        case ID_GEOMETRY_PROGRAM:
+            return GPT_GEOMETRY_PROGRAM;
+        case ID_FRAGMENT_PROGRAM:
+            return GPT_FRAGMENT_PROGRAM;
+            case ID_TESSELLATION_HULL_PROGRAM:
+            return GPT_HULL_PROGRAM;
+            case ID_TESSELLATION_DOMAIN_PROGRAM:
+            return GPT_DOMAIN_PROGRAM;
+        case ID_COMPUTE_PROGRAM:
+            return GPT_COMPUTE_PROGRAM;
         }
     }
 
@@ -85,11 +81,11 @@ namespace Ogre{
     bool getValue(const AbstractNodePtr &node, T& result);
     template<> bool getValue(const AbstractNodePtr &node, float& result)
     {
-        return StringConverter::parse(node->getString(), result);
+        return ScriptTranslator::getFloat(node, &result);
     }
     template<> bool getValue(const AbstractNodePtr &node, double& result)
     {
-        return StringConverter::parse(node->getString(), result);
+        return ScriptTranslator::getDouble(node, &result);
     }
     template<> bool getValue(const AbstractNodePtr &node, bool& result)
     {
@@ -97,11 +93,11 @@ namespace Ogre{
     }
     template<> bool getValue(const AbstractNodePtr &node, uint32& result)
     {
-        return StringConverter::parse(node->getString(), result);
+        return ScriptTranslator::getUInt(node, &result);
     }
     template<> bool getValue(const AbstractNodePtr &node, int32& result)
     {
-        return StringConverter::parse(node->getString(), result);
+        return ScriptTranslator::getInt(node, &result);
     }
     template<> bool getValue(const AbstractNodePtr &node, String& result)
     {
@@ -391,6 +387,26 @@ namespace Ogre{
         return true;
     }
 
+    template<> bool getValue(const AbstractNodePtr& node, TextureUnitState::BindingType& result)
+    {
+        if(node->type != ANT_ATOM)
+            return false;
+
+        switch (static_cast<AtomAbstractNode*>(node.get())->id)
+        {
+        case ID_VERTEX:
+            result = TextureUnitState::BT_VERTEX;
+            break;
+        case ID_FRAGMENT:
+            result = TextureUnitState::BT_FRAGMENT;
+            break;
+        default:
+            return false;
+        }
+        return true;
+    }
+
+
     template<> bool getValue(const AbstractNodePtr& node, CompositionTargetPass::InputMode& result)
     {
         if(node->type != ANT_ATOM)
@@ -589,22 +605,38 @@ namespace Ogre{
     //-------------------------------------------------------------------------
     bool ScriptTranslator::getFloat(const Ogre::AbstractNodePtr &node, float *result)
     {
-        return StringConverter::parse(node->getString(), *result);
+        if(node->type != ANT_ATOM)
+            return false;
+
+        AtomAbstractNode *atom = (AtomAbstractNode*)node.get();
+        return StringConverter::parse(atom->value, *result);
     }
     //-------------------------------------------------------------------------
     bool ScriptTranslator::getDouble(const Ogre::AbstractNodePtr &node, double *result)
     {
-        return StringConverter::parse(node->getString(), *result);
+        if(node->type != ANT_ATOM)
+            return false;
+
+        AtomAbstractNode *atom = (AtomAbstractNode*)node.get();
+        return StringConverter::parse(atom->value, *result);
     }
     //-------------------------------------------------------------------------
     bool ScriptTranslator::getInt(const Ogre::AbstractNodePtr &node, int *result)
     {
-        return StringConverter::parse(node->getString(), *result);
+        if (node->type != ANT_ATOM)
+            return false;
+
+        AtomAbstractNode *atom = (AtomAbstractNode*)node.get();
+        return StringConverter::parse(atom->value, *result);
     }
     //-------------------------------------------------------------------------
     bool ScriptTranslator::getUInt(const Ogre::AbstractNodePtr &node, uint *result)
     {
-        return StringConverter::parse(node->getString(), *result);
+        if (node->type != ANT_ATOM)
+            return false;
+
+        AtomAbstractNode *atom = (AtomAbstractNode*)node.get();
+        return StringConverter::parse(atom->value, *result);
     }
     //-------------------------------------------------------------------------
     bool ScriptTranslator::getColour(AbstractNodeList::const_iterator i, AbstractNodeList::const_iterator end, ColourValue *result, int maxEntries)
@@ -727,15 +759,22 @@ namespace Ogre{
         int n = 0;
         while (i != end && n < 16)
         {
-            Real r = 0;
-            if (!getReal(*i, &r))
+            if (i != end)
+            {
+                Real r = 0;
+                if (getReal(*i, &r))
+                    (*m)[n/4][n%4] = r;
+                else
+                    return false;
+            }
+            else
+            {
                 return false;
-
-            (*m)[n/4][n%4] = r;
+            }
             ++i;
             ++n;
         }
-        return n == 16;
+        return true;
     }
     //-------------------------------------------------------------------------
     bool ScriptTranslator::getInts(AbstractNodeList::const_iterator i, AbstractNodeList::const_iterator end, int *vals, int count)
@@ -915,8 +954,9 @@ namespace Ogre{
     //---------------------------------------------------------------------
     bool ScriptTranslator::getConstantType(AbstractNodeList::const_iterator i, GpuConstantType *op)
     {
-        const String& val = (*i)->getString();
-        if(val.empty())
+
+        String val;
+        if(!getString(*i, &val))
             return false;
 
         if (val.find("float") != String::npos)
@@ -1042,26 +1082,31 @@ namespace Ogre{
         if(!processed)
         {
             mMaterial = MaterialManager::getSingleton().create(obj->name, compiler->getResourceGroup()).get();
-        }
 
-        if(!mMaterial)
+            if(!mMaterial) // duplicate definition resolved by "use previous"
+                return;
+        }
+        else
         {
-            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line, obj->name);
-            return;
+            if(!mMaterial)
+            {
+                compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line,
+                                   "failed to find or create material \"" + obj->name + "\"");
+                return;
+            }
         }
 
         mMaterial->removeAllTechniques();
-        obj->context = mMaterial;
+        obj->context = Any(mMaterial);
         mMaterial->_notifyOrigin(obj->file);
 
         bool bval;
-        String sval;
 
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_LOD_VALUES:
@@ -1090,12 +1135,13 @@ namespace Ogre{
                         compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file,
                                            prop->line,
                                            "lod_distances. Use lod_values.");
+
                         // Read in LOD distances
                         Material::LodValueList lods;
-                        for(auto& j : prop->values)
+                        for(AbstractNodeList::iterator j = prop->values.begin(); j != prop->values.end(); ++j)
                         {
                             Real v = 0;
-                            if(getReal(j, &v))
+                            if(getReal(*j, &v))
                                 lods.push_back(v);
                             else
                                 compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
@@ -1105,17 +1151,35 @@ namespace Ogre{
                     }
                     break;
                 case ID_LOD_STRATEGY:
-                    if(getValue(prop, compiler, sval))
+                    if (prop->values.empty())
                     {
-                            if (sval == "Distance" || sval == "PixelCount")
-                                compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
-                                                   sval + ". use distance_box or pixel_count");
+                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line);
+                    }
+                    else if (prop->values.size() > 1)
+                    {
+                        compiler->addError(ScriptCompiler::CE_FEWERPARAMETERSEXPECTED, prop->file, prop->line,
+                                           "lod_strategy only supports 1 argument");
+                    }
+                    else
+                    {
+                        String strategyName;
+                        bool result = getString(prop->values.front(), &strategyName);
+                        if (result)
+                        {
 
-                            LodStrategy* strategy = LodStrategyManager::getSingleton().getStrategy(sval);
-                            if (strategy)
+                            LodStrategy *strategy = LodStrategyManager::getSingleton().getStrategy(strategyName);
+
+                            result = (strategy != 0);
+
+                            if (result)
                                 mMaterial->setLodStrategy(strategy);
-                            else
-                                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line, sval);
+                        }
+
+                        if (!result)
+                        {
+                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                               "lod_strategy argument must be a valid LOD strategy");
+                        }
                     }
                     break;
                 case ID_RECEIVE_SHADOWS:
@@ -1134,9 +1198,6 @@ namespace Ogre{
                     }
                     else
                     {
-                        compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
-                                            "set_texture_alias. Use 'set $variable value'");
-
                         AbstractNodeList::const_iterator i0 = getNodeAt(prop->values, 0), i1 = getNodeAt(prop->values, 1);
                         String name, value;
                         if(getString(*i0, &name) && getString(*i1, &value))
@@ -1148,13 +1209,19 @@ namespace Ogre{
                                        "token \"" + prop->name + "\" is not recognized");
                 }
             }
-            else if(i->type == ANT_OBJECT)
+            else if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
 
-        applyTextureAliases(compiler, mMaterial, mTextureAliases);
+        // Apply the texture aliases
+        if(compiler->getListener())
+        {
+            PreApplyTextureAliasesScriptCompilerEvent locEvt(mMaterial, &mTextureAliases);
+            compiler->_fireEvent(&locEvt, 0);
+        }
+        mMaterial->applyTextureAliases(mTextureAliases);
         mTextureAliases.clear();
     }
 
@@ -1173,7 +1240,7 @@ namespace Ogre{
         // Create the technique from the material
         Ogre::Material *material = Ogre::any_cast<Ogre::Material*>(obj->parent->context);
         mTechnique = material->createTechnique();
-        obj->context = mTechnique;
+        obj->context = Any(mTechnique);
 
         // Get the name of the technique
         if(!obj->name.empty())
@@ -1183,11 +1250,11 @@ namespace Ogre{
         String sval;
 
         // Set the properties for the material
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_SCHEME:
@@ -1329,9 +1396,9 @@ namespace Ogre{
                                        "token \"" + prop->name + "\" is not recognized");
                 }
             }
-            else if(i->type == ANT_OBJECT)
+            else if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
     }
@@ -1350,7 +1417,7 @@ namespace Ogre{
 
         Technique *technique = any_cast<Technique*>(obj->parent->context);
         mPass = technique->createPass();
-        obj->context = mPass;
+        obj->context = Any(mPass);
 
         // Get the name of the technique
         if(!obj->name.empty())
@@ -1361,11 +1428,11 @@ namespace Ogre{
         uint32 uival;
 
         // Set the properties for the material
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_AMBIENT:
@@ -1751,7 +1818,7 @@ namespace Ogre{
                         else
                         {
                             String val2;
-                            if (prop->values.front()->getString()=="force")
+                            if (getString(prop->values.front(), &val2) && val2=="force")
                             {
                                 mPass->setTransparentSortingEnabled(true);
                                 mPass->setTransparentSortingForced(true);
@@ -1778,8 +1845,10 @@ namespace Ogre{
                     ManualCullingMode mmode;
                     if(getValue(prop, compiler, mmode))
                         mPass->setManualCullingMode(mmode);
-                    compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
-                                       prop->name + ". Only used by the BSP scene manager.");
+                    break;
+                case ID_NORMALISE_NORMALS:
+                    if(getValue(prop, compiler, bval))
+                        mPass->setNormaliseNormals(bval);
                     break;
                 case ID_LIGHTING:
                     if(getValue(prop, compiler, bval))
@@ -1924,7 +1993,7 @@ namespace Ogre{
                         bool colourMask[] = {false ,false ,false, false};
 
                         uint8 channelIndex = 0;
-                        for(const AbstractNodePtr& abstractNode : prop->values)
+                        for(AbstractNodePtr abstractNode : prop->values)
                         {
                             if(!getBoolean(abstractNode, &colourMask[channelIndex++]))
                             {
@@ -2197,9 +2266,9 @@ namespace Ogre{
                                        "token \"" + prop->name + "\" is not recognized");
                 }
             }
-            else if(i->type == ANT_OBJECT)
+            else if((*i)->type == ANT_OBJECT)
             {
-                ObjectAbstractNode *child = static_cast<ObjectAbstractNode*>(i.get());
+                ObjectAbstractNode *child = static_cast<ObjectAbstractNode*>((*i).get());
                 switch(child->id)
                 {
                 case ID_FRAGMENT_PROGRAM_REF:
@@ -2211,19 +2280,19 @@ namespace Ogre{
                     translateProgramRef(getProgramType(child->id), compiler, child);
                     break;
                 case ID_SHADOW_CASTER_VERTEX_PROGRAM_REF:
-                    translateShadowCasterProgramRef(GPT_VERTEX_PROGRAM, compiler, child);
+                    translateShadowCasterVertexProgramRef(compiler, child);
                     break;
                 case ID_SHADOW_CASTER_FRAGMENT_PROGRAM_REF:
-                    translateShadowCasterProgramRef(GPT_FRAGMENT_PROGRAM, compiler, child);
+                    translateShadowCasterFragmentProgramRef(compiler, child);
                     break;
                 case ID_SHADOW_RECEIVER_VERTEX_PROGRAM_REF:
-                    translateShadowReceiverProgramRef(GPT_VERTEX_PROGRAM, compiler, child);
+                    translateShadowReceiverVertexProgramRef(compiler, child);
                     break;
                 case ID_SHADOW_RECEIVER_FRAGMENT_PROGRAM_REF:
-                    translateShadowReceiverProgramRef(GPT_FRAGMENT_PROGRAM, compiler, child);
+                    translateShadowReceiverFragmentProgramRef(compiler, child);
                     break;
                 default:
-                    processNode(compiler, i);
+                    processNode(compiler, *i);
                     break;
                 case ID_FRAGMENT_PROGRAM:
                 case ID_VERTEX_PROGRAM:
@@ -2233,7 +2302,7 @@ namespace Ogre{
                 case ID_COMPUTE_PROGRAM:
                 {
                     // auto assign inline defined programs
-                    processNode(compiler, i);
+                    processNode(compiler, *i);
                     GpuProgramType type = getProgramType(child->id);
                     mPass->setGpuProgram(type, GpuProgramUsage::_getProgramByName(child->name, mPass->getResourceGroup(), type));
                 }
@@ -2242,99 +2311,105 @@ namespace Ogre{
         }
     }
 
-    static GpuProgramPtr getProgram(ScriptCompiler* compiler, ObjectAbstractNode* node)
+    static Pass* getPass(ScriptCompiler* compiler, ObjectAbstractNode* node)
     {
         if(node->name.empty())
         {
             compiler->addError(ScriptCompiler::CE_OBJECTNAMEEXPECTED, node->file, node->line);
-            return nullptr;
+            return NULL;
         }
 
         ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::GPU_PROGRAM, node->name);
         compiler->_fireEvent(&evt, 0);
 
-        auto& mgr = GpuProgramManager::getSingleton();
-        if (auto ret = mgr.getByName(evt.mName, compiler->getResourceGroup()))
-            return ret;
+        if (!GpuProgramManager::getSingleton().getByName(evt.mName, compiler->getResourceGroup()))
+        {
+            //recheck with auto resource group
+            if (!GpuProgramManager::getSingleton().getByName(
+                    evt.mName, ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME))
+            {
+                compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file,
+                                   node->line, evt.mName);
+                return NULL;
+            }
+        }
 
-        // recheck with auto resource group
-        if (auto ret = mgr.getByName(evt.mName, RGN_AUTODETECT))
-            return ret;
-
-        compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file, node->line,
-                           evt.mName);
-        return nullptr;
+        return any_cast<Pass*>(node->parent->context);
     }
 
     //-------------------------------------------------------------------------
     void PassTranslator::translateProgramRef(GpuProgramType type, ScriptCompiler *compiler, ObjectAbstractNode *node)
     {
-        auto program = getProgram(compiler, node);
-        if(!program) return;
-        auto pass = any_cast<Pass*>(node->parent->context);
+        Pass *pass = getPass(compiler, node);
+        if(!pass) return;
+
+        auto program = GpuProgramUsage::_getProgramByName(node->name, pass->getResourceGroup(), type);
+        if (!program) {
+            compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file,
+                               node->line, node->name);
+            return;
+        }
 
         pass->setGpuProgram(type, program);
-        if(program->isSupported())
+        if(pass->getGpuProgram(type)->isSupported())
         {
             GpuProgramParametersSharedPtr params = pass->getGpuProgramParameters(type);
             GpuProgramTranslator::translateProgramParameters(compiler, params, node);
         }
     }
     //-------------------------------------------------------------------------
-    void PassTranslator::translateShadowCasterProgramRef(GpuProgramType type, ScriptCompiler *compiler, ObjectAbstractNode *node)
+    void PassTranslator::translateShadowCasterVertexProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
     {
-        auto program = getProgram(compiler, node);
-        if(!program) return;
-        auto pass = any_cast<Pass*>(node->parent->context);
+        Pass *pass = getPass(compiler, node);
+        if(!pass) return;
 
-        compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, node->file, node->line,
-                           node->cls + ". Use shadow_caster_material instead");
-
-        auto caster_mat = pass->getParent()->getShadowCasterMaterial();
-        if(!caster_mat)
+        pass->setShadowCasterVertexProgram(node->name);
+        if(pass->getShadowCasterVertexProgram()->isSupported())
         {
-            auto src_mat = pass->getParent()->getParent();
-            // only first pass of this will be used. The caster material is technique specific.
-            caster_mat = src_mat->clone(
-                StringUtil::format("%s/%p/CasterFallback", src_mat->getName().c_str(), pass->getParent()));
-            pass->getParent()->setShadowCasterMaterial(caster_mat);
-        }
-        auto caster_pass = caster_mat->getTechnique(0)->getPass(0);
-
-        caster_pass->setGpuProgram(type, program);
-        if(program->isSupported())
-        {
-            GpuProgramParametersSharedPtr params = caster_pass->getGpuProgramParameters(type);
+            GpuProgramParametersSharedPtr params = pass->getShadowCasterVertexProgramParameters();
             GpuProgramTranslator::translateProgramParameters(compiler, params, node);
         }
     }
     //-------------------------------------------------------------------------
-    void PassTranslator::translateShadowReceiverProgramRef(GpuProgramType type,ScriptCompiler *compiler, ObjectAbstractNode *node)
+    void PassTranslator::translateShadowCasterFragmentProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
     {
-        auto program = getProgram(compiler, node);
-        if(!program) return;
-        auto pass = any_cast<Pass*>(node->parent->context);
+        Pass *pass = getPass(compiler, node);
+        if(!pass) return;
 
-        compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, node->file, node->line,
-                           node->cls + ". Use shadow_receiver_material instead");
-
-        auto receiver_mat = pass->getParent()->getShadowReceiverMaterial();
-        if(!receiver_mat)
+        pass->setShadowCasterFragmentProgram(node->name);
+        if(pass->getShadowCasterFragmentProgram()->isSupported())
         {
-            auto src_mat = pass->getParent()->getParent();
-            // only first pass of this will be used
-            receiver_mat = src_mat->clone(src_mat->getName()+"/ReceiverFallback");
-            pass->getParent()->setShadowReceiverMaterial(receiver_mat);
-        }
-        auto receiver_pass = receiver_mat->getTechnique(0)->getPass(0);
-
-        receiver_pass->setGpuProgram(type, program);
-        if(program->isSupported())
-        {
-            GpuProgramParametersSharedPtr params = receiver_pass->getGpuProgramParameters(type);
+            GpuProgramParametersSharedPtr params = pass->getShadowCasterFragmentProgramParameters();
             GpuProgramTranslator::translateProgramParameters(compiler, params, node);
         }
     }
+    //-------------------------------------------------------------------------
+    void PassTranslator::translateShadowReceiverVertexProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
+    {
+        Pass *pass = getPass(compiler, node);
+        if(!pass) return;
+
+        pass->setShadowReceiverVertexProgram(node->name);
+        if(pass->getShadowReceiverVertexProgram()->isSupported())
+        {
+            GpuProgramParametersSharedPtr params = pass->getShadowReceiverVertexProgramParameters();
+            GpuProgramTranslator::translateProgramParameters(compiler, params, node);
+        }
+    }
+    //-------------------------------------------------------------------------
+    void PassTranslator::translateShadowReceiverFragmentProgramRef(ScriptCompiler *compiler, ObjectAbstractNode *node)
+    {
+        Pass *pass = getPass(compiler, node);
+        if(!pass) return;
+
+        pass->setShadowReceiverFragmentProgram(node->name);
+        if(pass->getShadowReceiverFragmentProgram()->isSupported())
+        {
+            GpuProgramParametersSharedPtr params = pass->getShadowReceiverFragmentProgramParameters();
+            GpuProgramTranslator::translateProgramParameters(compiler, params, node);
+        }
+    }
+
     /**************************************************************************
      * TextureUnitTranslator
      *************************************************************************/
@@ -2503,11 +2578,11 @@ namespace Ogre{
         SamplerPtr sampler = TextureManager::getSingleton().createSampler(obj->name);
 
         // Set the properties for the material
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_TEX_ADDRESS_MODE:
@@ -2524,9 +2599,9 @@ namespace Ogre{
                                        "token \"" + prop->name + "\" is not recognized");
                 }
             }
-            else if(i->type == ANT_OBJECT)
+            else if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
     }
@@ -2537,7 +2612,7 @@ namespace Ogre{
 
         Pass *pass = any_cast<Pass*>(obj->parent->context);
         mUnit = pass->createTextureUnitState();
-        obj->context = mUnit;
+        obj->context = Any(mUnit);
 
         // Get the name of the technique
         if(!obj->name.empty())
@@ -2548,11 +2623,11 @@ namespace Ogre{
         String sval;
 
         // Set the properties for the material
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_TEX_ADDRESS_MODE:
@@ -2576,15 +2651,9 @@ namespace Ogre{
                                                prop->file, prop->line, sval);
                     }
                     break;
-                case ID_UNORDERED_ACCESS_MIP:
-                    if(getValue(prop, compiler, uival))
-                        mUnit->setUnorderedAccessMipLevel(uival);
-                    break;
                 case ID_TEXTURE_ALIAS:
-                    compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
-                        "texture_alias. Use 'texture $variable'");
                     if(getValue(prop, compiler, sval))
-                        mUnit->setName(sval);
+                        mUnit->setTextureNameAlias(sval);
                     break;
                 case ID_TEXTURE:
                     if(prop->values.empty())
@@ -2606,7 +2675,7 @@ namespace Ogre{
                             bool isAlpha = false;
                             bool sRGBRead = false;
                             PixelFormat format = PF_UNKNOWN;
-                            int mipmaps = TextureManager::getSingleton().getDefaultNumMipmaps(); // MIP_DEFAULT
+                            int mipmaps = MIP_DEFAULT;
 
                             ++j;
                             while(j != prop->values.end())
@@ -2641,14 +2710,10 @@ namespace Ogre{
                                         sRGBRead = true;
                                         break;
                                     default:
-                                        if(!StringConverter::parse(atom->value, mipmaps))
-                                        {
+                                        if(StringConverter::isNumber(atom->value))
+                                            mipmaps = StringConverter::parseInt(atom->value);
+                                        else
                                             format = PixelUtil::getFormatFromName(atom->value, true);
-
-                                            if (format == PF_UNKNOWN)
-                                                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS,
-                                                                   prop->file, prop->line, atom->value);
-                                        }
                                     }
                                 }
                                 else
@@ -2662,30 +2727,9 @@ namespace Ogre{
                             ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::TEXTURE, val);
                             compiler->_fireEvent(&evt, 0);
 
-                            if(isAlpha)
-                            {
-                                // format = PF_A8; should only be done, if src is luminance, which we dont know here
-                                compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file,
-                                                   prop->line, "alpha. Use PF_A8 instead");
-                            }
-
-                            if(const auto& tex = TextureManager::getSingleton().getByName(evt.mName, mUnit->getParent()->getResourceGroup()))
-                            {
-                                // the texture is shared with another texture unit, report any discrepancies
-                                if (tex->getDesiredFormat() != format || tex->getNumMipmaps() != uint(mipmaps) ||
-                                    tex->isHardwareGammaEnabled() != sRGBRead || tex->getTextureType() != texType)
-                                {
-                                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                       "overriding previous declarations of texture '" + evt.mName +
-                                                           "' with different parameters");
-                                }
-                            }
-
                             mUnit->setTextureName(evt.mName, texType);
                             mUnit->setDesiredFormat(format);
-                            OGRE_IGNORE_DEPRECATED_BEGIN
                             mUnit->setIsAlpha(isAlpha);
-                            OGRE_IGNORE_DEPRECATED_END
                             mUnit->setNumMipmaps(mipmaps);
                             mUnit->setHardwareGammaEnabled(sRGBRead);
                         }
@@ -3277,6 +3321,11 @@ namespace Ogre{
                             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
                     }
                     break;
+                case ID_BINDING_TYPE:
+                    TextureUnitState::BindingType bt;
+                    if(getValue(prop, compiler, bt))
+                        mUnit->setBindingType(bt);
+                    break;
                 case ID_CONTENT_TYPE:
                     if(prop->values.empty())
                     {
@@ -3344,9 +3393,9 @@ namespace Ogre{
                                        "token \"" + prop->name + "\" is not recognized");
                 }
             }
-            else if(i->type == ANT_OBJECT)
+            else if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
     }
@@ -3373,74 +3422,70 @@ namespace Ogre{
         // Set the value of the source
         ExternalTextureSourceManager::getSingleton().setCurrentPlugIn(obj->values.front()->getValue());
 
-        if (!ExternalTextureSourceManager::getSingleton().getCurrentPlugIn())
-        {
-            compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, node->file, node->line,
-                               obj->values.front()->getValue());
-            return;
-        }
-
         // Set up the technique, pass, and texunit levels
-        TextureUnitState *texunit = any_cast<TextureUnitState*>(obj->parent->context);
-        Pass *pass = texunit->getParent();
-        Technique *technique = pass->getParent();
-        Material *material = technique->getParent();
-
-        unsigned short techniqueIndex = 0, passIndex = 0, texUnitIndex = 0;
-        for(unsigned short i = 0; i < material->getNumTechniques(); i++)
+        if(ExternalTextureSourceManager::getSingleton().getCurrentPlugIn() != 0)
         {
-            if(material->getTechnique(i) == technique)
-            {
-                techniqueIndex = i;
-                break;
-            }
-        }
-        for(unsigned short i = 0; i < technique->getNumPasses(); i++)
-        {
-            if(technique->getPass(i) == pass)
-            {
-                passIndex = i;
-                break;
-            }
-        }
-        for(unsigned short i = 0; i < pass->getNumTextureUnitStates(); i++)
-        {
-            if(pass->getTextureUnitState(i) == texunit)
-            {
-                texUnitIndex = i;
-                break;
-            }
-        }
+            TextureUnitState *texunit = any_cast<TextureUnitState*>(obj->parent->context);
+            Pass *pass = texunit->getParent();
+            Technique *technique = pass->getParent();
+            Material *material = technique->getParent();
 
-        String tps;
-        tps = StringConverter::toString(techniqueIndex) + " "
-            + StringConverter::toString(passIndex) + " "
-            + StringConverter::toString(texUnitIndex);
-
-        ExternalTextureSourceManager::getSingleton().getCurrentPlugIn()->setParameter( "set_T_P_S", tps );
-
-        for(auto & i : obj->children)
-        {
-            if(i->type == ANT_PROPERTY)
+            unsigned short techniqueIndex = 0, passIndex = 0, texUnitIndex = 0;
+            for(unsigned short i = 0; i < material->getNumTechniques(); i++)
             {
-                PropertyAbstractNode *prop = (PropertyAbstractNode*)i.get();
-                // Glob the property values all together
-                String str = "";
-                for(AbstractNodeList::iterator j = prop->values.begin(); j != prop->values.end(); ++j)
+                if(material->getTechnique(i) == technique)
                 {
-                    if(j != prop->values.begin())
-                        str = str + " ";
-                    str = str + (*j)->getValue();
+                    techniqueIndex = i;
+                    break;
                 }
-                ExternalTextureSourceManager::getSingleton().getCurrentPlugIn()->setParameter(prop->name, str);
             }
-            else if(i->type == ANT_OBJECT)
+            for(unsigned short i = 0; i < technique->getNumPasses(); i++)
             {
-                processNode(compiler, i);
+                if(technique->getPass(i) == pass)
+                {
+                    passIndex = i;
+                    break;
+                }
             }
-        }
+            for(unsigned short i = 0; i < pass->getNumTextureUnitStates(); i++)
+            {
+                if(pass->getTextureUnitState(i) == texunit)
+                {
+                    texUnitIndex = i;
+                    break;
+                }
+            }
 
-        ExternalTextureSourceManager::getSingleton().getCurrentPlugIn()->createDefinedTexture(material->getName(), material->getGroup());
+            String tps;
+            tps = StringConverter::toString(techniqueIndex) + " "
+                + StringConverter::toString(passIndex) + " "
+                + StringConverter::toString(texUnitIndex);
+
+            ExternalTextureSourceManager::getSingleton().getCurrentPlugIn()->setParameter( "set_T_P_S", tps );
+
+            for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
+            {
+                if((*i)->type == ANT_PROPERTY)
+                {
+                    PropertyAbstractNode *prop = (PropertyAbstractNode*)(*i).get();
+                    // Glob the property values all together
+                    String str = "";
+                    for(AbstractNodeList::iterator j = prop->values.begin(); j != prop->values.end(); ++j)
+                    {
+                        if(j != prop->values.begin())
+                            str = str + " ";
+                        str = str + (*j)->getValue();
+                    }
+                    ExternalTextureSourceManager::getSingleton().getCurrentPlugIn()->setParameter(prop->name, str);
+                }
+                else if((*i)->type == ANT_OBJECT)
+                {
+                    processNode(compiler, *i);
+                }
+            }
+
+            ExternalTextureSourceManager::getSingleton().getCurrentPlugIn()->createDefinedTexture(material->getName(), material->getGroup());
+        }
     }
 
     /**************************************************************************
@@ -3472,52 +3517,237 @@ namespace Ogre{
 
         // Get the language
         String language;
-        for(const auto& lnode : obj->values)
+        if(!getString(obj->values.front(), &language))
         {
-            if(!getString(lnode, &language))
-            {
-                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line);
-                return;
-            }
-
-            if (language == "asm")
-            {
-                compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, obj->file, obj->line, "asm. Use syntax code.");
-                break; // always supported
-            }
-            if (GpuProgramManager::getSingleton().isLanguageSupported(language))
-                break;
+            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line);
+            return;
         }
 
-        translateGpuProgram(compiler, obj, language);
+        if(language == "asm")
+            translateGpuProgram(compiler, obj);
+        else if(language == "unified")
+            translateUnifiedGpuProgram(compiler, obj);
+        else
+            translateHighLevelGpuProgram(compiler, obj);
     }
     //-------------------------------------------------------------------------
-    void GpuProgramTranslator::translateGpuProgram(ScriptCompiler *compiler, ObjectAbstractNode *obj, String language)
+    void GpuProgramTranslator::translateGpuProgram(ScriptCompiler *compiler, ObjectAbstractNode *obj)
     {
-        String syntax;
-        std::vector<String> delegates;
+        std::list<std::pair<String,String> > customParameters;
+        String syntax, source;
+        AbstractNodePtr params;
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
+        {
+            if((*i)->type == ANT_PROPERTY)
+            {
+                PropertyAbstractNode *prop = (PropertyAbstractNode*)(*i).get();
+                if(prop->id == ID_SOURCE)
+                {
+                    if(!prop->values.empty())
+                    {
+                        if(prop->values.front()->type == ANT_ATOM)
+                            source = ((AtomAbstractNode*)prop->values.front().get())->value;
+                        else
+                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                               "source file expected");
+                    }
+                    else
+                    {
+                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line,
+                                           "source file expected");
+                    }
+                }
+                else if(prop->id == ID_SYNTAX)
+                {
+                    if(!prop->values.empty())
+                    {
+                        if(prop->values.front()->type == ANT_ATOM)
+                            syntax = ((AtomAbstractNode*)prop->values.front().get())->value;
+                        else
+                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                               "syntax string expected");
+                    }
+                    else
+                    {
+                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line,
+                                           "syntax string expected");
+                    }
+                }
+                else
+                {
+                    String name = prop->name, value;
+                    bool first = true;
+                    for(AbstractNodeList::iterator it = prop->values.begin(); it != prop->values.end(); ++it)
+                    {
+                        if((*it)->type == ANT_ATOM)
+                        {
+                            if(!first)
+                                value += " ";
+                            else
+                                first = false;
+                            value += ((AtomAbstractNode*)(*it).get())->value;
+                        }
+                    }
+                    customParameters.push_back(std::make_pair(name, value));
+                }
+            }
+            else if((*i)->type == ANT_OBJECT)
+            {
+                if(((ObjectAbstractNode*)(*i).get())->id == ID_DEFAULT_PARAMS)
+                    params = *i;
+                else
+                    processNode(compiler, *i);
+            }
+        }
+
+        // Allocate the program
+        GpuProgram *prog = 0;
+        CreateGpuProgramScriptCompilerEvent evt(obj->file, obj->name, compiler->getResourceGroup(), source, syntax, translateIDToGpuProgramType(obj->id));
+        bool processed = compiler->_fireEvent(&evt, (void*)&prog);
+        if(!processed)
+        {
+            prog = GpuProgramManager::getSingleton().createProgram(obj->name, compiler->getResourceGroup(), source, translateIDToGpuProgramType(obj->id), syntax).get();
+        }
+
+        // Check that allocation worked
+        if(prog == 0)
+        {
+            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line,
+                               "gpu program \"" + obj->name + "\" could not be created");
+            return;
+        }
+
+        obj->context = Any(prog);
+
+        prog->setMorphAnimationIncluded(false);
+        prog->setPoseAnimationIncluded(0);
+        prog->setSkeletalAnimationIncluded(false);
+        prog->setVertexTextureFetchRequired(false);
+        prog->_notifyOrigin(obj->file);
+
+        // Set the custom parameters
+        for(std::list<std::pair<String,String> >::iterator i = customParameters.begin(); i != customParameters.end(); ++i)
+            prog->setParameter(i->first, i->second);
+
+        // Set up default parameters
+        if(prog->isSupported() && params)
+        {
+            GpuProgramParametersSharedPtr ptr = prog->getDefaultParameters();
+            GpuProgramTranslator::translateProgramParameters(compiler, ptr, static_cast<ObjectAbstractNode*>(params.get()));
+        }
+    }
+    //-------------------------------------------------------------------------
+    void GpuProgramTranslator::translateUnifiedGpuProgram(ScriptCompiler *compiler, ObjectAbstractNode *obj)
+    {
+        std::list<std::pair<String,String> > customParameters;
+        AbstractNodePtr params;
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
+        {
+            if((*i)->type == ANT_PROPERTY)
+            {
+                PropertyAbstractNode *prop = (PropertyAbstractNode*)(*i).get();
+                if(prop->name == "delegate")
+                {
+                    String value;
+                    if(!prop->values.empty() && prop->values.front()->type == ANT_ATOM)
+                        value = ((AtomAbstractNode*)prop->values.front().get())->value;
+
+                    ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::GPU_PROGRAM, value);
+                    compiler->_fireEvent(&evt, 0);
+                    customParameters.push_back(std::make_pair("delegate", evt.mName));
+                }
+                else
+                {
+                    String name = prop->name, value;
+                    bool first = true;
+                    for(AbstractNodeList::iterator it = prop->values.begin(); it != prop->values.end(); ++it)
+                    {
+                        if((*it)->type == ANT_ATOM)
+                        {
+                            if(!first)
+                                value += " ";
+                            else
+                                first = false;
+                            value += ((AtomAbstractNode*)(*it).get())->value;
+                        }
+                    }
+                    customParameters.push_back(std::make_pair(name, value));
+                }
+            }
+            else if((*i)->type == ANT_OBJECT)
+            {
+                if(((ObjectAbstractNode*)(*i).get())->id == ID_DEFAULT_PARAMS)
+                    params = *i;
+                else
+                    processNode(compiler, *i);
+            }
+        }
+
+        // Allocate the program
+        HighLevelGpuProgram *prog = 0;
+        CreateHighLevelGpuProgramScriptCompilerEvent evt(obj->file, obj->name, compiler->getResourceGroup(), "", "unified", translateIDToGpuProgramType(obj->id));
+        bool processed = compiler->_fireEvent(&evt, (void*)&prog);
+
+        if(!processed)
+        {
+            prog = HighLevelGpuProgramManager::getSingleton().createProgram(obj->name, compiler->getResourceGroup(), "unified", translateIDToGpuProgramType(obj->id)).get();
+        }
+
+        // Check that allocation worked
+        if(prog == 0)
+        {
+            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line,
+                               "gpu program \"" + obj->name + "\" could not be created");
+            return;
+        }
+
+        obj->context = Any(prog);
+
+        prog->setMorphAnimationIncluded(false);
+        prog->setPoseAnimationIncluded(0);
+        prog->setSkeletalAnimationIncluded(false);
+        prog->setVertexTextureFetchRequired(false);
+        prog->_notifyOrigin(obj->file);
+
+        // Set the custom parameters
+        for(std::list<std::pair<String,String> >::iterator i = customParameters.begin(); i != customParameters.end(); ++i)
+            prog->setParameter(i->first, i->second);
+
+        // Set up default parameters
+        if(prog->isSupported() && params)
+        {
+            GpuProgramParametersSharedPtr ptr = prog->getDefaultParameters();
+            GpuProgramTranslator::translateProgramParameters(compiler, ptr, static_cast<ObjectAbstractNode*>(params.get()));
+        }
+
+    }
+    //-------------------------------------------------------------------------
+    void GpuProgramTranslator::translateHighLevelGpuProgram(ScriptCompiler *compiler, ObjectAbstractNode *obj)
+    {
+        if(obj->values.empty())
+        {
+            compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, obj->file, obj->line);
+            return;
+        }
+        String language;
+        if(!getString(obj->values.front(), &language))
+        {
+            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line);
+            return;
+        }
+
         std::vector<std::pair<PropertyAbstractNode*, String> > customParameters;
         String source, profiles, target;
         AbstractNodePtr params;
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = (PropertyAbstractNode*)i.get();
+                PropertyAbstractNode *prop = (PropertyAbstractNode*)(*i).get();
                 if(prop->id == ID_SOURCE)
                 {
                     if(!getValue(prop, compiler, source))
                         return;
-                }
-                else if(prop->name == "delegate")
-                {
-                    String value;
-                    if(!getValue(prop, compiler, value))
-                        return;
-
-                    ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::GPU_PROGRAM, value);
-                    compiler->_fireEvent(&evt, 0);
-                    delegates.push_back(evt.mName);
                 }
                 else
                 {
@@ -3537,10 +3767,6 @@ namespace Ogre{
                                 ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::GPU_PROGRAM, ((AtomAbstractNode*)(*it).get())->value);
                                 compiler->_fireEvent(&evt, 0);
                                 value += evt.mName;
-
-                                compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file,
-                                                   prop->line,
-                                                   "attach. Use the #include directive instead");
                             }
                             else
                             {
@@ -3553,53 +3779,41 @@ namespace Ogre{
                         profiles = value;
                     else if(prop->name == "target")
                         target = value;
-                    else if(prop->id == ID_SYNTAX && language == "asm")
-                        syntax = value;
                     else
                         customParameters.push_back(std::make_pair(prop, value));
                 }
             }
-            else if(i->type == ANT_OBJECT)
+            else if((*i)->type == ANT_OBJECT)
             {
-                if(((ObjectAbstractNode*)i.get())->id == ID_DEFAULT_PARAMS)
-                    params = i;
+                if(((ObjectAbstractNode*)(*i).get())->id == ID_DEFAULT_PARAMS)
+                    params = *i;
                 else
-                    processNode(compiler, i);
+                    processNode(compiler, *i);
             }
         }
 
         // Allocate the program
-        GpuProgramType gpt = getProgramType(obj->id);
-        GpuProgram *prog = 0;
-
-        if(language == "asm")
-            language = syntax;
-        CreateGpuProgramScriptCompilerEvent evt(obj->file, obj->name, compiler->getResourceGroup(), source,
-                                                language, gpt);
-        bool processed = compiler->_fireEvent(&evt, &prog);
-
+        HighLevelGpuProgram *prog = 0;
+        CreateHighLevelGpuProgramScriptCompilerEvent evt(obj->file, obj->name, compiler->getResourceGroup(), source, language,
+                                                         translateIDToGpuProgramType(obj->id));
+        bool processed = compiler->_fireEvent(&evt, (void*)&prog);
         if(!processed)
         {
-            prog = GpuProgramManager::getSingleton().create(obj->name, compiler->getResourceGroup(), gpt, language).get();
+            prog = HighLevelGpuProgramManager::getSingleton().createProgram(obj->name, compiler->getResourceGroup(), language, translateIDToGpuProgramType(obj->id)).get();
 
-            if (source.empty() && language != "unified")
-            {
-                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line,
-                                   "No 'source' provided for GPU program");
-                return;
-            }
-
-            if(prog && !source.empty()) // prog=0 if duplicate definition resolved by "use previous"
+            if(prog) // duplicate definition resolved by "use previous"
                 prog->setSourceFile(source);
         }
 
-        if(!prog)
+        // Check that allocation worked
+        if(prog == 0)
         {
-            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line, obj->name);
+            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line,
+                               "GPU program \"" + obj->name + "\" could not be created");
             return;
         }
 
-        obj->context = prog;
+        obj->context = Any(prog);
 
         prog->setMorphAnimationIncluded(false);
         prog->setPoseAnimationIncluded(0);
@@ -3615,10 +3829,6 @@ namespace Ogre{
         if(!target.empty())
             prog->setParameter("target", target);
 
-        // special case for unified
-        for(const auto& d : delegates)
-            prog->setParameter("delegate", d);
-
         // Set the custom parameters
         for(const auto& p : customParameters)
         {
@@ -3632,40 +3842,20 @@ namespace Ogre{
         if(prog->isSupported() && params)
         {
             GpuProgramParametersSharedPtr ptr = prog->getDefaultParameters();
-
-            if(prog->hasCompileError())
-                return;
-
             GpuProgramTranslator::translateProgramParameters(compiler, ptr, static_cast<ObjectAbstractNode*>(params.get()));
         }
+
     }
     //-------------------------------------------------------------------------
-    static int parseProgramParameterDimensions(String& declarator, BaseConstantType& type)
+    static int parseProgramParameterDimensions(String& declarator, const char* type)
     {
         // Assume 1 unless otherwise specified
         int dimensions = 1;
-        type = BCT_UNKNOWN;
 
-        // get the type
-        const char* typeStrings[] = {"float", "int", "uint", "double", "bool"};
-        BaseConstantType baseTypes[] = {BCT_FLOAT, BCT_INT, BCT_UINT, BCT_DOUBLE, BCT_BOOL};
-
-        const char* typeStr = "";
-
-        for(int i = 0; i < 5; ++i)
-        {
-            if(declarator.find(typeStrings[i]) == 0)
-            {
-                type = baseTypes[i];
-                typeStr = typeStrings[i];
-                break;
-            }
-        }
-
-        if(type == BCT_UNKNOWN)
+        if(declarator.size() == strlen(type))
             return dimensions;
 
-        size_t start = declarator.find_first_not_of(typeStr);
+        size_t start = declarator.find_first_not_of(type);
 
         if (start != String::npos)
         {
@@ -3692,43 +3882,16 @@ namespace Ogre{
         return dimensions; 
     }
     //-------------------------------------------------------------------------
-    template <typename T, typename It>
-    static void safeSetConstant(const GpuProgramParametersPtr& params, const String& name, size_t index, It arrayStart,
-                                It arrayEnd, size_t count, PropertyAbstractNode* prop, ScriptCompiler* compiler)
+    void GpuProgramTranslator::translateProgramParameters(ScriptCompiler *compiler, GpuProgramParametersSharedPtr params, ObjectAbstractNode *obj)
     {
-        int roundedCount = (count + 3) / 4; // integer ceil
-        roundedCount *= 4;
-
-        std::vector<T> vals;
-        if (!_getVector(arrayStart, arrayEnd, vals, roundedCount))
-        {
-            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
-            return;
-        }
-
-        try
-        {
-            if (!name.empty())
-                params->setNamedConstant(name, vals.data(), count, 1);
-            else
-                params->setConstant(index, vals.data(), roundedCount / 4);
-        }
-        catch (Exception& e)
-        {
-            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line, e.getDescription());
-        }
-    }
-
-    void GpuProgramTranslator::translateProgramParameters(ScriptCompiler *compiler, const GpuProgramParametersSharedPtr& params, ObjectAbstractNode *obj)
-    {
-        uint32 animParametricsCount = 0;
+        size_t animParametricsCount = 0;
 
         String value;
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_SHARED_PARAMS_REF:
@@ -3803,10 +3966,83 @@ namespace Ogre{
                                                        "incorrect matrix4x4 declaration");
                                 }
                             }
+                            else if (atom1->value == "subroutine")
+                            {
+                                String s;
+                                if (getString(*k, &s))
+                                {
+                                    try
+                                    {
+                                        if (named)
+                                            params->setNamedSubroutine(name, s);
+                                        else
+                                            params->setSubroutine(index, s);
+                                    }
+                                    catch (Exception& e)
+                                    {
+                                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                                           e.getDescription());
+                                    }
+                                }
+                                else
+                                {
+                                    compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line,
+                                                       "incorrect subroutine declaration");
+                                }
+                            }
+                            // else if (atom1->value == "atomic_counter")
+                            // {
+                            //     //GpuProgramParameters::ElementType type = GpuProgramParameters::ET_INT; //FIXME
+                            //     int count = 0;
+                            //     if(atom1->value.size() > 14) {
+                            //         count = StringConverter::parseInt(atom1->value.substr(3));
+                            //         compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                            //                            "currently only a single atomic counter can be set at a time");
+                            //         break;
+                            //     }
+                            //     else
+                            //     {
+                            //         count = 1;
+                            //     }
+
+                            //     // First, clear out any offending auto constants
+                            //     if(named)
+                            //         params->clearNamedAutoConstant(name);
+                            //     else
+                            //         params->clearAutoConstant(index);
+
+                            //     // uint8 roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
+                            //     int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
+
+                            //     // uint32 *vals = OGRE_ALLOC_T(uint32, roundedCount, MEMCATEGORY_SCRIPTING);
+                            //     int *vals = OGRE_ALLOC_T(int, roundedCount, MEMCATEGORY_SCRIPTING);
+                            //     if(getInts(k, prop->values.end(), vals, roundedCount))
+                            //     {
+                            //         try
+                            //         {
+                            //             if(named)
+                            //                 params->setNamedConstant(name, vals, count, 1);
+                            //             else
+                            //                 params->setConstant(index, vals, roundedCount/4);
+                            //         }
+                            //         catch(...)
+                            //         {
+                            //             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                            //                                "setting of constant failed");
+                            //         }
+                            //     }
+                            //     else
+                            //     {
+                            //         compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
+                            //                            "incorrect integer constant declaration");
+                            //     }
+                            //     OGRE_FREE(vals, MEMCATEGORY_SCRIPTING);
+                            // }
+                            //TODO This should probably converted into a function of type.
                             else
                             {
+                                // GpuProgramParameters::ElementType type = GpuProgramParameters::ET_FLOAT;
                                 int count;
-                                BaseConstantType type;
 
                                 // First, clear out any offending auto constants
                                 if (named)
@@ -3814,29 +4050,121 @@ namespace Ogre{
                                 else
                                     params->clearAutoConstant(index);
 
-                                count = parseProgramParameterDimensions(atom1->value, type);
+                                if (atom1->value.find("float") != String::npos)
+                                {
+                                    // type = GpuProgramParameters::ET_FLOAT;
+                                    count = parseProgramParameterDimensions(atom1->value, "float");
+                                    int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
 
-                                if (type == BCT_FLOAT)
-                                {
-                                    safeSetConstant<float>(params, name, index, k, prop->values.cend(), count, prop, compiler);
+                                    std::vector<float> vals;
+                                    if (_getVector(k, prop->values.end(), vals, roundedCount))
+                                    {
+                                        try
+                                        {
+                                            if (named)
+                                                params->setNamedConstant(name, vals.data(), count, 1);
+                                            else
+                                                params->setConstant(index, vals.data(), roundedCount/4);
+                                        }
+                                        catch (Exception& e)
+                                        {
+                                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                                               e.getDescription());
+                                        }
+                                    }
+                                    else
+                                    {
+                                        compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
+                                                           "incorrect float constant declaration");
+                                    }
                                 }
-                                else if (type == BCT_UINT)
+                                else if (atom1->value.find("uint") != String::npos)
                                 {
-                                    safeSetConstant<uint>(params, name, index, k, prop->values.cend(), count, prop, compiler);
+                                    count = parseProgramParameterDimensions(atom1->value, "uint");
+                                    int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
+
+                                    std::vector<uint> vals;
+                                    if (_getVector(k, prop->values.end(), vals, roundedCount))
+                                    {
+                                        try
+                                        {
+                                            if (named)
+                                                params->setNamedConstant(name, vals.data(), count, 1);
+                                            else
+                                                params->setConstant(index, vals.data(), roundedCount/4);
+                                        }
+                                        catch (Exception& e)
+                                        {
+                                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                                               e.getDescription());
+                                        }
+                                    }
+                                    else
+                                    {
+                                        compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
+                                                           "incorrect unsigned integer constant declaration");
+                                    }
                                 }
-                                else if (type == BCT_INT)
+                                else if (atom1->value.find("int") != String::npos)
                                 {
-                                    safeSetConstant<int>(params, name, index, k, prop->values.cend(), count, prop, compiler);
+                                    count = parseProgramParameterDimensions(atom1->value, "int");
+                                    int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
+
+                                    std::vector<int> vals;
+                                    if (_getVector(k, prop->values.end(), vals, roundedCount))
+                                    {
+                                        try
+                                        {
+                                            if (named)
+                                                params->setNamedConstant(name, vals.data(), count, 1);
+                                            else
+                                                params->setConstant(index, vals.data(), roundedCount/4);
+                                        }
+                                        catch (Exception& e)
+                                        {
+                                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                                               e.getDescription());
+                                        }
+                                    }
+                                    else
+                                    {
+                                        compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
+                                                           "incorrect integer constant declaration");
+                                    }
                                 }
-                                else if (type == BCT_DOUBLE)
+                                else if (atom1->value.find("double") != String::npos)
                                 {
-                                    safeSetConstant<double>(params, name, index, k, prop->values.cend(), count, prop, compiler);
+                                    count = parseProgramParameterDimensions(atom1->value, "double");
+                                    int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
+
+                                    std::vector<double> vals;
+                                    if (_getVector(k, prop->values.end(), vals, roundedCount))
+                                    {
+                                        try
+                                        {
+                                            if (named)
+                                                params->setNamedConstant(name, vals.data(), count, 1);
+                                            else
+                                                params->setConstant(index, vals.data(), roundedCount/4);
+                                        }
+                                        catch (Exception& e)
+                                        {
+                                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                                               e.getDescription());
+                                        }
+                                    }
+                                    else
+                                    {
+                                        compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
+                                                           "incorrect double constant declaration");
+                                    }
                                 }                                
-                                else if (type == BCT_BOOL)
+                                else if (atom1->value.find("bool") != String::npos)
                                 {
+                                    count = parseProgramParameterDimensions(atom1->value, "bool");
+                                    int roundedCount = count%4 != 0 ? count + 4 - (count%4) : count;
+
                                     std::vector<bool> tmp;
-                                    int roundedCount = (count + 3) / 4; // integer ceil
-                                    roundedCount *= 4;
                                     if (_getVector(k, prop->values.end(), tmp, roundedCount))
                                     {
                                         std::vector<uint> vals(tmp.begin(), tmp.end());
@@ -3855,12 +4183,9 @@ namespace Ogre{
                                     }
                                     else
                                     {
-                                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                        compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
                                                            "incorrect boolean constant declaration");
                                     }
-
-                                    compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
-                                                       "bool. Use uint instead");
                                 }
                                 else
                                 {
@@ -3915,12 +4240,6 @@ namespace Ogre{
                                 switch(def->dataType)
                                 {
                                 case GpuProgramParameters::ACDT_NONE:
-                                    if (i2 != prop->values.end())
-                                    {
-                                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file,
-                                                           prop->line, "unexpected <extraInfo> parameter");
-                                    }
-
                                     // Set the auto constant
                                     try
                                     {
@@ -3929,10 +4248,10 @@ namespace Ogre{
                                         else
                                             params->setAutoConstant(index, def->acType);
                                     }
-                                    catch(Exception& e)
+                                    catch(...)
                                     {
                                         compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                           e.getDescription());
+                                                           "setting of constant failed");
                                     }
                                     break;
                                 case GpuProgramParameters::ACDT_INT:
@@ -3945,10 +4264,10 @@ namespace Ogre{
                                             else
                                                 params->setAutoConstant(index, def->acType, animParametricsCount++);
                                         }
-                                        catch(Exception& e)
+                                        catch(...)
                                         {
                                             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                               e.getDescription());
+                                                               "setting of constant failed");
                                         }
                                     }
                                     else
@@ -3979,7 +4298,7 @@ namespace Ogre{
                                             else
                                             {
                                                 compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
-                                                                   "<extraInfo> parameter required by constant definition " + atom1->value);
+                                                                   "extra parameters required by constant definition " + atom1->value);
                                             }
                                         }
                                         else
@@ -4021,7 +4340,7 @@ namespace Ogre{
                                             else
                                             {
                                                 compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                                   "invalid auto constant <extraInfo> parameter");
+                                                                   "invalid auto constant extra info parameter");
                                             }
                                         }
                                     }
@@ -4070,13 +4389,13 @@ namespace Ogre{
                                             else
                                             {
                                                 compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                                                   "incorrect float argument definition in <extraInfo> parameter");
+                                                                   "incorrect float argument definition in extra parameters");
                                             }
                                         }
                                         else
                                         {
                                             compiler->addError(ScriptCompiler::CE_NUMBEREXPECTED, prop->file, prop->line,
-                                                               "<extraInfo> parameter required by constant definition " + atom1->value);
+                                                               "extra parameters required by constant definition " + atom1->value);
                                         }
                                     }
                                     break;
@@ -4149,7 +4468,8 @@ namespace Ogre{
         // Must have a name
         if (obj->name.empty())
         {
-            compiler->addError(ScriptCompiler::CE_OBJECTNAMEEXPECTED, obj->file, obj->line);
+            compiler->addError(ScriptCompiler::CE_OBJECTNAMEEXPECTED, obj->file, obj->line,
+                               "shared_params must be given a name");
             return;
         }
 
@@ -4164,22 +4484,18 @@ namespace Ogre{
 
         if (!sharedParams)
         {
-            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line, obj->name);
+            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line);
             return;
         }
 
-        for (auto & i : obj->children)
+        for (AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if (i->type != ANT_PROPERTY)
+            if ((*i)->type != ANT_PROPERTY)
                 continue;
 
-            PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+            PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
             if (prop->id != ID_SHARED_PARAM_NAMED)
-            {
-                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
-                                   prop->name);
                 continue;
-            }
 
             if (prop->values.size() < 2)
             {
@@ -4201,7 +4517,7 @@ namespace Ogre{
             }
 
             AbstractNodeList::const_iterator arrayStart = getNodeAt(prop->values, 2), arrayEnd = prop->values.end();
-            uint32 arraySz = 1;
+            size_t arraySz = 1;
 
             if (arrayStart != arrayEnd)
             {
@@ -4278,8 +4594,6 @@ namespace Ogre{
             }
             case BCT_BOOL:
             {
-                compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line,
-                                   "bool. Use uint instead");
                 std::vector<bool> tmp;
                 if(_getVector(arrayStart, arrayEnd, tmp, arraySz))
                 {
@@ -4327,7 +4641,7 @@ namespace Ogre{
 
         if(!mSystem)
         {
-            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line, obj->name);
+            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line);
             return;
         }
 
@@ -4336,63 +4650,83 @@ namespace Ogre{
         mSystem->removeAllEmitters();
         mSystem->removeAllAffectors();
 
-        obj->context = mSystem;
+        obj->context = Any(mSystem);
 
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
-                if(prop->values.empty())
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
+                switch(prop->id)
                 {
-                    compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line);
-                    return;
-                }
-
-                String value;
-                if(prop->id == ID_MATERIAL)
-                {
-                    if(prop->values.front()->type == ANT_ATOM)
+                case ID_MATERIAL:
+                    if(prop->values.empty())
                     {
-                        value = ((AtomAbstractNode*)prop->values.front().get())->value;
-
-                        ProcessResourceNameScriptCompilerEvent locEvt(ProcessResourceNameScriptCompilerEvent::MATERIAL, value);
-                        compiler->_fireEvent(&locEvt, 0);
-                        value = locEvt.mName;
+                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line);
+                        return;
                     }
-                }
-                else
-                {
-                    // Glob the values together
-                    for(auto& v : prop->values)
+                    else
                     {
-                        if(v->type == ANT_ATOM)
+                        if(prop->values.front()->type == ANT_ATOM)
                         {
-                            if(value.empty())
-                                value = ((AtomAbstractNode*)v.get())->value;
+                            String name = ((AtomAbstractNode*)prop->values.front().get())->value;
+
+                            ProcessResourceNameScriptCompilerEvent locEvt(ProcessResourceNameScriptCompilerEvent::MATERIAL, name);
+                            compiler->_fireEvent(&locEvt, 0);
+
+                            if(!mSystem->setParameter("material", locEvt.mName))
+                            {
+                                if(mSystem->getRenderer())
+                                {
+                                    if(!mSystem->getRenderer()->setParameter("material", locEvt.mName))
+                                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line,
+                                                           "material property could not be set with material \"" + locEvt.mName + "\"");
+                                }
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    if(prop->values.empty())
+                    {
+                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line);
+                        return;
+                    }
+                    else
+                    {
+                        String name = prop->name, value;
+
+                        // Glob the values together
+                        for(AbstractNodeList::iterator it = prop->values.begin(); it != prop->values.end(); ++it)
+                        {
+                            if((*it)->type == ANT_ATOM)
+                            {
+                                if(value.empty())
+                                    value = ((AtomAbstractNode*)(*it).get())->value;
+                                else
+                                    value = value + " " + ((AtomAbstractNode*)(*it).get())->value;
+                            }
                             else
-                                value = value + " " + ((AtomAbstractNode*)v.get())->value;
+                            {
+                                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                                return;
+                            }
                         }
-                        else
-                        {
-                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
-                            return;
-                        }
-                    }
-                }
 
-                if(!mSystem->setParameter(prop->name, value))
-                {
-                    if(auto renderer = mSystem->getRenderer())
-                    {
-                        if(!renderer->setParameter(prop->name, value))
-                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                        if(!mSystem->setParameter(name, value))
+                        {
+                            if(mSystem->getRenderer())
+                            {
+                                if(!mSystem->getRenderer()->setParameter(name, value))
+                                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                            }
+                        }
                     }
                 }
             }
             else
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
     }
@@ -4416,23 +4750,21 @@ namespace Ogre{
             return;
         }
 
-        ParticleSystem *system = any_cast<ParticleSystem*>(obj->parent->context);
-
-        try
+        String type;
+        if(!getString(obj->values.front(), &type))
         {
-            mEmitter = system->addEmitter(obj->values.front()->getString());
-        }
-        catch(Exception &e)
-        {
-            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line, e.getDescription());
+            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line);
             return;
         }
 
-        for(auto & i : obj->children)
+        ParticleSystem *system = any_cast<ParticleSystem*>(obj->parent->context);
+        mEmitter = system->addEmitter(type);
+
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 String value;
 
                 // Glob the values together
@@ -4459,7 +4791,7 @@ namespace Ogre{
             }
             else
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
     }
@@ -4483,22 +4815,21 @@ namespace Ogre{
             return;
         }
 
-        ParticleSystem *system = any_cast<ParticleSystem*>(obj->parent->context);
-        try
+        String type;
+        if(!getString(obj->values.front(), &type))
         {
-            mAffector = system->addAffector(obj->values.front()->getString());
-        }
-        catch(Exception &e)
-        {
-            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line, e.getDescription());
+            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line);
             return;
         }
 
-        for(auto & i : obj->children)
+        ParticleSystem *system = any_cast<ParticleSystem*>(obj->parent->context);
+        mAffector = system->addAffector(type);
+
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 String value;
 
                 // Glob the values together
@@ -4525,7 +4856,7 @@ namespace Ogre{
             }
             else
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
     }
@@ -4556,26 +4887,26 @@ namespace Ogre{
             mCompositor = CompositorManager::getSingleton().create(obj->name, compiler->getResourceGroup()).get();
         }
 
-        if(!mCompositor)
+        if(mCompositor == 0)
         {
-            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line, obj->name);
+            compiler->addError(ScriptCompiler::CE_OBJECTALLOCATIONERROR, obj->file, obj->line);
             return;
         }
 
         // Prepare the compositor
         mCompositor->removeAllTechniques();
         mCompositor->_notifyOrigin(obj->file);
-        obj->context = mCompositor;
+        obj->context = Any(mCompositor);
 
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_OBJECT)
+            if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
             else
             {
-                compiler->addError(ScriptCompiler::CE_UNEXPECTEDTOKEN, i->file, i->line,
+                compiler->addError(ScriptCompiler::CE_UNEXPECTEDTOKEN, (*i)->file, (*i)->line,
                                    "token not recognized");
             }
         }
@@ -4595,19 +4926,19 @@ namespace Ogre{
 
         Compositor *compositor = any_cast<Compositor*>(obj->parent->context);
         mTechnique = compositor->createTechnique();
-        obj->context = mTechnique;
+        obj->context = Any(mTechnique);
 
         String sval;
 
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_OBJECT)
+            if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
-            else if(i->type == ANT_PROPERTY)
+            else if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_TEXTURE:
@@ -4624,13 +4955,12 @@ namespace Ogre{
                         // Save the first atom, should be name
                         AtomAbstractNode *atom0 = (AtomAbstractNode*)(*it).get();
 
-                        uint32 width = 0, height = 0;
+                        size_t width = 0, height = 0;
                         float widthFactor = 1.0f, heightFactor = 1.0f;
                         bool widthSet = false, heightSet = false, formatSet = false;
                         bool pooled = false;
                         bool hwGammaWrite = false;
                         bool fsaa = true;
-                        auto type = TEX_TYPE_2D;
                         uint16 depthBufferId = DepthBuffer::POOL_DEFAULT;
                         CompositionTechnique::TextureScope scope = CompositionTechnique::TS_LOCAL;
                         Ogre::PixelFormatList formats;
@@ -4659,7 +4989,7 @@ namespace Ogre{
                             case ID_TARGET_HEIGHT_SCALED:
                                 {
                                     bool *pSetFlag;
-                                    uint32 *pSize;
+                                    size_t *pSize;
                                     float *pFactor;
 
                                     if (atom->id == ID_TARGET_WIDTH_SCALED)
@@ -4695,9 +5025,6 @@ namespace Ogre{
                                 break;
                             case ID_POOLED:
                                 pooled = true;
-                                break;
-                            case ID_CUBIC:
-                                type = TEX_TYPE_CUBE_MAP;
                                 break;
                             case ID_SCOPE_LOCAL:
                                 scope = CompositionTechnique::TS_LOCAL;
@@ -4778,7 +5105,6 @@ namespace Ogre{
                         CompositionTechnique::TextureDefinition *def = mTechnique->createTextureDefinition(atom0->value);
                         def->width = width;
                         def->height = height;
-                        def->type = type;
                         def->widthFactor = widthFactor;
                         def->heightFactor = heightFactor;
                         def->formatList = formats;
@@ -4857,45 +5183,33 @@ namespace Ogre{
         if(obj->id == ID_TARGET)
         {
             mTarget = technique->createTargetPass();
-            if(obj->name.empty())
+            if(!obj->name.empty())
             {
-                compiler->addError(ScriptCompiler::CE_OBJECTNAMEEXPECTED, obj->file, obj->line);
-                return;
-            }
-            mTarget->setOutputName(obj->name);
+                String name = obj->name;
 
-            if(!obj->values.empty())
-            {
-                int val;
-                if(getInt(obj->values.front(), &val))
-                    mTarget->setOutputSlice(val);
+                mTarget->setOutputName(name);
             }
         }
         else if(obj->id == ID_TARGET_OUTPUT)
         {
             mTarget = technique->getOutputTargetPass();
-            if (!mTarget->getPasses().empty() || mTarget->getInputMode() != CompositionTargetPass::IM_NONE)
-            {
-                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, obj->file, obj->line,
-                                   "target_output can only be used once per technique");
-            }
         }
-        obj->context = mTarget;
+        obj->context = Any(mTarget);
 
         bool bval;
         Real fval;
         uint32 uival;
         String sval;
 
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_OBJECT)
+            if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
-            else if(i->type == ANT_PROPERTY)
+            else if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_INPUT:
@@ -4946,7 +5260,7 @@ namespace Ogre{
         // The name is the type of the pass
         if(obj->values.empty() || obj->values.front()->type != ANT_ATOM)
         {
-            compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, obj->file, obj->line, "pass type missing");
+            compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, obj->file, obj->line);
             return;
         }
 
@@ -4980,7 +5294,7 @@ namespace Ogre{
 
         CompositionTargetPass *target = any_cast<CompositionTargetPass*>(obj->parent->context);
         mPass = target->createPass(ptype);
-        obj->context = mPass;
+        obj->context = Any(mPass);
 
         if(mPass->getType() == CompositionPass::PT_RENDERCUSTOM) 
         {
@@ -5000,15 +5314,15 @@ namespace Ogre{
         String sval;
         StencilOperation sop;
 
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_OBJECT)
+            if((*i)->type == ANT_OBJECT)
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
-            else if(i->type == ANT_PROPERTY)
+            else if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 switch(prop->id)
                 {
                 case ID_CHECK:
@@ -5043,6 +5357,10 @@ namespace Ogre{
                 case ID_TWO_SIDED:
                     if(getValue(prop, compiler, bval))
                         mPass->setStencilTwoSidedOperation(bval);
+                    break;
+                case ID_READ_BACK_AS_TEXTURE:
+                    if(getValue(prop, compiler, bval))
+                        mPass->setStencilReadBackAsTextureOperation(bval);
                     break;
                 case ID_BUFFERS:
                     {
@@ -5080,10 +5398,7 @@ namespace Ogre{
                             return;
                         }
                         ColourValue val;
-                        if (prop->values.front()->type == ANT_ATOM &&
-                            ((AtomAbstractNode*)prop->values.front().get())->id == ID_AUTO)
-                            mPass->setAutomaticColour(true);
-                        else if(getColour(prop->values.begin(), prop->values.end(), &val))
+                        if(getColour(prop->values.begin(), prop->values.end(), &val))
                             mPass->setClearColour(val);
                         else
                             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
@@ -5102,12 +5417,7 @@ namespace Ogre{
                     {
                         ProcessResourceNameScriptCompilerEvent evt(ProcessResourceNameScriptCompilerEvent::MATERIAL, sval);
                         compiler->_fireEvent(&evt, 0);
-                        auto mat = MaterialManager::getSingleton().getByName(evt.mName, compiler->getResourceGroup());
-                        if (mat)
-                            mPass->setMaterial(mat);
-                        else
-                            compiler->addError(ScriptCompiler::CE_REFERENCETOANONEXISTINGOBJECT, prop->file,
-                                               prop->line, evt.mName);
+                        mPass->setMaterialName(evt.mName);
                     }
                     break;
                 case ID_INPUT:
@@ -5195,30 +5505,6 @@ namespace Ogre{
                         else
                         {
                             compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
-                        }
-                    }
-                    break;
-                case ID_CAMERA:
-                    if(prop->values.empty())
-                    {
-                        compiler->addError(ScriptCompiler::CE_STRINGEXPECTED, prop->file, prop->line);
-                        return;
-                    }
-                    else if (prop->values.size() > 2)
-                    {
-                        compiler->addError(ScriptCompiler::CE_FEWERPARAMETERSEXPECTED, prop->file, prop->line);
-                        return;
-                    }
-                    else
-                    {
-                        if (!getValue(prop->values.front(), sval))
-                            return;
-                        mPass->setCameraName(sval);
-                        if (prop->values.back()->type == ANT_ATOM &&
-                            static_cast<AtomAbstractNode*>(prop->values.back().get())->id ==
-                                ID_ALIGN_TO_FACE)
-                        {
-                            mPass->setAlignCameraToFace(true);
                         }
                     }
                     break;

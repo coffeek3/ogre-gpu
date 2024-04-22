@@ -31,8 +31,7 @@ THE SOFTWARE.
 
 #include "OgreBuildSettings.h"
 
-#include "Sample.h"
-#include "Ogre.h"
+#include "SdkSample.h"
 
 // resource group that will be automatically unloaded after the close of the sample
 #define TRANSIENT_RESOURCE_GROUP "VisualTestTransient"
@@ -45,15 +44,25 @@ class VisualTest : public OgreBites::Sample
 
     VisualTest()
     {
+        mInfo["Title"] = "Untitled Test";
+        mInfo["Description"] = "";
         mInfo["Category"] = "Tests";
         mInfo["Thumbnail"] = "thumb_visual_tests.png";
+        mInfo["Help"] = "";
         Ogre::ResourceGroupManager& rgm = Ogre::ResourceGroupManager::getSingleton();
         if (!rgm.resourceGroupExists(TRANSIENT_RESOURCE_GROUP))
             rgm.createResourceGroup(TRANSIENT_RESOURCE_GROUP, true);
     }
 
+    /** Adds a screenshot frame to the list - this should
+     *    be done during setup of the test. */
+    void addScreenshotFrame(unsigned int frame)
+    {
+        mScreenshotFrames.insert(frame);
+    }
+
     /** set up the camera and viewport */
-    void setupView() override
+    virtual void setupView()
     {
         mCamera = mSceneMgr->createCamera("MainCamera");
         mCameraNode = mSceneMgr->getRootSceneNode()->createChildSceneNode();
@@ -66,32 +75,57 @@ class VisualTest : public OgreBites::Sample
     }
 
     /** Unload all resources used by this sample */
-    void unloadResources() override
+    virtual void unloadResources()
     {
+#ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
+        auto& rtShaderGen = Ogre::RTShader::ShaderGenerator::getSingleton();
+        auto schemRenderState = rtShaderGen.getRenderState(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
+        schemRenderState->reset();
+#endif
         Ogre::ResourceGroupManager::getSingleton().clearResourceGroup(TRANSIENT_RESOURCE_GROUP);
         Sample::unloadResources();
         mAnimStateList.clear();
     }
 
+    /** Returns whether or not a screenshot should be taken at the given frame */
+    virtual bool isScreenshotFrame(unsigned int frame)
+    {
+        if (mScreenshotFrames.empty())
+        {
+            mDone = true;
+        }
+        else if (frame == *(mScreenshotFrames.begin()))
+        {
+            mScreenshotFrames.erase(mScreenshotFrames.begin());
+            if (mScreenshotFrames.empty())
+                mDone = true;
+            return true;
+        }
+        return false;
+    }
+
     /** Default frame started callback, advances animations */
-    bool frameStarted(const Ogre::FrameEvent& evt) override
+    virtual bool frameStarted(const Ogre::FrameEvent& evt)
     {
         for(unsigned int i = 0; i < mAnimStateList.size(); ++i)
             mAnimStateList[i]->addTime(evt.timeSinceLastFrame);
         return true;
     }
 
-    bool keyPressed(const OgreBites::KeyboardEvent& evt) override
-    {
-        if (evt.keysym.sym == OgreBites::SDLK_F6)
-            mCamera->getViewport()->getTarget()->writeContentsToTimestampedFile("screenshot", ".png");
-
-        return true;
-    }
-
  protected:
+
+    // a set of frame numbers at which to trigger screenshots
+    std::set<unsigned int> mScreenshotFrames;
+
     // a list of animation states to automatically update
     std::vector<Ogre::AnimationState*> mAnimStateList;
+
+    // The camera for this sample
+    Ogre::Camera* mCamera;
+    Ogre::SceneNode* mCameraNode;
+    // The viewport for this sample
+    Ogre::Viewport* mViewport;
+
 };
 
 #endif

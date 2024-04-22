@@ -30,16 +30,26 @@ THE SOFTWARE.
 #ifndef __EGLWindow_H__
 #define __EGLWindow_H__
 
-#include "OgreGLWindow.h"
+#include "OgreRenderWindow.h"
 #include "OgreEGLSupport.h"
 #include "OgreEGLContext.h"
+#include "OgreGLRenderTarget.h"
 
 namespace Ogre {
-    class _OgrePrivate EGLWindow : public GLWindow
+    class _OgrePrivate EGLWindow : public RenderWindow, public GLRenderTarget
     {
     private:
         protected:
+            bool mClosed;
+            bool mVisible;
+            bool mIsTopLevel;
+            bool mIsExternal;
+            bool mIsExternalGLControl;
+            bool mVSync;
+            unsigned int mVSyncInterval;
+
             EGLSupport* mGLSupport;
+            EGLContext* mContext;
             NativeWindowType mWindow;
             NativeDisplayType mNativeDisplay;
             ::EGLDisplay mEglDisplay;
@@ -50,39 +60,64 @@ namespace Ogre {
 
             ::EGLSurface createSurfaceFromWindow(::EGLDisplay display, NativeWindowType win);
 
-            virtual void switchFullScreen(bool fullscreen) {}
-            EGLContext * createEGLContext(::EGLContext external = NULL) const {
-                return new EGLContext(mEglDisplay, mGLSupport, mEglConfig, mEglSurface, external);
+            virtual void switchFullScreen(bool fullscreen) = 0;
+            EGLContext * createEGLContext() const {
+                return new EGLContext(mEglDisplay, mGLSupport, mEglConfig, mEglSurface);
             }
 
-            void windowMovedOrResized() override {}
+            virtual void getLeftAndTopFromNativeWindow(int & left, int & top, uint width, uint height) = 0;
+            virtual void initNativeCreatedWindow(const NameValuePairList *miscParams) = 0;
+            virtual void createNativeWindow( int &left, int &top, uint &width, uint &height, String &title ) = 0;
+            virtual void reposition(int left, int top) = 0;
+            virtual void resize(unsigned int width, unsigned int height) = 0;
+            virtual void windowMovedOrResized() = 0;
 
-            void finaliseWindow();
+            GLContext* getContext() const { return mContext; }
     public:
             EGLWindow(EGLSupport* glsupport);
             virtual ~EGLWindow();
 
-            // default, PBuffer based, implementation
-            void create(const String& name, unsigned int width, unsigned int height, bool fullScreen,
-                        const NameValuePairList* miscParams) override;
+//      Moved create to native source because it has native calls in it.
+//            void create(const String& name, unsigned int width, unsigned int height,
+//                        bool fullScreen, const NameValuePairList *miscParams);
 
-            void resize(unsigned int width, unsigned int height) override {}
+            virtual void setFullscreen (bool fullscreen, uint width, uint height);
+            void destroy(void);
+            bool isClosed(void) const;
+            bool isVisible(void) const;
+            void setVisible(bool visible);
+            void swapBuffers();
+            void copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer);
 
-            void setFullscreen (bool fullscreen, uint width, uint height) override;
-            void destroy(void) override;
-            void swapBuffers() override;
-            void setVSyncEnabled(bool vsync) override;
+            /** @copydoc see RenderWindow::setVSyncEnabled */
+            void setVSyncEnabled(bool vsync);
+
+            /** @copydoc see RenderWindow::isVSyncEnabled */
+            bool isVSyncEnabled() const {
+                return mVSync;
+            }
+
+            /** @copydoc see RenderWindow::setVSyncInterval */
+            void setVSyncInterval(unsigned int interval);
+
+            /** @copydoc see RenderWindow::getVSyncInterval */
+            unsigned int getVSyncInterval() const {
+                return mVSyncInterval;
+            }
 
             /**
-
+               @remarks
                * Get custom attribute; the following attributes are valid:
                * WINDOW         The X NativeWindowType target for rendering.
                * GLCONTEXT      The Ogre GLContext used for rendering.
                * DISPLAY        EGLDisplay connection behind that context.
+               * DISPLAYNAME    The name for the connected display.
                */
-            void getCustomAttribute(const String& name, void* pData) override;
+            virtual void getCustomAttribute(const String& name, void* pData);
 
-            PixelFormat suggestPixelFormat() const override;
+            bool requiresTextureFlipping() const;
+
+            PixelFormat suggestPixelFormat() const;
     };
 }
 

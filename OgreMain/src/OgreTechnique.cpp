@@ -32,7 +32,7 @@ THE SOFTWARE.
 namespace Ogre {
     //-----------------------------------------------------------------------------
     Technique::Technique(Material* parent)
-        : mParent(parent), mIlluminationPassesCompilationPhase(IPS_NOT_COMPILED), mIsSupported(false), mLodIndex(0), mSchemeIndex(0)
+        : mParent(parent), mIlluminationPassesCompilationPhase(IPS_NOT_COMPILED), mLodIndex(0), mSchemeIndex(0), mIsSupported(false)
     {
         // See above, defaults to unsupported until examined
     }
@@ -60,9 +60,11 @@ namespace Ogre {
         size_t memSize = 0;
 
         // Tally up passes
-        for (auto *p : mPasses)
+        Passes::const_iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
         {
-            memSize += p->calculateSize();
+            memSize += (*i)->calculateSize();
         }
         return memSize;
     }
@@ -71,7 +73,11 @@ namespace Ogre {
     {
         StringStream errors;
 
-        mIsSupported = checkGPURules(errors) && checkHardwareSupport(autoManageTextureUnits, errors);
+        if(!Root::getSingleton().getRenderSystem()) {
+            errors << "NULL RenderSystem";
+        } else {
+            mIsSupported = checkGPURules(errors) && checkHardwareSupport(autoManageTextureUnits, errors);
+        }
 
         // Compile for categorised illumination on demand
         clearIlluminationPasses();
@@ -86,55 +92,21 @@ namespace Ogre {
         // Go through each pass, checking requirements
         Passes::iterator i;
         unsigned short passNum = 0;
-        const RenderSystemCapabilities* caps = nullptr;
-        if (auto rs = Root::getSingleton().getRenderSystem())
-            caps = rs->getCapabilities();
-        else
-        {
-            static RenderSystemCapabilities nullCaps;
-            caps = &nullCaps;
-        }
-
+        const RenderSystemCapabilities* caps =
+            Root::getSingleton().getRenderSystem()->getCapabilities();
         unsigned short numTexUnits = caps->getNumTextureUnits();
         for (i = mPasses.begin(); i != mPasses.end(); ++i, ++passNum)
         {
             Pass* currPass = *i;
             // Adjust pass index
             currPass->_notifyIndex(passNum);
-
-            const char* err = 0;
-
-            if(currPass->getLineWidth() != 1 && !caps->hasCapability(RSC_WIDE_LINES))
-                err = "line_width > 1";
-            else if(currPass->getPointSize() != 1 && !caps->hasCapability(RSC_POINT_SPRITES))
-                err = "point_size > 1";
-
-            if(err)
+            // Check for advanced blending operation support
+            if ((currPass->getSceneBlendingOperation() != SBO_ADD || currPass->getSceneBlendingOperationAlpha() != SBO_ADD) &&
+                !caps->hasCapability(RSC_ADVANCED_BLEND_OPERATIONS))
             {
-                compileErrors << "Pass " << passNum << ": " << err << " not supported by RenderSystem";
+                compileErrors << "Pass " << passNum << ": Advanced blend operations are not supported." << std::endl;
                 return false;
             }
-
-            // Check a few fixed-function options in texture layers
-            size_t texUnit = 0;
-            for(const TextureUnitState* tex : currPass->getTextureUnitStates())
-            {
-                if ((tex->getTextureType() == TEX_TYPE_3D) && !caps->hasCapability(RSC_TEXTURE_3D))
-                    err = "Volume";
-
-                if ((tex->getTextureType() == TEX_TYPE_2D_ARRAY) && !caps->hasCapability(RSC_TEXTURE_2D_ARRAY))
-                    err = "Array";
-
-                if (err)
-                {
-                    // Fail
-                    compileErrors << "Pass " << passNum << " Tex " << texUnit << ": " << err
-                                    << " textures not supported by RenderSystem";
-                    return false;
-                }
-                ++texUnit;
-            }
-
             // Check texture unit requirements
             size_t numTexUnitsRequested = currPass->getNumTextureUnitStates();
             // Don't trust getNumTextureUnits for programmable
@@ -149,7 +121,8 @@ namespace Ogre {
                     {
                         // The user disabled auto pass split
                         compileErrors << "Pass " << passNum <<
-                            ": Too many texture units for the current hardware and no splitting allowed";
+                            ": Too many texture units for the current hardware and no splitting allowed."
+                            << std::endl;
                         return false;
                     }
                     else if (currPass->hasVertexProgram())
@@ -157,9 +130,43 @@ namespace Ogre {
                         // Can't do this one, and can't split a programmable pass
                         compileErrors << "Pass " << passNum <<
                             ": Too many texture units for the current hardware and "
-                            "cannot split programmable passes";
+                            "cannot split programmable passes."
+                            << std::endl;
                         return false;
                     }
+                }
+
+                // Check a few fixed-function options in texture layers
+                size_t texUnit = 0;
+                Pass::TextureUnitStates::const_iterator it;
+                for(it = currPass->getTextureUnitStates().begin(); it != currPass->getTextureUnitStates().end(); ++it)
+                {
+                    TextureUnitState* tex = *it;
+                    // Any 3D textures? NB we make the assumption that any
+                    // card capable of running fragment programs can support
+                    // 3D textures, which has to be true, surely?
+                    if (((tex->getTextureType() == TEX_TYPE_3D) || (tex->getTextureType() == TEX_TYPE_2D_ARRAY)) &&
+                        !caps->hasCapability(RSC_TEXTURE_3D))
+                    {
+                        // Fail
+                        compileErrors << "Pass " << passNum <<
+                            " Tex " << texUnit <<
+                            ": Volume textures not supported by current environment."
+                            << std::endl;
+                        return false;
+                    }
+                    // Any Dot3 blending?
+                    if (tex->getColourBlendMode().operation == LBX_DOTPRODUCT &&
+                        !caps->hasCapability(RSC_DOT3))
+                    {
+                        // Fail
+                        compileErrors << "Pass " << passNum <<
+                            " Tex " << texUnit <<
+                            ": DOT3 blending not supported by current environment."
+                            << std::endl;
+                        return false;
+                    }
+                    ++texUnit;
                 }
 
                 // We're ok on operations, now we need to check # texture units
@@ -184,20 +191,10 @@ namespace Ogre {
                 }
             }
 
-            // try to catch user missing a program early on
-            if (!caps->hasCapability(RSC_FIXED_FUNCTION) && currPass->isProgrammable() &&
-                !currPass->hasGpuProgram(GPT_COMPUTE_PROGRAM))
-            {
-                if (!currPass->hasVertexProgram() ||
-                    (!currPass->hasFragmentProgram() && !currPass->hasGeometryProgram()))
-                {
-                    compileErrors << "Pass " << passNum << ": RenderSystem requires both vertex and fragment programs";
-                    return false;
-                }
-            }
+            
 
             //Check compilation errors for all program types.
-            for (int t = 0; t < GPT_COUNT; t++)
+            for (int t = 0; t < 6; t++)
             {
                 GpuProgramType programType = GpuProgramType(t);
                 if (currPass->hasGpuProgram(programType))
@@ -208,13 +205,12 @@ namespace Ogre {
                         compileErrors << "Pass " << passNum <<
                             ": " << GpuProgram::getProgramTypeName(programType) + " program " << program->getName()
                             << " cannot be used - ";
-                        if (program->hasCompileError() && program->getSource().empty())
-                            compileErrors << "resource not found";
-                        else if (program->hasCompileError())
-                            compileErrors << "compile error";
+                        if (program->hasCompileError())
+                            compileErrors << "compile error.";
                         else
-                            compileErrors << "not supported";
+                            compileErrors << "not supported.";
 
+                        compileErrors << std::endl;
                         return false;
                     }
                 }
@@ -226,39 +222,33 @@ namespace Ogre {
     //---------------------------------------------------------------------
     bool Technique::checkGPURules(StringStream& errors)
     {
-        const RenderSystemCapabilities* caps = nullptr;
-        if (auto rs = Root::getSingleton().getRenderSystem())
-            caps = rs->getCapabilities();
-
-        if (!caps && (!mGPUVendorRules.empty() || !mGPUDeviceNameRules.empty()))
-        {
-            errors << "GPU rules failed because the RenderSystem is NULL";
-            return false;
-        }
+        const RenderSystemCapabilities* caps =
+            Root::getSingleton().getRenderSystem()->getCapabilities();
 
         StringStream includeRules;
         bool includeRulesPresent = false;
         bool includeRuleMatched = false;
 
         // Check vendors first
-        for (auto& r : mGPUVendorRules)
+        for (GPUVendorRuleList::const_iterator i = mGPUVendorRules.begin();
+            i != mGPUVendorRules.end(); ++i)
         {
-            if (r.includeOrExclude == INCLUDE)
+            if (i->includeOrExclude == INCLUDE)
             {
                 includeRulesPresent = true;
-                includeRules << caps->vendorToString(r.vendor) << " ";
-                if (r.vendor == caps->getVendor())
+                includeRules << caps->vendorToString(i->vendor) << " ";
+                if (i->vendor == caps->getVendor())
                     includeRuleMatched = true;
             }
             else // EXCLUDE
             {
-                if (r.vendor == caps->getVendor())
+                if (i->vendor == caps->getVendor())
                 {
-                    errors << "Excluded GPU vendor: " << caps->vendorToString(r.vendor)
+                    errors << "Excluded GPU vendor: " << caps->vendorToString(i->vendor)
                         << std::endl;
                     return false;
                 }
-
+                    
             }
         }
 
@@ -274,20 +264,21 @@ namespace Ogre {
         includeRulesPresent = false;
         includeRuleMatched = false;
 
-        for (auto& r : mGPUDeviceNameRules)
+        for (GPUDeviceNameRuleList::const_iterator i = mGPUDeviceNameRules.begin();
+            i != mGPUDeviceNameRules.end(); ++i)
         {
-            if (r.includeOrExclude == INCLUDE)
+            if (i->includeOrExclude == INCLUDE)
             {
                 includeRulesPresent = true;
-                includeRules << r.devicePattern << " ";
-                if (StringUtil::match(caps->getDeviceName(), r.devicePattern, r.caseSensitive))
+                includeRules << i->devicePattern << " ";
+                if (StringUtil::match(caps->getDeviceName(), i->devicePattern, i->caseSensitive))
                     includeRuleMatched = true;
             }
             else // EXCLUDE
             {
-                if (StringUtil::match(caps->getDeviceName(), r.devicePattern, r.caseSensitive))
+                if (StringUtil::match(caps->getDeviceName(), i->devicePattern, i->caseSensitive))
                 {
-                    errors << "Excluded GPU device: " << r.devicePattern
+                    errors << "Excluded GPU device: " << i->devicePattern
                         << std::endl;
                     return false;
                 }
@@ -313,15 +304,35 @@ namespace Ogre {
         return newPass;
     }
     //-----------------------------------------------------------------------------
+    Pass* Technique::getPass(unsigned short index) const
+    {
+        assert(index < mPasses.size() && "Index out of bounds");
+        return mPasses[index];
+    }
+    //-----------------------------------------------------------------------------
     Pass* Technique::getPass(const String& name) const
     {
+        Passes::const_iterator i    = mPasses.begin();
+        Passes::const_iterator iend = mPasses.end();
+        Pass* foundPass = 0;
+
         // iterate through techniques to find a match
-        for (Pass *p : mPasses) {
-            if (p->getName() == name )
-                return p;
+        while (i != iend)
+        {
+            if ( (*i)->getName() == name )
+            {
+                foundPass = (*i);
+                break;
+            }
+            ++i;
         }
 
-        return (Pass *)0;
+        return foundPass;
+    }
+    //-----------------------------------------------------------------------------
+    unsigned short Technique::getNumPasses(void) const
+    {
+        return static_cast<unsigned short>(mPasses.size());
     }
     //-----------------------------------------------------------------------------
     void Technique::removePass(unsigned short index)
@@ -339,9 +350,11 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     void Technique::removeAllPasses(void)
     {
-        for (auto *p : mPasses)
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
         {
-            p->queueForDeletion();
+            (*i)->queueForDeletion();
         }
         mPasses.clear();
     }
@@ -396,9 +409,6 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     Technique& Technique::operator=(const Technique& rhs)
     {
-        if (this == &rhs)
-            return *this;
-
         mName = rhs.mName;
         this->mIsSupported = rhs.mIsSupported;
         this->mLodIndex = rhs.mLodIndex;
@@ -412,9 +422,11 @@ namespace Ogre {
 
         // copy passes
         removeAllPasses();
-        for (auto *rp : rhs.mPasses)
+        Passes::const_iterator i, iend;
+        iend = rhs.mPasses.end();
+        for (i = rhs.mPasses.begin(); i != iend; ++i)
         {
-            Pass* p = OGRE_NEW Pass(this, rp->getIndex(), *(rp));
+            Pass* p = OGRE_NEW Pass(this, (*i)->getIndex(), *(*i));
             mPasses.push_back(p);
         }
         // Compile for categorised illumination on demand
@@ -505,71 +517,85 @@ namespace Ogre {
     {
         assert (mIsSupported && "This technique is not supported");
         // Load each pass
-        for (auto *p : mPasses)
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
         {
-            p->_prepare();
+            (*i)->_prepare();
         }
 
-        for (auto *i : mIlluminationPasses)
+        IlluminationPassList::iterator il, ilend;
+        ilend = mIlluminationPasses.end();
+        for (il = mIlluminationPasses.begin(); il != ilend; ++il)
         {
-            if(i->pass != i->originalPass)
-                i->pass->_prepare();
+            if((*il)->pass != (*il)->originalPass)
+                (*il)->pass->_prepare();
         }
     }
     //-----------------------------------------------------------------------------
     void Technique::_unprepare(void)
     {
         // Unload each pass
-        for (auto *p : mPasses)
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
         {
-            p->_unprepare();
+            (*i)->_unprepare();
         }
     }
     //-----------------------------------------------------------------------------
     void Technique::_load(void)
     {
+        assert (mIsSupported && "This technique is not supported");
         // Load each pass
-        for (auto *p : mPasses)
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
         {
-            p->_load();
+            (*i)->_load();
         }
 
-        for (auto *i : mIlluminationPasses)
+        IlluminationPassList::iterator il, ilend;
+        ilend = mIlluminationPasses.end();
+        for (il = mIlluminationPasses.begin(); il != ilend; ++il)
         {
-            if(i->pass != i->originalPass)
-                i->pass->_load();
+            if((*il)->pass != (*il)->originalPass)
+                (*il)->pass->_load();
         }
 
-        if (!mShadowCasterMaterial && !mShadowCasterMaterialName.empty())
-        {
-            // in case we could not get material as it wasn't yet parsed/existent at that time.
-            mShadowCasterMaterial = MaterialManager::getSingleton().getByName(mShadowCasterMaterialName);
-        }
-
-        if (mShadowCasterMaterial && mShadowCasterMaterial.get() != getParent())
+        if (mShadowCasterMaterial)
         {
             mShadowCasterMaterial->load();
         }
-
-        if(!mShadowReceiverMaterial && !mShadowReceiverMaterialName.empty())
+        else if (!mShadowCasterMaterialName.empty())
+        {
+            // in case we could not get material as it wasn't yet parsed/existent at that time.
+            mShadowCasterMaterial = MaterialManager::getSingleton().getByName(mShadowCasterMaterialName);
+            if (mShadowCasterMaterial)
+                mShadowCasterMaterial->load();
+        }
+        if (mShadowReceiverMaterial)
+        {
+            mShadowReceiverMaterial->load();
+        }
+        else if (!mShadowReceiverMaterialName.empty())
         {
             // in case we could not get material as it wasn't yet parsed/existent at that time.
             mShadowReceiverMaterial = MaterialManager::getSingleton().getByName(mShadowReceiverMaterialName);
-        }
-
-        if (mShadowReceiverMaterial && mShadowReceiverMaterial.get() != getParent())
-        {
-            mShadowReceiverMaterial->load();
+            if (mShadowReceiverMaterial)
+                mShadowReceiverMaterial->load();
         }
     }
     //-----------------------------------------------------------------------------
     void Technique::_unload(void)
     {
         // Unload each pass
-        for (auto *p : mPasses)
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
         {
-            p->_unload();
-        }
+            (*i)->_unload();
+        }   
     }
     //-----------------------------------------------------------------------------
     bool Technique::isLoaded(void) const
@@ -578,23 +604,57 @@ namespace Ogre {
         return mParent->isLoaded() && mIsSupported;
     }
     //-----------------------------------------------------------------------
-    #define ALL_PASSES(fncall) for(auto p : mPasses) p->fncall
-    void Technique::setPointSize(Real ps) { ALL_PASSES(setPointSize(ps)); }
+    void Technique::setPointSize(Real ps)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setPointSize(ps);
+        }
+
+    }
     //-----------------------------------------------------------------------
-    void Technique::setAmbient(float red, float green, float blue) { setAmbient(ColourValue(red, green, blue)); }
+    void Technique::setAmbient(float red, float green, float blue)
+    {
+        setAmbient(ColourValue(red, green, blue));
+        
+
+    }
     //-----------------------------------------------------------------------
-    void Technique::setAmbient(const ColourValue& ambient) { ALL_PASSES(setAmbient(ambient)); }
+    void Technique::setAmbient(const ColourValue& ambient)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setAmbient(ambient);
+        }
+    }
     //-----------------------------------------------------------------------
     void Technique::setDiffuse(float red, float green, float blue, float alpha)
     {
-        ALL_PASSES(setDiffuse(red, green, blue, alpha));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setDiffuse(red, green, blue, alpha);
+        }
     }
     //-----------------------------------------------------------------------
-    void Technique::setDiffuse(const ColourValue& diffuse) { setDiffuse(diffuse.r, diffuse.g, diffuse.b, diffuse.a); }
+    void Technique::setDiffuse(const ColourValue& diffuse)
+    {
+        setDiffuse(diffuse.r, diffuse.g, diffuse.b, diffuse.a);
+    }
     //-----------------------------------------------------------------------
     void Technique::setSpecular(float red, float green, float blue, float alpha)
     {
-        ALL_PASSES(setSpecular(red, green, blue, alpha));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setSpecular(red, green, blue, alpha);
+        }
     }
     //-----------------------------------------------------------------------
     void Technique::setSpecular(const ColourValue& specular)
@@ -602,71 +662,202 @@ namespace Ogre {
         setSpecular(specular.r, specular.g, specular.b, specular.a);
     }
     //-----------------------------------------------------------------------
-    void Technique::setShininess(Real val) { ALL_PASSES(setShininess(val)); }
+    void Technique::setShininess(Real val)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setShininess(val);
+        }
+    }
     //-----------------------------------------------------------------------
     void Technique::setSelfIllumination(float red, float green, float blue)
     {
         setSelfIllumination(ColourValue(red, green, blue));
     }
     //-----------------------------------------------------------------------
-    void Technique::setSelfIllumination(const ColourValue& selfIllum) { ALL_PASSES(setSelfIllumination(selfIllum)); }
+    void Technique::setSelfIllumination(const ColourValue& selfIllum)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setSelfIllumination(selfIllum);
+        }
+    }
     //-----------------------------------------------------------------------
-    void Technique::setDepthCheckEnabled(bool enabled) { ALL_PASSES(setDepthCheckEnabled(enabled)); }
+    void Technique::setDepthCheckEnabled(bool enabled)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setDepthCheckEnabled(enabled);
+        }
+    }
     //-----------------------------------------------------------------------
-    void Technique::setDepthWriteEnabled(bool enabled) { ALL_PASSES(setDepthWriteEnabled(enabled)); }
+    void Technique::setDepthWriteEnabled(bool enabled)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setDepthWriteEnabled(enabled);
+        }
+    }
     //-----------------------------------------------------------------------
-    void Technique::setDepthFunction(CompareFunction func) { ALL_PASSES(setDepthFunction(func)); }
+    void Technique::setDepthFunction( CompareFunction func )
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setDepthFunction(func);
+        }
+    }
     //-----------------------------------------------------------------------
-    void Technique::setColourWriteEnabled(bool enabled) { ALL_PASSES(setColourWriteEnabled(enabled)); }
+    void Technique::setColourWriteEnabled(bool enabled)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setColourWriteEnabled(enabled);
+        }
+    }
     //-----------------------------------------------------------------------
     void Technique::setColourWriteEnabled(bool red, bool green, bool blue, bool alpha)
     {
-        ALL_PASSES(setColourWriteEnabled(red, green, blue, alpha));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setColourWriteEnabled(red, green, blue, alpha);
+        }
     }
     //-----------------------------------------------------------------------
-    void Technique::setCullingMode(CullingMode mode) { ALL_PASSES(setCullingMode(mode)); }
-    //-----------------------------------------------------------------------
-    void Technique::setManualCullingMode(ManualCullingMode mode) { ALL_PASSES(setManualCullingMode(mode)); }
-    //-----------------------------------------------------------------------
-    void Technique::setLightingEnabled(bool enabled) { ALL_PASSES(setLightingEnabled(enabled)); }
-    //-----------------------------------------------------------------------
-    void Technique::setShadingMode(ShadeOptions mode) { ALL_PASSES(setShadingMode(mode)); }
-    //-----------------------------------------------------------------------
-    void Technique::setFog(bool overrideScene, FogMode mode, const ColourValue& colour, Real expDensity,
-                           Real linearStart, Real linearEnd)
+    void Technique::setCullingMode( CullingMode mode )
     {
-        ALL_PASSES(setFog(overrideScene, mode, colour, expDensity, linearStart, linearEnd));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setCullingMode(mode);
+        }
+    }
+    //-----------------------------------------------------------------------
+    void Technique::setManualCullingMode( ManualCullingMode mode )
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setManualCullingMode(mode);
+        }
+    }
+    //-----------------------------------------------------------------------
+    void Technique::setLightingEnabled(bool enabled)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setLightingEnabled(enabled);
+        }
+    }
+    //-----------------------------------------------------------------------
+    void Technique::setShadingMode( ShadeOptions mode )
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setShadingMode(mode);
+        }
+    }
+    //-----------------------------------------------------------------------
+    void Technique::setFog(bool overrideScene, FogMode mode, const ColourValue& colour,
+        Real expDensity, Real linearStart, Real linearEnd)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setFog(overrideScene, mode, colour, expDensity, linearStart, linearEnd);
+        }
     }
     //-----------------------------------------------------------------------
     void Technique::setDepthBias(float constantBias, float slopeScaleBias)
     {
-        ALL_PASSES(setDepthBias(constantBias, slopeScaleBias));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setDepthBias(constantBias, slopeScaleBias);
+        }
     }
     //-----------------------------------------------------------------------
     void Technique::setTextureFiltering(TextureFilterOptions filterType)
     {
-        ALL_PASSES(setTextureFiltering(filterType));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setTextureFiltering(filterType);
+        }
     }
     // --------------------------------------------------------------------
-    void Technique::setTextureAnisotropy(unsigned int maxAniso) { ALL_PASSES(setTextureAnisotropy(maxAniso)); }
-    // --------------------------------------------------------------------
-    void Technique::setSceneBlending(const SceneBlendType sbt) { ALL_PASSES(setSceneBlending(sbt)); }
-    // --------------------------------------------------------------------
-    void Technique::setSeparateSceneBlending(const SceneBlendType sbt, const SceneBlendType sbta)
+    void Technique::setTextureAnisotropy(unsigned int maxAniso)
     {
-        ALL_PASSES(setSeparateSceneBlending(sbt, sbta));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setTextureAnisotropy(maxAniso);
+        }
     }
     // --------------------------------------------------------------------
-    void Technique::setSceneBlending(const SceneBlendFactor sourceFactor, const SceneBlendFactor destFactor)
+    void Technique::setSceneBlending( const SceneBlendType sbt )
     {
-        ALL_PASSES(setSceneBlending(sourceFactor, destFactor));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setSceneBlending(sbt);
+        }
+    }
+    // --------------------------------------------------------------------
+    void Technique::setSeparateSceneBlending( const SceneBlendType sbt, const SceneBlendType sbta )
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setSeparateSceneBlending(sbt, sbta);
+        }
+    }
+    // --------------------------------------------------------------------
+    void Technique::setSceneBlending( const SceneBlendFactor sourceFactor,
+        const SceneBlendFactor destFactor)
+    {
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setSceneBlending(sourceFactor, destFactor);
+        }
     }
     // --------------------------------------------------------------------
     void Technique::setSeparateSceneBlending( const SceneBlendFactor sourceFactor, const SceneBlendFactor destFactor, const SceneBlendFactor sourceFactorAlpha, const SceneBlendFactor destFactorAlpha)
     {
-        ALL_PASSES(setSeparateSceneBlending(sourceFactor, destFactor, sourceFactorAlpha, destFactorAlpha));
+        Passes::iterator i, iend;
+        iend = mPasses.end();
+        for (i = mPasses.begin(); i != iend; ++i)
+        {
+            (*i)->setSeparateSceneBlending(sourceFactor, destFactor, sourceFactorAlpha, destFactorAlpha);
+        }
     }
-    #undef ALL_PASSES
 
     // --------------------------------------------------------------------
     void Technique::setName(const String& name)
@@ -710,19 +901,23 @@ namespace Ogre {
     bool Technique::checkManuallyOrganisedIlluminationPasses()
     {
         // first check whether all passes have manually assigned illumination
-        for (auto *p : mPasses)
+        Passes::iterator i, ibegin, iend;
+        ibegin = mPasses.begin();
+        iend = mPasses.end();
+
+        for (i = ibegin; i != iend; ++i)
         {
-            if (p->getIlluminationStage() == IS_UNKNOWN)
+            if ((*i)->getIlluminationStage() == IS_UNKNOWN)
                 return false;
         }
 
         // ok, all manually controlled, so just use that
-        for (auto *p : mPasses)
+        for (i = ibegin; i != iend; ++i)
         {
             IlluminationPass* iPass = OGRE_NEW IlluminationPass();
             iPass->destroyOnShutdown = false;
-            iPass->originalPass = iPass->pass = p;
-            iPass->stage = p->getIlluminationStage();
+            iPass->originalPass = iPass->pass = *i;
+            iPass->stage = (*i)->getIlluminationStage();
             mIlluminationPasses.push_back(iPass);
         }
 
@@ -777,9 +972,11 @@ namespace Ogre {
                             {
                                 // Alpha rejection passes must retain their transparency, so
                                 // we allow the texture units, but override the colour functions
-                                for(auto *s : newPass->getTextureUnitStates())
+                                Pass::TextureUnitStates::const_iterator it;
+                                for(it = newPass->getTextureUnitStates().begin(); it != newPass->getTextureUnitStates().end(); ++it)
                                 {
-                                    s->setColourOperationEx(LBX_SOURCE1, LBS_CURRENT);
+                                    TextureUnitState* tus = *it;
+                                    tus->setColourOperationEx(LBX_SOURCE1, LBS_CURRENT);
                                 }
                             }
                             else
@@ -861,9 +1058,11 @@ namespace Ogre {
                             {
                                 // Alpha rejection passes must retain their transparency, so
                                 // we allow the texture units, but override the colour functions
-                                for(auto *s : newPass->getTextureUnitStates())
+                                Pass::TextureUnitStates::const_iterator it;
+                                for(it = newPass->getTextureUnitStates().begin(); it != newPass->getTextureUnitStates().end(); ++it)
                                 {
-                                    s->setColourOperationEx(LBX_SOURCE1, LBS_CURRENT);
+                                    TextureUnitState* tus = *it;
+                                    tus->setColourOperationEx(LBX_SOURCE1, LBS_CURRENT);
                                 }
                             }
                             else
@@ -959,13 +1158,15 @@ namespace Ogre {
         if(MaterialManager::getSingletonPtr())
             MaterialManager::getSingleton()._notifyBeforeIlluminationPassesCleared(this);
 
-        for (auto *i : mIlluminationPasses)
+        IlluminationPassList::iterator i, iend;
+        iend = mIlluminationPasses.end();
+        for (i = mIlluminationPasses.begin(); i != iend; ++i)
         {
-            if (i->destroyOnShutdown)
+            if ((*i)->destroyOnShutdown)
             {
-                i->pass->queueForDeletion();
+                (*i)->pass->queueForDeletion();
             }
-            OGRE_DELETE i;
+            OGRE_DELETE *i;
         }
         mIlluminationPasses.clear();
     }
@@ -995,14 +1196,31 @@ namespace Ogre {
     {
         return mParent->getGroup();
     }
+
     //-----------------------------------------------------------------------
-    Ogre::MaterialPtr  Technique::getShadowCasterMaterial() const
+    bool Technique::applyTextureAliases(const AliasTextureNamePairList& aliasList, const bool apply) const
     {
-        return mShadowCasterMaterial;
+        // iterate through passes and apply texture alias
+        Passes::const_iterator i, iend;
+        iend = mPasses.end();
+        bool testResult = false;
+
+        for(i = mPasses.begin(); i != iend; ++i)
+        {
+            if ((*i)->applyTextureAliases(aliasList, apply))
+                testResult = true;
+        }
+
+        return testResult;
     }
     //-----------------------------------------------------------------------
-    void  Technique::setShadowCasterMaterial(Ogre::MaterialPtr val)
-    {
+    Ogre::MaterialPtr  Technique::getShadowCasterMaterial() const 
+    { 
+        return mShadowCasterMaterial; 
+    }
+    //-----------------------------------------------------------------------
+    void  Technique::setShadowCasterMaterial(Ogre::MaterialPtr val) 
+    { 
         if (!val)
         {
             mShadowCasterMaterial.reset();
@@ -1010,27 +1228,24 @@ namespace Ogre {
         }
         else
         {
-            // shadow caster material should never receive shadows
-            val->setReceiveShadows(false); // should we warn if this is not set?
-            mShadowCasterMaterial = val;
+            mShadowCasterMaterial = val; 
             mShadowCasterMaterialName = val->getName();
         }
     }
     //-----------------------------------------------------------------------
-    void  Technique::setShadowCasterMaterial(const Ogre::String &name)
-    {
-        setShadowCasterMaterial(MaterialManager::getSingleton().getByName(name));
-        // remember the name, even if it is not created yet
+    void  Technique::setShadowCasterMaterial(const Ogre::String &name) 
+    { 
         mShadowCasterMaterialName = name;
+        mShadowCasterMaterial = MaterialManager::getSingleton().getByName(name);
     }
     //-----------------------------------------------------------------------
-    Ogre::MaterialPtr  Technique::getShadowReceiverMaterial() const
-    {
-        return mShadowReceiverMaterial;
+    Ogre::MaterialPtr  Technique::getShadowReceiverMaterial() const 
+    { 
+        return mShadowReceiverMaterial; 
     }
     //-----------------------------------------------------------------------
-    void  Technique::setShadowReceiverMaterial(Ogre::MaterialPtr val)
-    {
+    void  Technique::setShadowReceiverMaterial(Ogre::MaterialPtr val) 
+    { 
         if (!val)
         {
             mShadowReceiverMaterial.reset();
@@ -1038,13 +1253,13 @@ namespace Ogre {
         }
         else
         {
-            mShadowReceiverMaterial = val;
+            mShadowReceiverMaterial = val; 
             mShadowReceiverMaterialName = val->getName();
         }
     }
     //-----------------------------------------------------------------------
-    void  Technique::setShadowReceiverMaterial(const Ogre::String &name)
-    {
+    void  Technique::setShadowReceiverMaterial(const Ogre::String &name)  
+    { 
         mShadowReceiverMaterialName = name;
         mShadowReceiverMaterial = MaterialManager::getSingleton().getByName(name);
     }
@@ -1077,7 +1292,7 @@ namespace Ogre {
         return GPUVendorRuleIterator(mGPUVendorRules.begin(), mGPUVendorRules.end());
     }
     //---------------------------------------------------------------------
-    void Technique::addGPUDeviceNameRule(const String& devicePattern,
+    void Technique::addGPUDeviceNameRule(const String& devicePattern, 
         Technique::IncludeOrExclude includeOrExclude, bool caseSensitive)
     {
         addGPUDeviceNameRule(GPUDeviceNameRule(devicePattern, includeOrExclude, caseSensitive));
@@ -1106,4 +1321,6 @@ namespace Ogre {
         return GPUDeviceNameRuleIterator(mGPUDeviceNameRules.begin(), mGPUDeviceNameRules.end());
     }
     //---------------------------------------------------------------------
+
+
 }

@@ -61,10 +61,6 @@ namespace Ogre {
             : w(1), x(0), y(0), z(0)
         {
         }
-        /// Copy constructor
-        inline Quaternion(const Ogre::Quaternion& rhs)
-            : w(rhs.w), x(rhs.x), y(rhs.y), z(rhs.z)
-        {}
         /// Construct from an explicit list of values
         inline Quaternion (
             Real fW,
@@ -288,7 +284,7 @@ namespace Ogre {
             Slerp ( 0.0f, A, B ) = A
             Slerp ( 1.0f, A, B ) = B
             @return Interpolated quaternion
-
+            @remarks
             Slerp has the proprieties of performing the interpolation at constant
             velocity, and being torque-minimal (unless shortestPath=false).
             However, it's NOT commutative, which means
@@ -320,7 +316,7 @@ namespace Ogre {
         /** Performs Normalised linear interpolation between two quaternions, and returns the result.
             nlerp ( 0.0f, A, B ) = A
             nlerp ( 1.0f, A, B ) = B
-
+            @remarks
             Nlerp is faster than Slerp.
             Nlerp has the proprieties of being commutative (@see Slerp;
             commutativity is desired in certain places, like IK animation), and
@@ -343,13 +339,11 @@ namespace Ogre {
 
         Real w, x, y, z;
 
-#ifndef OGRE_FAST_MATH
         /// Check whether this quaternion contains valid values
         inline bool isNaN() const
         {
             return Math::isNaN(x) || Math::isNaN(y) || Math::isNaN(z) || Math::isNaN(w);
         }
-#endif
 
         /** Function for writing to a stream. Outputs "Quaternion(w, x, y, z)" with w,x,y,z
             being the member values of the quaternion.

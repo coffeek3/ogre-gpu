@@ -31,7 +31,6 @@ THE SOFTWARE.
 
 #include "OgrePrerequisites.h"
 #include "OgreGLSupportPrerequisites.h"
-#include "OgreCommon.h"
 
 namespace Ogre
 {
@@ -58,7 +57,7 @@ namespace Ogre
     protected:
         typedef std::unordered_map<uint32, uint32> BindBufferMap;
         typedef std::unordered_map<uint32, int> TexParameteriMap;
-        typedef std::unordered_map<uint32, TexParameteriMap> TexUnitsMap;
+        typedef std::unordered_map<uint32, float> TexParameterfMap;
 
         /* These variables are used for caching OpenGL state.
          They are cached because state changes can be quite expensive,
@@ -78,7 +77,7 @@ namespace Ogre
         /// Stores the current stencil mask
         uint32 mStencilMask;
         /// Viewport origin and size
-        Rect mViewport;
+        int mViewport[4];
         /// A map of different buffer types and the currently bound buffer for each type
         BindBufferMap mActiveBufferMap;
         /// Stores the current face culling setting
@@ -94,10 +93,13 @@ namespace Ogre
         uint32 mBlendFuncDestAlpha;
         /// Stores the currently active texture unit
         size_t mActiveTextureUnit;
-        /// A map of texture parameters for each texture unit
-        TexUnitsMap mTexUnitsMap;
     public:
         virtual ~GLStateCacheManagerCommon() {}
+
+        void getViewport(int* array) {
+            for (int i = 0; i < 4; ++i)
+                array[i] = mViewport[i];
+        }
 
         /** Gets the current colour mask setting.
          @return An array containing the mask in RGBA order.

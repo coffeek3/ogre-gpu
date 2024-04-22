@@ -35,7 +35,7 @@ THE SOFTWARE.
 #include "OgreCommon.h"
 #include "OgreHeaderPrefix.h"
 #include "OgreMath.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 
 namespace Ogre {
     /** \addtogroup Core
@@ -46,7 +46,7 @@ namespace Ogre {
     */
 
     /** A billboard is a primitive which always faces the camera in every frame.
-
+        @remarks
             Billboards can be used for special effects or some other trickery which requires the
             triangles to always facing the camera no matter where it is. Ogre groups billboards into
             sets for efficiency, so you should never create a billboard on it's own (it's ok to have a
@@ -69,20 +69,21 @@ namespace Ogre {
     {
         friend class BillboardSet;
         friend class BillboardParticleRenderer;
-    private:
+    protected:
         bool mOwnDimensions;
         bool mUseTexcoordRect;
         uint16 mTexcoordIndex;      /// Index into the BillboardSet array of texture coordinates
         FloatRect mTexcoordRect;    /// Individual texture coordinates
-        float mWidth;
-        float mHeight;
+        Real mWidth;
+        Real mHeight;
     public:
         // Note the intentional public access to main internal variables used at runtime
         // Forcing access via get/set would be too costly for 000's of billboards
         Vector3 mPosition;
         /// Normalised direction vector
         Vector3 mDirection;
-        RGBA mColour;
+        BillboardSet* mParentSet;
+        ColourValue mColour;
         Radian mRotation;
 
         /** Default constructor.
@@ -98,69 +99,77 @@ namespace Ogre {
         Billboard(const Vector3& position, BillboardSet* owner, const ColourValue& colour = ColourValue::White);
 
         /** Get the rotation of the billboard.
-
+            @remarks
                 This rotation is relative to the center of the billboard.
         */
         const Radian& getRotation(void) const { return mRotation; }
 
         /** Set the rotation of the billboard.
-
+            @remarks
                 This rotation is relative to the center of the billboard.
         */
-        void setRotation(const Radian& rotation) { mRotation = rotation; }
+        void setRotation(const Radian& rotation);
 
         /** Set the position of the billboard.
-
+            @remarks
                 This position is relative to a point on the quad which is the billboard. Depending on the BillboardSet,
                 this may be the center of the quad, the top-left etc. See BillboardSet::setBillboardOrigin for more info.
         */
-        void setPosition(const Vector3& position) { mPosition = position; }
+        void setPosition(const Vector3& position);
 
-        /// @overload
-        void setPosition(Real x, Real y, Real z) { setPosition({x, y, z}); }
+        /** Set the position of the billboard.
+            @remarks
+                This position is relative to a point on the quad which is the billboard. Depending on the BillboardSet,
+                this may be the center of the quad, the top-left etc. See BillboardSet::setBillboardOrigin for more info.
+        */
+        void setPosition(Real x, Real y, Real z);
 
         /** Get the position of the billboard.
-
+            @remarks
                 This position is relative to a point on the quad which is the billboard. Depending on the BillboardSet,
                 this may be the center of the quad, the top-left etc. See BillboardSet::setBillboardOrigin for more info.
         */
-        const Vector3& getPosition(void) const { return mPosition; }
+        const Vector3& getPosition(void) const;
 
         /** Sets the width and height for this billboard.
-
+            @remarks
                 Note that it is most efficient for every billboard in a BillboardSet to have the same dimensions. If you
                 choose to alter the dimensions of an individual billboard the set will be less efficient. Do not call
                 this method unless you really need to have different billboard dimensions within the same set. Otherwise
                 just call the BillboardSet::setDefaultDimensions method instead.
         */
-        void setDimensions(float width, float height);
+        void setDimensions(Real width, Real height);
 
         /** Resets this Billboard to use the parent BillboardSet's dimensions instead of it's own. */
         void resetDimensions(void) { mOwnDimensions = false; }
         /** Sets the colour of this billboard.
-
+            @remarks
                 Billboards can be tinted based on a base colour. This allows variations in colour irrespective of the
                 base colour of the material allowing more varied billboards. The default colour is white.
                 The tinting is effected using vertex colours.
         */
-        void setColour(const ColourValue& colour) { mColour = colour.getAsBYTE(); }
+        void setColour(const ColourValue& colour);
 
         /** Gets the colour of this billboard.
         */
-        ColourValue getColour(void) const { return ColourValue((const uchar*)&mColour); }
+        const ColourValue& getColour(void) const;
 
         /** Returns true if this billboard deviates from the BillboardSet's default dimensions (i.e. if the
             Billboard::setDimensions method has been called for this instance).
             @see
                 Billboard::setDimensions
         */
-        bool hasOwnDimensions(void) const { return mOwnDimensions; }
+        bool hasOwnDimensions(void) const;
 
         /** Retrieves the billboard's personal width, if hasOwnDimensions is true. */
-        float getOwnWidth(void) const { return mWidth; }
+        Real getOwnWidth(void) const;
 
         /** Retrieves the billboard's personal height, if hasOwnDimensions is true. */
-        float getOwnHeight(void) const { return mHeight; }
+        Real getOwnHeight(void) const;
+
+        /** Internal method for notifying the billboard of it's owner.
+        */
+        void _notifyOwner(BillboardSet* owner);
 
         /** Returns true if this billboard use individual texture coordinate rect (i.e. if the 
             Billboard::setTexcoordRect method has been called for this instance), or returns
@@ -184,23 +193,27 @@ namespace Ogre {
 
         /** getTexcoordIndex() returns the previous value set by setTexcoordIndex(). 
             The default value is 0, which is always a valid texture coordinate set.
-
+            @remarks
                 This value is useful only when isUseTexcoordRect return false.
           */
         uint16 getTexcoordIndex(void) const { return mTexcoordIndex; }
 
-        /** sets the individual texture coordinate rect of this billboard will use when rendering.
-            The parent billboard set may contain more than one, in
+        /** setTexcoordRect() sets the individual texture coordinate rect of this billboard
+            will use when rendering. The parent billboard set may contain more than one, in
             which case a billboard can be textured with different pieces of a larger texture
             sheet very efficiently.
         */
         void setTexcoordRect(const FloatRect& texcoordRect);
 
-        /// @overload
-        void setTexcoordRect(float u0, float v0, float u1, float v1) { setTexcoordRect({u0, v0, u1, v1}); }
+        /** setTexcoordRect() sets the individual texture coordinate rect of this billboard
+            will use when rendering. The parent billboard set may contain more than one, in
+            which case a billboard can be textured with different pieces of a larger texture
+            sheet very efficiently.
+        */
+        void setTexcoordRect(Real u0, Real v0, Real u1, Real v1);
 
         /** getTexcoordRect() returns the previous value set by setTexcoordRect(). 
-
+            @remarks
                 This value is useful only when isUseTexcoordRect returns true.
         */
         const FloatRect& getTexcoordRect(void) const { return mTexcoordRect; }

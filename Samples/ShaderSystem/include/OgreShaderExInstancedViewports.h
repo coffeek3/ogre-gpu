@@ -47,37 +47,36 @@ namespace RTShader {
 class ShaderExInstancedViewports : public SubRenderState
 {
     friend class ShaderExInstancedViewportsFactory;
-    bool mOwnsGlobalData; // only true for template sub render state
+
 // Interface.
 public:
     /** Class default constructor */    
     ShaderExInstancedViewports();
-    ~ShaderExInstancedViewports();
     
     /** 
     @see SubRenderState::getType.
     */
-    const String&   getType             () const override;
+    virtual const String&   getType             () const;
 
     /** 
     @see SubRenderState::getExecutionOrder.
     */
-    int             getExecutionOrder       () const override;
+    virtual int             getExecutionOrder       () const;
 
     /** 
     @see SubRenderState::copyFrom.
     */
-    void            copyFrom                (const SubRenderState& rhs) override;
+    virtual void            copyFrom                (const SubRenderState& rhs);
 
     /** 
     @see SubRenderState::preAddToRenderState.
     */
-    bool            preAddToRenderState     (const RenderState* renderState, Pass* srcPass, Pass* dstPass) override;
+    virtual bool            preAddToRenderState     (const RenderState* renderState, Pass* srcPass, Pass* dstPass);
 
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    void            updateGpuProgramsParams (Renderable* rend, const Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList) override;
+    virtual void            updateGpuProgramsParams (Renderable* rend, const Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList);
 
 
     /** Set the monitors count. */
@@ -95,17 +94,17 @@ protected:
     /** 
     @see SubRenderState::resolveParameters.
     */
-    bool            resolveParameters       (ProgramSet* programSet) override;
+    virtual bool            resolveParameters       (ProgramSet* programSet);
 
     /** 
     @see SubRenderState::resolveDependencies.
     */
-    bool            resolveDependencies     (ProgramSet* programSet) override;
+    virtual bool            resolveDependencies     (ProgramSet* programSet);
 
     /** 
     @see SubRenderState::addFunctionInvocations.
     */
-    bool            addFunctionInvocations  (ProgramSet* programSet) override;
+    virtual bool            addFunctionInvocations  (ProgramSet* programSet);
 
     /** 
     Internal method that adds related vertex shader functions invocations.
@@ -156,24 +155,24 @@ public:
     /** 
     @see SubRenderStateFactory::getType.
     */
-    const String&   getType             () const override;
+    virtual const String&   getType             () const;
 
     /** 
     @see SubRenderStateFactory::createInstance.
     */
-    SubRenderState* createInstance      (ScriptCompiler* compiler, PropertyAbstractNode* prop, Pass* pass, SGScriptTranslator* translator) override;
+    virtual SubRenderState* createInstance      (ScriptCompiler* compiler, PropertyAbstractNode* prop, Pass* pass, SGScriptTranslator* translator);
 
     /** 
     @see SubRenderStateFactory::writeInstance.
     */
-    void            writeInstance       (MaterialSerializer* ser, SubRenderState* subRenderState, Pass* srcPass, Pass* dstPass) override;
+    virtual void            writeInstance       (MaterialSerializer* ser, SubRenderState* subRenderState, Pass* srcPass, Pass* dstPass);
 
 protected:
 
     /** 
     @see SubRenderStateFactory::createInstanceImpl.
     */
-    SubRenderState* createInstanceImpl  () override;
+    virtual SubRenderState* createInstanceImpl  ();
 
 
 

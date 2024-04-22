@@ -32,7 +32,7 @@ PROJECT_NAME           = OGRE
 # This could be handy for archiving the generated documentation or
 # if some version control system is used.
 
-PROJECT_NUMBER         = ${OGRE_SOVERSION}
+PROJECT_NUMBER         = ${OGRE_VERSION}
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
 # for a project that appears at the top of each page and should give viewer
@@ -123,7 +123,7 @@ ALWAYS_DETAILED_SEC    = YES
 # members were ordinary class members. Constructors, destructors and assignment
 # operators of the base classes will not be shown.
 
-INLINE_INHERITED_MEMB  = NO
+INLINE_INHERITED_MEMB  = YES
 
 # If the FULL_PATH_NAMES tag is set to YES then Doxygen will prepend the full
 # path before files name in the file list and in the header files. If set
@@ -205,8 +205,7 @@ TAB_SIZE               = 4
 # will result in a user-defined paragraph with heading "Side Effects:".
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                =  ffp_rtss_only="@note Only has an effect with the fixed-function pipeline or the @ref rtss"
-ALIASES               +=  shaderparam="@note When using shader programs, you have to explicitely forward this property in the @ref Program-Parameter-Specification"
+ALIASES                =
 
 # This tag can be used to specify a number of word-keyword mappings (TCL only).
 # A mapping has the form "name=value". For example adding
@@ -420,7 +419,7 @@ HIDE_UNDOC_CLASSES     = NO
 # If set to NO (the default) these declarations will be included in the
 # documentation.
 
-HIDE_FRIEND_COMPOUNDS  = YES
+HIDE_FRIEND_COMPOUNDS  = NO
 
 # If the HIDE_IN_BODY_DOCS tag is set to YES, Doxygen will hide any
 # documentation blocks found inside the body of a function.
@@ -722,8 +721,6 @@ EXCLUDE_PATTERNS       = *UTF* \
                          */GLSupport/include/GLX/* \
                          */GLSupport/include/OSX/* \
                          */GLSupport/include/win32/* \
-                         */include/Threading/* \
-                         */OgreMemoryAllocatorConfig.h \
                          *EAGL* \
                          */RenderSystems/GLES/*
 
@@ -733,7 +730,7 @@ EXCLUDE_PATTERNS       = *UTF* \
 # wildcard * is used, a substring. Examples: ANamespace, AClass,
 # AClass::ANamespace, ANamespace::*Test
 
-EXCLUDE_SYMBOLS        = Ogre::AllocatedObject Ogre::ParamCommand
+EXCLUDE_SYMBOLS        =
 
 # The EXAMPLE_PATH tag can be used to specify one or more files or
 # directories that contain example code fragments that are included (see
@@ -902,8 +899,6 @@ IGNORE_PREFIX          =
 
 GENERATE_HTML          = YES
 
-GENERATE_LATEX = NO
-
 # The HTML_OUTPUT tag is used to specify where the HTML docs will be put.
 # If a relative path is entered the value of OUTPUT_DIRECTORY will be
 # put in front of it. If left blank `html' will be used as the default path.
@@ -952,7 +947,7 @@ HTML_STYLESHEET        =
 # robust against future updates. Doxygen will copy the style sheet file to
 # the output directory.
 
-HTML_EXTRA_STYLESHEET  = "${PROJECT_SOURCE_DIR}/Docs/doxygen-awesome.css" "${PROJECT_SOURCE_DIR}/Docs/ogre_style.css"
+HTML_EXTRA_STYLESHEET  = "${PROJECT_SOURCE_DIR}/Docs/ogre_style.css"
 
 # The HTML_EXTRA_FILES tag can be used to specify one or more extra images or
 # other source files which should be copied to the HTML output directory. Note
@@ -1207,14 +1202,7 @@ PREDEFINED             = OGRE_MEMORY_ALLOCATOR=1 \
                          RTSHADER_SYSTEM_BUILD_EXT_SHADERS \
                          OGRE_PLATFORM=10 \
                          OGRE_DEPRECATED= \
-                         OGRE_NODISCARD= \
-                         OGRE_NORETURN= \
-                         DECL_MALLOC= \
-                         OGRE_FORCE_INLINE=inline \
-                         OGRE_NODELESS_POSITIONING= \
                          MANAGED_RESOURCE= \
-                         OGRE_AUTO_MUTEX= \
-                         OGRE_FORMAT_PRINTF=;// \
                          OGRE_RESOURCE_GROUP_INIT==RGN_DEFAULT \
                          protected=private
 
@@ -1269,6 +1257,10 @@ ALLEXTERNALS           = NO
 
 EXTERNAL_GROUPS        = YES
 
+# The PERL_PATH should be the absolute path and name of the perl script
+# interpreter (i.e. the result of `which perl').
+
+PERL_PATH              = /usr/bin/perl
 
 #---------------------------------------------------------------------------
 # Configuration options related to the dot tool

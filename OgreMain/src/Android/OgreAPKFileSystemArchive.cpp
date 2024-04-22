@@ -15,39 +15,39 @@ namespace {
         ~APKFileSystemArchive();
 
         /// @copydoc Archive::isCaseSensitive
-        bool isCaseSensitive(void) const override;
+        bool isCaseSensitive(void) const;
 
         /// @copydoc Archive::load
-        void load() override;
+        void load();
         /// @copydoc Archive::unload
-        void unload() override;
+        void unload();
 
         /// @copydoc Archive::open
-        DataStreamPtr open(const String& filename, bool readOnly = true) const override;
+        DataStreamPtr open(const String& filename, bool readOnly = true) const;
 
         /// @copydoc Archive::create
-        DataStreamPtr create(const String& filename) override;
+        DataStreamPtr create(const String& filename);
 
         /// @copydoc Archive::remove
-        void remove(const String& filename) override;
+        void remove(const String& filename);
 
         /// @copydoc Archive::list
-        StringVectorPtr list(bool recursive = true, bool dirs = false) const override;
+        StringVectorPtr list(bool recursive = true, bool dirs = false) const;
 
         /// @copydoc Archive::listFileInfo
-        FileInfoListPtr listFileInfo(bool recursive = true, bool dirs = false) const override;
+        FileInfoListPtr listFileInfo(bool recursive = true, bool dirs = false) const;
 
         /// @copydoc Archive::find
-        StringVectorPtr find(const String& pattern, bool recursive = true, bool dirs = false) const override;
+        StringVectorPtr find(const String& pattern, bool recursive = true, bool dirs = false) const;
 
         /// @copydoc Archive::findFileInfo
-        FileInfoListPtr findFileInfo(const String& pattern, bool recursive = true, bool dirs = false) const override;
+        FileInfoListPtr findFileInfo(const String& pattern, bool recursive = true, bool dirs = false) const;
 
         /// @copydoc Archive::exists
-        bool exists(const String& filename) const override;
+        bool exists(const String& filename) const;
 
         /// @copydoc Archive::getModifiedTime
-        time_t getModifiedTime(const String& filename) const override;
+        time_t getModifiedTime(const String& filename) const;
     };
 
 	std::map<String, std::vector< String > > mFiles;
@@ -72,12 +72,12 @@ namespace {
 	APKFileSystemArchive::APKFileSystemArchive(const String& name, const String& archType, AAssetManager* assetMgr)
 		:Archive(name, archType), mAssetMgr(assetMgr)
 	{
-		if (mName.size() > 0 && mName[0] == '/')
-			mName.erase(mName.begin());
+        if (mName.size() > 0 && mName[0] == '/')
+        	mName.erase(mName.begin());
 
-		mPathPreFix = mName;
-		if (mPathPreFix.size() > 0)
-			mPathPreFix += "/";
+        mPathPreFix = mName;
+        if (mPathPreFix.size() > 0)
+        	mPathPreFix += "/";
 			
 		if(!IsFolderParsed( mName )) {
 			ParseFolder( mAssetMgr, mName );
@@ -116,7 +116,7 @@ namespace {
 		if(asset)
 		{
 			off_t length = AAsset_getLength(asset);
-            stream = std::make_shared<MemoryDataStream>(filename, length, true, true);
+            stream.reset(new Ogre::MemoryDataStream(length, true, true));
 			memcpy(stream->getPtr(), AAsset_getBuffer(asset), length);
 			AAsset_close(asset);
 		}

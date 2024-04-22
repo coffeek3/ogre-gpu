@@ -13,12 +13,10 @@
 ###############################################################
 
 # Set docs target directory
-if (NOT OGRE_DOCS_PATH)
-    if (WIN32 OR APPLE)
-        set(OGRE_DOCS_PATH "Docs")
-    elseif (UNIX)
-        set(OGRE_DOCS_PATH "share/doc/OGRE")
-    endif ()
+if (WIN32 OR APPLE)
+  set(OGRE_DOCS_PATH "Docs")
+elseif (UNIX)
+  set(OGRE_DOCS_PATH "share/OGRE/docs")
 endif ()
 
 # Build and install API documentation if doxygen is available
@@ -33,30 +31,27 @@ if(DOXYGEN_FOUND)
 
     file(GLOB TUTORIALS ${PROJECT_SOURCE_DIR}/Docs/src/tutorials/*.md)
     file(GLOB BASIC_TUTORIALS ${PROJECT_SOURCE_DIR}/Docs/src/tutorials/basictutorials/*.md)
-    file(GLOB COMPONENTS ${PROJECT_SOURCE_DIR}/Components/*/include)
-    file(GLOB PLUGINS ${PROJECT_SOURCE_DIR}/PlugIns/*/include)
 
     set(CMAKE_DOXYGEN_INPUT_LIST
         ${PROJECT_SOURCE_DIR}/OgreMain/include
-        ${COMPONENTS}
-        ${PLUGINS}
+        ${PROJECT_SOURCE_DIR}/Components
+        ${PROJECT_SOURCE_DIR}/PlugIns
         ${PROJECT_SOURCE_DIR}/PlugIns/PCZSceneManager/docs/readme.md
-        ${PROJECT_SOURCE_DIR}/PlugIns/DotScene/README.md
         ${PROJECT_SOURCE_DIR}/RenderSystems
-        ${BASIC_TUTORIALS}
         ${PROJECT_SOURCE_DIR}/Docs/src/apimainpage.md
         ${PROJECT_SOURCE_DIR}/Docs/src/manual.md
-        ${PROJECT_SOURCE_DIR}/Docs/src/ogre-shadows.md
+        ${PROJECT_SOURCE_DIR}/Docs/src/OgreShadows.md
         ${PROJECT_SOURCE_DIR}/Docs/src/scripts.md
         ${PROJECT_SOURCE_DIR}/Docs/src/material-scripts.md
         ${PROJECT_SOURCE_DIR}/Docs/src/high-level-programs.md
         ${PROJECT_SOURCE_DIR}/Docs/src/particle-scripts.md
         ${PROJECT_SOURCE_DIR}/Docs/src/hardware-buffers.md
+        ${PROJECT_SOURCE_DIR}/Docs/src/hlms.md
         ${PROJECT_SOURCE_DIR}/Docs/src/rtss.md
-        ${PROJECT_SOURCE_DIR}/Docs/src/instancing.md
         ${PROJECT_SOURCE_DIR}/Docs/src/resourcemanagement.md
         ${PROJECT_SOURCE_DIR}/BuildingOgre.md
-		${TUTORIALS})
+        ${TUTORIALS}
+        ${BASIC_TUTORIALS})
     string(REPLACE ";" " \\\n" CMAKE_DOXYGEN_INPUT_LIST "${CMAKE_DOXYGEN_INPUT_LIST}")
     configure_file(${OGRE_TEMPLATES_DIR}/html.cfg.in ${PROJECT_BINARY_DIR}/html.cfg)
     add_custom_target(OgreDoc COMMAND 

@@ -27,8 +27,6 @@
  */
 #include "OgreFileSystemLayer.h"
 
-#include <unistd.h>
-
 namespace Ogre
 {
     String FileSystemLayer::resolveBundlePath(String path)

@@ -27,13 +27,10 @@ THE SOFTWARE.
 #include "OgreShaderPrecompiledHeaders.h"
 #ifdef RTSHADER_SYSTEM_BUILD_EXT_SHADERS
 
-#define SGX_FUNC_TRIPLANAR_TEXTURING "SGX_TriplanarTexturing"
-
 namespace Ogre {
 namespace RTShader {
 
     String TriplanarTexturing::type = "SGX_TriplanarTexturing";
-    const String SRS_TRIPLANAR_TEXTURING = "SGX_TriplanarTexturing";
 
     //-----------------------------------------------------------------------
 
@@ -62,15 +59,15 @@ namespace RTShader {
 		mVSOutPosition = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
 		mPSInPosition = psMain->resolveInputParameter(mVSOutPosition);
 
-		mSamplerFromX = psProgram->resolveParameter(GCT_SAMPLER2D, "tp_sampler_from_x", mTextureSamplerIndexFromX);
+		mSamplerFromX = psProgram->resolveParameter(GCT_SAMPLER2D, mTextureSamplerIndexFromX, (uint16)GPV_GLOBAL, "tp_sampler_from_x");
 		if (mSamplerFromX.get() == NULL)
 			return false;
 
-		mSamplerFromY = psProgram->resolveParameter(GCT_SAMPLER2D, "tp_sampler_from_y", mTextureSamplerIndexFromY);
+		mSamplerFromY = psProgram->resolveParameter(GCT_SAMPLER2D, mTextureSamplerIndexFromY, (uint16)GPV_GLOBAL, "tp_sampler_from_y");
 		if (mSamplerFromY.get() == NULL)
 			return false;
 
-		mSamplerFromZ = psProgram->resolveParameter(GCT_SAMPLER2D, "tp_sampler_from_z", mTextureSamplerIndexFromZ);
+		mSamplerFromZ = psProgram->resolveParameter(GCT_SAMPLER2D, mTextureSamplerIndexFromZ, (uint16)GPV_GLOBAL, "tp_sampler_from_z");
 		if (mSamplerFromZ.get() == NULL)
 			return false;
 
@@ -78,7 +75,7 @@ namespace RTShader {
         if (mPSOutDiffuse.get() == NULL)    
             return false;
     
-        mPSTPParams = psProgram->resolveParameter(GCT_FLOAT3, "gTPParams");
+        mPSTPParams = psProgram->resolveParameter(GCT_FLOAT3, -1, (uint16)GPV_GLOBAL, "gTPParams");
         if (mPSTPParams.get() == NULL)
             return false;
         return true;
@@ -88,8 +85,10 @@ namespace RTShader {
     bool TriplanarTexturing::resolveDependencies(ProgramSet* programSet)
     {
         Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
+        Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
 		psProgram->addDependency(FFP_LIB_TEXTURING);
         psProgram->addDependency("SGXLib_TriplanarTexturing");
+        vsProgram->addDependency(FFP_LIB_COMMON);
         return true;
     }
 
@@ -106,7 +105,7 @@ namespace RTShader {
         vsStage.assign(mVSInPosition, mVSOutPosition);
 
         psMain->getStage(FFP_PS_TEXTURING)
-            .callFunction("SGX_TriplanarTexturing",
+            .callFunction(SGX_FUNC_TRIPLANAR_TEXTURING,
                           {In(mPSInDiffuse), In(mPSInNormal), In(mPSInPosition), In(mSamplerFromX),
                            In(mSamplerFromY), In(mSamplerFromZ), In(mPSTPParams), Out(mPSOutDiffuse)});
 
@@ -116,7 +115,7 @@ namespace RTShader {
     //-----------------------------------------------------------------------
     const String& TriplanarTexturing::getType() const
     {
-        return SRS_TRIPLANAR_TEXTURING;
+        return type;
     }
 
     //-----------------------------------------------------------------------
@@ -153,6 +152,9 @@ namespace RTShader {
         mPSOutDiffuse = rhsTP.mPSOutDiffuse;
         mPSInDiffuse = rhsTP.mPSInDiffuse;
 
+        mVSInPosition = rhsTP.mVSInPosition;
+        mVSOutPosition = rhsTP.mVSOutPosition;
+
         mVSOutNormal = rhsTP.mVSOutNormal;
         mVSInNormal = rhsTP.mVSInNormal;
         mPSInNormal = rhsTP.mPSInNormal;
@@ -179,31 +181,24 @@ namespace RTShader {
         mPSTPParams->setGpuParameter(mParameters);
     }
 
-    void TriplanarTexturing::setParameter(const String& name, const Any& value)
+    //-----------------------------------------------------------------------
+    void TriplanarTexturing::setParameters(const Vector3 &parameters)
     {
-        if (name == "parameters")
-        {
-            mParameters = any_cast<Vector3>(value);
-            return;
-        }
-        else if (name == "texture_names")
-        {
-            const StringVector& textureNames = any_cast<StringVector>(value);
-            if (textureNames.size() == 3)
-            {
-                mTextureNameFromX = textureNames[0];
-                mTextureNameFromY = textureNames[1];
-                mTextureNameFromZ = textureNames[2];
-                return;
-            }
-        }
-        SubRenderState::setParameter(name, value);
+        mParameters = parameters;
+    }
+
+    //-----------------------------------------------------------------------
+    void TriplanarTexturing::setTextureNames(const String &textureNameFromX, const String &textureNameFromY, const String &textureNameFromZ)
+    {
+        mTextureNameFromX = textureNameFromX;
+        mTextureNameFromY = textureNameFromY;
+        mTextureNameFromZ = textureNameFromZ;
     }
 
     //-----------------------------------------------------------------------
     const String& TriplanarTexturingFactory::getType() const
     {
-        return SRS_TRIPLANAR_TEXTURING;
+        return TriplanarTexturing::type;
     }
 
     //-----------------------------------------------------------------------
@@ -221,30 +216,50 @@ namespace RTShader {
                 float parameters[3];
                 if (false == SGScriptTranslator::getFloat(*it, parameters))
                 {
+                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
                     return NULL;
                 }
                 ++it;
                 if (false == SGScriptTranslator::getFloat(*it, parameters + 1))
                 {
+                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
                     return NULL;
                 }
                 ++it;
                 if (false == SGScriptTranslator::getFloat(*it, parameters + 2))
                 {
+                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                    return NULL;
+                }
+                Vector3 vParameters(parameters[0], parameters[1], parameters[2]);
+                tpSubRenderState->setParameters(vParameters);
+
+                String textureNameFromX, textureNameFromY, textureNameFromZ;
+                ++it;
+                if (false == SGScriptTranslator::getString(*it, &textureNameFromX))
+                {
+                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
                     return NULL;
                 }
                 ++it;
-                Vector3 vParameters(parameters[0], parameters[1], parameters[2]);
-                tpSubRenderState->setParameter("parameters", vParameters);
-
-                StringVector textureNames = {(*it++)->getString(), (*it++)->getString(), (*it++)->getString()};
-
-                if(textureNames[0].empty() || textureNames[1].empty() || textureNames[2].empty())
+                if (false == SGScriptTranslator::getString(*it, &textureNameFromY))
+                {
+                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
                     return NULL;
-
-                tpSubRenderState->setParameter("texture_names", textureNames);
+                }
+                ++it;
+                if (false == SGScriptTranslator::getString(*it, &textureNameFromZ))
+                {
+                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                    return NULL;
+                }
+                tpSubRenderState->setTextureNames(textureNameFromX, textureNameFromY, textureNameFromZ);
 
                 return subRenderState;
+            }
+            else
+            {
+                compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
             }
         }
         return NULL;

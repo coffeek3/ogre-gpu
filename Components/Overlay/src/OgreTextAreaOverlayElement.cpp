@@ -41,63 +41,13 @@ namespace Ogre {
 #define DEFAULT_INITIAL_CHARS 12
     //---------------------------------------------------------------------
     String TextAreaOverlayElement::msTypeName = "TextArea";
-    //-----------------------------------------------------------------------------------------
-    class _OgrePrivate CmdCaption : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdCharHeight : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdSpaceWidth : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdFontName : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdColourTop : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdColourBottom : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdColour : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    class _OgrePrivate CmdAlignment : public ParamCommand
-    {
-    public:
-        String doGet( const void* target ) const override;
-        void doSet( void* target, const String& val ) override;
-    };
-    // Command objects
-    static CmdCharHeight msCmdCharHeight;
-    static CmdSpaceWidth msCmdSpaceWidth;
-    static CmdFontName msCmdFontName;
-    static CmdColour msCmdColour;
-    static CmdColourTop msCmdColourTop;
-    static CmdColourBottom msCmdColourBottom;
-    static CmdAlignment msCmdAlignment;
+    TextAreaOverlayElement::CmdCharHeight TextAreaOverlayElement::msCmdCharHeight;
+    TextAreaOverlayElement::CmdSpaceWidth TextAreaOverlayElement::msCmdSpaceWidth;
+    TextAreaOverlayElement::CmdFontName TextAreaOverlayElement::msCmdFontName;
+    TextAreaOverlayElement::CmdColour TextAreaOverlayElement::msCmdColour;
+    TextAreaOverlayElement::CmdColourBottom TextAreaOverlayElement::msCmdColourBottom;
+    TextAreaOverlayElement::CmdColourTop TextAreaOverlayElement::msCmdColourTop;
+    TextAreaOverlayElement::CmdAlignment TextAreaOverlayElement::msCmdAlignment;
     //---------------------------------------------------------------------
     #define POS_TEX_BINDING 0
     #define COLOUR_BINDING 1
@@ -105,6 +55,7 @@ namespace Ogre {
     #define UNICODE_CR 0x000D
     #define UNICODE_LF 0x000A
     #define UNICODE_SPACE 0x0020
+    #define UNICODE_ZERO 0x0030
     //---------------------------------------------------------------------
     TextAreaOverlayElement::TextAreaOverlayElement(const String& name)
         : OverlayElement(name), mColourBottom(ColourValue::White), mColourTop(ColourValue::White)
@@ -118,6 +69,7 @@ namespace Ogre {
 
         mCharHeight = 0.02;
         mPixelCharHeight = 12;
+        mSpaceWidthOverridden = false;
         mSpaceWidth = 0;
         mPixelSpaceWidth = 0;
         mViewportAspectCoef = 1;
@@ -139,16 +91,17 @@ namespace Ogre {
             VertexDeclaration* decl = mRenderOp.vertexData->vertexDeclaration;
             size_t offset = 0;
             // Positions
-            offset += decl->addElement(POS_TEX_BINDING, offset, VET_FLOAT3, VES_POSITION).getSize();
+            decl->addElement(POS_TEX_BINDING, offset, VET_FLOAT3, VES_POSITION);
+            offset += VertexElement::getTypeSize(VET_FLOAT3);
             // Texcoords
             decl->addElement(POS_TEX_BINDING, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0);
             // Colours - store these in a separate buffer because they change less often
-            decl->addElement(COLOUR_BINDING, 0, VET_UBYTE4_NORM, VES_DIFFUSE);
+            decl->addElement(COLOUR_BINDING, 0, VET_COLOUR, VES_DIFFUSE);
 
             mRenderOp.operationType = RenderOperation::OT_TRIANGLE_LIST;
             mRenderOp.useIndexes = false;
             mRenderOp.vertexData->vertexStart = 0;
-            mRenderOp.useGlobalInstancing = false;
+            mRenderOp.useGlobalInstancingVertexBufferIsAvailable = false;
             // Vertex buffer will be created in checkMemoryAllocation
 
             mInitialised = true;
@@ -228,10 +181,7 @@ namespace Ogre {
             return;
         }
 
-        mFont->load();  // ensure glyph info is there
-
-        auto decoded = utftoc32(mCaption);
-        size_t charlen = decoded.size();
+        size_t charlen = mCaption.size();
         checkMemoryAllocation( charlen );
 
         mRenderOp.vertexData->vertexCount = charlen * 6;
@@ -245,30 +195,37 @@ namespace Ogre {
         float left = _getDerivedLeft() * 2.0f - 1.0f;
         float top = -( (_getDerivedTop() * 2.0f ) - 1.0f );
 
+        // Derive space with from a number 0
+        if(!mSpaceWidthOverridden)
+        {
+            mSpaceWidth = mFont->getGlyphAspectRatio(UNICODE_ZERO) * mCharHeight;
+        }
+
         // Use iterator
-        auto iend = decoded.end();
+        DisplayString::iterator i, iend;
+        iend = mCaption.end();
         bool newLine = true;
-        for( auto i = decoded.begin(); i != iend; ++i )
+        for( i = mCaption.begin(); i != iend; ++i )
         {
             if( newLine )
             {
                 Real len = 0.0f;
-                for( auto j = i; j != iend; j++ )
+                for( DisplayString::iterator j = i; j != iend; j++ )
                 {
-                    Font::CodePoint character = *j;
+                    Font::CodePoint character = j.getCharacter();
                     if (character == UNICODE_CR
                         || character == UNICODE_NEL
                         || character == UNICODE_LF) 
                     {
                         break;
                     }
-                    else if (character == UNICODE_SPACE && mSpaceWidth) // space
+                    else if (character == UNICODE_SPACE) // space
                     {
                         len += mSpaceWidth * 2.0f * mViewportAspectCoef;
                     }
                     else 
                     {
-                        len += mFont->getGlyphInfo(character).advance * mCharHeight * 2.0f * mViewportAspectCoef;
+                        len += mFont->getGlyphAspectRatio(character) * mCharHeight * 2.0f * mViewportAspectCoef;
                     }
                 }
 
@@ -280,7 +237,7 @@ namespace Ogre {
                 newLine = false;
             }
 
-            Font::CodePoint character = *i;
+            Font::CodePoint character = i.getCharacter();
             if (character == UNICODE_CR
                 || character == UNICODE_NEL
                 || character == UNICODE_LF)
@@ -294,8 +251,9 @@ namespace Ogre {
                 // consume CR/LF in one
                 if (character == UNICODE_CR)
                 {
-                    auto peeki = i + 1;
-                    if (peeki != iend && *peeki == UNICODE_LF)
+                    DisplayString::iterator peeki = i;
+                    peeki++;
+                    if (peeki != iend && peeki.getCharacter() == UNICODE_LF)
                     {
                         i = peeki; // skip both as one newline
                         // Also reduce tri count
@@ -305,7 +263,7 @@ namespace Ogre {
                 }
                 continue;
             }
-            else if (character == UNICODE_SPACE && mSpaceWidth) // space
+            else if (character == UNICODE_SPACE) // space
             {
                 // Just leave a gap, no tris
                 left += mSpaceWidth * 2.0f * mViewportAspectCoef;
@@ -314,20 +272,8 @@ namespace Ogre {
                 continue;
             }
 
-            const auto& glyphInfo = mFont->getGlyphInfo(character);
-            Real horiz_height = glyphInfo.aspectRatio * mViewportAspectCoef ;
-            const Font::UVRect& uvRect = glyphInfo.uvRect;
-
-            if(uvRect.isNull())
-            {
-                // Just leave a gap, no tris
-                left += glyphInfo.advance * mCharHeight * 2.0f * mViewportAspectCoef;
-                // Also reduce tri count
-                mRenderOp.vertexData->vertexCount -= 6;
-                continue;
-            }
-
-            left += glyphInfo.bearing * mCharHeight * 2 * mViewportAspectCoef;
+            Real horiz_height = mFont->getGlyphAspectRatio(character) * mViewportAspectCoef ;
+            const Font::UVRect& uvRect = mFont->getGlyphTexCoords(character);
 
             // each vert is (x, y, z, u, v)
             //-------------------------------------------------------------------------------------
@@ -392,10 +338,6 @@ namespace Ogre {
 
             // Go back up with top
             top += mCharHeight * 2.0f;
-
-            // advance
-            left -= horiz_height  * mCharHeight * 2.0f;
-            left += (glyphInfo.advance  - glyphInfo.bearing) * mCharHeight * 2.0f * mViewportAspectCoef;
 
             float currentWidth = (left + 1)/2 - _getDerivedLeft();
             if (currentWidth > largestWidth)
@@ -472,6 +414,7 @@ namespace Ogre {
 
     void TextAreaOverlayElement::setSpaceWidth( Real width )
     {
+        mSpaceWidthOverridden = true;
         if (mMetricsMode != GMM_RELATIVE)
         {
             mPixelSpaceWidth = static_cast<unsigned short>(width);
@@ -516,6 +459,7 @@ namespace Ogre {
             // Ugly hack, but we need to override for lazy-load
             *const_cast<MaterialPtr*>(&mMaterial) = mFont->getMaterial();
             mMaterial->setDepthCheckEnabled(false);
+            mMaterial->setLightingEnabled(false);
         }
         return mMaterial;
     }
@@ -603,8 +547,9 @@ namespace Ogre {
     void TextAreaOverlayElement::updateColours(void)
     {
         // Convert to system-specific
-        RGBA topColour = mColourTop.getAsBYTE();
-        RGBA bottomColour = mColourBottom.getAsBYTE();
+        RGBA topColour, bottomColour;
+        Root::getSingleton().convertColourValue(mColourTop, &topColour);
+        Root::getSingleton().convertColourValue(mColourBottom, &bottomColour);
 
         HardwareVertexBufferSharedPtr vbuf = 
             mRenderOp.vertexData->vertexBufferBinding->getBuffer(COLOUR_BINDING);
@@ -700,12 +645,12 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Char height command object
     //
-    String CmdCharHeight::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdCharHeight::doGet( const void* target ) const
     {
         return StringConverter::toString( 
             static_cast< const TextAreaOverlayElement* >( target )->getCharHeight() );
     }
-    void CmdCharHeight::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdCharHeight::doSet( void* target, const String& val )
     {
         static_cast< TextAreaOverlayElement* >( target )->setCharHeight( 
             StringConverter::parseReal( val ) );
@@ -713,12 +658,12 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Space width command object
     //
-    String CmdSpaceWidth::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdSpaceWidth::doGet( const void* target ) const
     {
         return StringConverter::toString( 
             static_cast< const TextAreaOverlayElement* >( target )->getSpaceWidth() );
     }
-    void CmdSpaceWidth::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdSpaceWidth::doSet( void* target, const String& val )
     {
         static_cast< TextAreaOverlayElement* >( target )->setSpaceWidth( 
             StringConverter::parseReal( val ) );
@@ -728,11 +673,11 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Font name command object
     //
-    String CmdFontName::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdFontName::doGet( const void* target ) const
     {
         return static_cast< const TextAreaOverlayElement* >( target )->getFont()->getName();
     }
-    void CmdFontName::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdFontName::doSet( void* target, const String& val )
     {
         static_cast< TextAreaOverlayElement* >( target )->setFontName( val );
     }
@@ -740,12 +685,12 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Colour command object
     //
-    String CmdColour::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdColour::doGet( const void* target ) const
     {
         return StringConverter::toString (
             static_cast< const TextAreaOverlayElement* >( target )->getColour());
     }
-    void CmdColour::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdColour::doSet( void* target, const String& val )
     {
         static_cast< TextAreaOverlayElement* >( target )->setColour( 
             StringConverter::parseColourValue(val) );
@@ -755,12 +700,12 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Top colour command object
     //
-    String CmdColourTop::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdColourTop::doGet( const void* target ) const
     {
         return StringConverter::toString (
             static_cast< const TextAreaOverlayElement* >( target )->getColourTop());
     }
-    void CmdColourTop::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdColourTop::doSet( void* target, const String& val )
     {
         static_cast< TextAreaOverlayElement* >( target )->setColourTop( 
             StringConverter::parseColourValue(val) );
@@ -770,12 +715,12 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Bottom colour command object
     //
-    String CmdColourBottom::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdColourBottom::doGet( const void* target ) const
     {
         return StringConverter::toString (
             static_cast< const TextAreaOverlayElement* >( target )->getColourBottom());
     }
-    void CmdColourBottom::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdColourBottom::doSet( void* target, const String& val )
     {
         static_cast< TextAreaOverlayElement* >( target )->setColourBottom( 
             StringConverter::parseColourValue(val) );
@@ -785,35 +730,35 @@ namespace Ogre {
     //---------------------------------------------------------------------------------------------
     // Alignment command object
     //
-    String CmdAlignment::doGet( const void* target ) const
+    String TextAreaOverlayElement::CmdAlignment::doGet( const void* target ) const
     {
-        TextAreaOverlayElement::Alignment align = static_cast< const TextAreaOverlayElement* >( target )->getAlignment();
+        Alignment align = static_cast< const TextAreaOverlayElement* >( target )->getAlignment();
         switch (align)
         {
-            case TextAreaOverlayElement::Left:
+            case Left:
                 return "left";
-            case TextAreaOverlayElement::Center:
+            case Center:
                 return "center";
-            case TextAreaOverlayElement::Right:
+            case Right:
                 return "right";
                 
         }
         // To keep compiler happy
         return "left";
     }
-    void CmdAlignment::doSet( void* target, const String& val )
+    void TextAreaOverlayElement::CmdAlignment::doSet( void* target, const String& val )
     {
         if (val == "center")
         {
-            static_cast< TextAreaOverlayElement* >( target )->setAlignment(TextAreaOverlayElement::Center);
+            static_cast< TextAreaOverlayElement* >( target )->setAlignment(Center);
         }
         else if (val == "right")
         {
-            static_cast< TextAreaOverlayElement* >( target )->setAlignment(TextAreaOverlayElement::Right);
+            static_cast< TextAreaOverlayElement* >( target )->setAlignment(Right);
         }
         else
         {
-            static_cast< TextAreaOverlayElement* >( target )->setAlignment(TextAreaOverlayElement::Left);
+            static_cast< TextAreaOverlayElement* >( target )->setAlignment(Left);
         }
     }
     //---------------------------------------------------------------------------------------------

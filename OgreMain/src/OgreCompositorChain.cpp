@@ -96,7 +96,7 @@ void CompositorChain::createOriginalScene()
                 }
                 pass render_scene
                 {
-                    visibility_mask 0xFFFFFFFF
+                    visibility_mask FFFFFFFF
                     render_queues SKIES_EARLY SKIES_LATE
                 }
             }
@@ -113,17 +113,18 @@ void CompositorChain::createOriginalScene()
     CompositorPtr scene = CompositorManager::getSingleton().getByName(compName, ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME);
     if (!scene)
     {
-        /// Create base "original scene" compositor
         scene = CompositorManager::getSingleton().create(compName, ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME);
         CompositionTargetPass *tp = scene->createTechnique()->getOutputTargetPass();
-        auto pass = tp->createPass(CompositionPass::PT_CLEAR);
-        pass->setAutomaticColour(true);
+        tp->createPass(CompositionPass::PT_CLEAR);
 
         /// Render everything, including skies
-        pass = tp->createPass(CompositionPass::PT_RENDERSCENE);
+        CompositionPass *pass = tp->createPass(CompositionPass::PT_RENDERSCENE);
         pass->setFirstRenderQueue(RENDER_QUEUE_BACKGROUND);
-        pass->setLastRenderQueue(RENDER_QUEUE_TRANSPARENTS);
-        scene->load();
+        pass->setLastRenderQueue(RENDER_QUEUE_SKIES_LATE);
+
+        /// Create base "original scene" compositor
+        scene = static_pointer_cast<Compositor>(CompositorManager::getSingleton().load(compName,
+            ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME));
     }
     mOriginalScene = OGRE_NEW CompositorInstance(scene->getSupportedTechnique(), this);
 }
@@ -139,7 +140,7 @@ void CompositorChain::destroyOriginalScene()
 }
 
 //-----------------------------------------------------------------------
-CompositorInstance* CompositorChain::addCompositor(const CompositorPtr& filter, size_t addPosition, const String& scheme)
+CompositorInstance* CompositorChain::addCompositor(CompositorPtr filter, size_t addPosition, const String& scheme)
 {
 
 
@@ -147,6 +148,10 @@ CompositorInstance* CompositorChain::addCompositor(const CompositorPtr& filter, 
     CompositionTechnique *tech = filter->getSupportedTechnique(scheme);
     if(!tech)
     {
+        /// Warn user
+        LogManager::getSingleton().logMessage(
+            "CompositorChain: Compositor " + filter->getName() + " has no supported techniques.", LML_CRITICAL
+            );
         return 0;
     }
     CompositorInstance *t = OGRE_NEW CompositorInstance(tech, this);
@@ -182,9 +187,11 @@ size_t CompositorChain::getNumCompositors()
 //-----------------------------------------------------------------------
 void CompositorChain::removeAllCompositors()
 {
-    for (auto *i : mInstances)
+    Instances::iterator i, iend;
+    iend = mInstances.end();
+    for (i = mInstances.begin(); i != iend; ++i)
     {
-        OGRE_DELETE i;
+        OGRE_DELETE *i;
     }
     mInstances.clear();
     
@@ -208,9 +215,15 @@ void CompositorChain::_queuedOperation(CompositorInstance::RenderSystemOperation
 
 }
 //-----------------------------------------------------------------------
-size_t CompositorChain::getCompositorPosition(const String& name) const
+CompositorInstance *CompositorChain::getCompositor(size_t index)
 {
-    for (auto it = mInstances.begin(); it != mInstances.end(); ++it)
+    assert (index < mInstances.size() && "Index out of bounds.");
+    return mInstances[index];
+}
+//-----------------------------------------------------------------------
+size_t CompositorChain::getCompositorPosition(const String& name)
+{
+    for (Instances::iterator it = mInstances.begin(); it != mInstances.end(); ++it) 
     {
         if ((*it)->getCompositor()->getName() == name) 
         {
@@ -219,7 +232,7 @@ size_t CompositorChain::getCompositorPosition(const String& name) const
     }
     return NPOS;
 }
-CompositorInstance *CompositorChain::getCompositor(const String& name) const
+CompositorInstance *CompositorChain::getCompositor(const String& name)
 {
     size_t idx = getCompositorPosition(name);
     return idx == NPOS ? NULL : mInstances[idx];
@@ -264,19 +277,6 @@ void CompositorChain::setCompositorEnabled(size_t position, bool state)
     inst->setEnabled(state);
 }
 //-----------------------------------------------------------------------
-static const Quaternion& getCubemapRotation(int i)
-{
-    static const Quaternion CubemapRotations[6] = {
-        Quaternion(Degree(-90), Vector3::UNIT_Y), //+X
-        Quaternion(Degree(90), Vector3::UNIT_Y),  //-X
-        Quaternion(Degree(90), Vector3::UNIT_X),  //+Y
-        Quaternion(Degree(-90), Vector3::UNIT_X), //-Y
-        Quaternion::IDENTITY,                     //+Z
-        Quaternion(Degree(180), Vector3::UNIT_Y)  //-Z
-    };
-
-    return CubemapRotations[i];
-}
 void CompositorChain::preRenderTargetUpdate(const RenderTargetEvent& evt)
 {
     /// Compile if state is dirty
@@ -302,30 +302,17 @@ void CompositorChain::preRenderTargetUpdate(const RenderTargetEvent& evt)
     }
 
     /// Iterate over compiled state
-    for(auto& op : mCompiledState)
+    CompositorInstance::CompiledState::iterator i;
+    for(i=mCompiledState.begin(); i!=mCompiledState.end(); ++i)
     {
         /// Skip if this is a target that should only be initialised initially
-        if(op.onlyInitial && op.hasBeenRendered)
+        if(i->onlyInitial && i->hasBeenRendered)
             continue;
-        op.hasBeenRendered = true;
-
-        auto vp = op.target->getViewport(0);
-        if (!op.cameraOverride.empty())
-        {
-            SceneManager *sm = cam->getSceneManager();
-            cam = sm->getCamera(op.cameraOverride);
-            vp->setCamera(cam);
-        }
-
-        if (op.alignCameraToFace > -1)
-        {
-            cam->getParentSceneNode()->setOrientation(getCubemapRotation(op.alignCameraToFace));
-        }
-
+        i->hasBeenRendered = true;
         /// Setup and render
-        preTargetOperation(op, vp, cam);
-        op.target->update();
-        postTargetOperation(op, vp, cam);
+        preTargetOperation(*i, i->target->getViewport(0), cam);
+        i->target->update();
+        postTargetOperation(*i, i->target->getViewport(0), cam);
     }
 }
 //-----------------------------------------------------------------------
@@ -347,14 +334,16 @@ void CompositorChain::preViewportUpdate(const RenderTargetViewportEvent& evt)
     // set original scene details from viewport
     CompositionPass* pass = mOriginalScene->getTechnique()->getOutputTargetPass()->getPasses()[0];
     CompositionTargetPass* passParent = pass->getParent();
-    if (pass->getClearBuffers() != mOldClearEveryFrameBuffers ||
+    if (pass->getClearBuffers() != mViewport->getClearBuffers() ||
+        pass->getClearColour() != mViewport->getBackgroundColour() ||
         pass->getClearDepth() != mViewport->getDepthClear() ||
         passParent->getVisibilityMask() != mViewport->getVisibilityMask() ||
         passParent->getMaterialScheme() != mViewport->getMaterialScheme() ||
         passParent->getShadowsEnabled() != mViewport->getShadowsEnabled())
     {
         // recompile if viewport settings are different
-        pass->setClearBuffers(mOldClearEveryFrameBuffers);
+        pass->setClearBuffers(mViewport->getClearBuffers());
+        pass->setClearColour(mViewport->getBackgroundColour());
         pass->setClearDepth(mViewport->getDepthClear());
         passParent->setVisibilityMask(mViewport->getVisibilityMask());
         passParent->setMaterialScheme(mViewport->getMaterialScheme());
@@ -433,17 +422,19 @@ void CompositorChain::postViewportUpdate(const RenderTargetViewportEvent& evt)
 void CompositorChain::viewportCameraChanged(Viewport* viewport)
 {
     Camera* camera = viewport->getCamera();
-    for (auto *i : mInstances)
+    size_t count = mInstances.size();
+    for (size_t i = 0; i < count; ++i)
     {
-        i->notifyCameraChanged(camera);
+        mInstances[i]->notifyCameraChanged(camera);
     }
 }
 //-----------------------------------------------------------------------
 void CompositorChain::viewportDimensionsChanged(Viewport* viewport)
 {
-    for (auto *i : mInstances)
+    size_t count = mInstances.size();
+    for (size_t i = 0; i < count; ++i)
     {
-        i->notifyResized();
+        mInstances[i]->notifyResized();
     }
 }
 //-----------------------------------------------------------------------
@@ -455,9 +446,10 @@ void CompositorChain::viewportDestroyed(Viewport* viewport)
 //-----------------------------------------------------------------------
 void CompositorChain::clearCompiledState()
 {
-    for (auto *r : mRenderSystemOperations)
+    for (RenderSystemOperations::iterator i = mRenderSystemOperations.begin();
+        i != mRenderSystemOperations.end(); ++i)
     {
-        OGRE_DELETE r;
+        OGRE_DELETE *i;
     }
     mRenderSystemOperations.clear();
 
@@ -488,13 +480,17 @@ void CompositorChain::_compile()
     /// Set previous CompositorInstance for each compositor in the list
     CompositorInstance *lastComposition = mOriginalScene;
     mOriginalScene->mPreviousInstance = 0;
-    for(auto *i : mInstances)
+    CompositionPass* pass = mOriginalScene->getTechnique()->getOutputTargetPass()->getPasses()[0];
+    pass->setClearBuffers(mViewport->getClearBuffers());
+    pass->setClearColour(mViewport->getBackgroundColour());
+    pass->setClearDepth(mViewport->getDepthClear());
+    for(Instances::iterator i=mInstances.begin(); i!=mInstances.end(); ++i)
     {
-        if(i->getEnabled())
+        if((*i)->getEnabled())
         {
             compositorsEnabled = true;
-            i->mPreviousInstance = lastComposition;
-            lastComposition = i;
+            (*i)->mPreviousInstance = lastComposition;
+            lastComposition = (*i);
         }
     }
     
@@ -566,7 +562,7 @@ void CompositorChain::_notifyViewport(Viewport* vp)
 }
 //-----------------------------------------------------------------------
 void CompositorChain::RQListener::renderQueueStarted(uint8 id, 
-    const String& cameraName, bool& skipThisQueue)
+    const String& invocation, bool& skipThisQueue)
 {
     // Skip when not matching viewport
     // shadows update is nested within main viewport update
@@ -580,6 +576,11 @@ void CompositorChain::RQListener::renderQueueStarted(uint8 id,
     {
         skipThisQueue = true;
     }
+}
+//-----------------------------------------------------------------------
+void CompositorChain::RQListener::renderQueueEnded(uint8 id, 
+    const String& invocation, bool& repeatThisQueue)
+{
 }
 //-----------------------------------------------------------------------
 void CompositorChain::RQListener::setOperation(CompositorInstance::TargetOperation *op,SceneManager *sm,RenderSystem *rs)
@@ -625,14 +626,14 @@ CompositorInstance* CompositorChain::getPreviousInstance(CompositorInstance* cur
 CompositorInstance* CompositorChain::getNextInstance(CompositorInstance* curr, bool activeOnly)
 {
     bool found = false;
-    for(auto *i : mInstances)
+    for(Instances::iterator i=mInstances.begin(); i!=mInstances.end(); ++i)
     {
         if (found)
         {
-            if (i->getEnabled() || !activeOnly)
-                return i;
+            if ((*i)->getEnabled() || !activeOnly)
+                return *i;
         }
-        else if(i == curr)
+        else if(*i == curr)
         {
             found = true;
         }

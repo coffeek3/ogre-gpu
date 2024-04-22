@@ -36,36 +36,45 @@ THE SOFTWARE.
 #include "OgreConfigFile.h"
 #include "OgreResourceGroupManager.h"
 #include "OgreLogManager.h"
-#include "OgreSTBICodec.h"
-#include "OgreStreamSerialiser.h"
-#include "OgreDefaultHardwareBufferManager.h"
 
 using namespace Ogre;
 
 class TerrainTests : public ::testing::Test
 {
 public:
+#ifdef OGRE_STATIC_LIB
+    OgreBites::StaticPluginLoader mStaticPluginLoader;
+#endif
+
     Root* mRoot;
     SceneManager* mSceneMgr;
     TerrainGlobalOptions* mTerrainOpts;
+    FileSystemLayer* mFSLayer;
 
-    void SetUp() override;
-    void TearDown() override;
+    void SetUp();
+    void TearDown();
 };
 
 //--------------------------------------------------------------------------
 void TerrainTests::SetUp()
 {
-    mRoot = OGRE_NEW Root("");
+    mFSLayer = OGRE_NEW_T(Ogre::FileSystemLayer, Ogre::MEMCATEGORY_GENERAL)(OGRE_VERSION_NAME);
 
-
-    STBIImageCodec::startup();
+#ifdef OGRE_STATIC_LIB
+    mRoot = OGRE_NEW Root(BLANKSTRING);        
+    mStaticPluginLoader.load();
+#else
+    String pluginsPath = mFSLayer->getConfigFilePath("plugins.cfg");
+    mRoot = OGRE_NEW Root(pluginsPath);
+    Ogre::LogManager::getSingletonPtr()->getDefaultLog()->setDebugOutputEnabled(false);
+#endif
 
     mTerrainOpts = OGRE_NEW TerrainGlobalOptions();
 
     // Load resource paths from config file
     ConfigFile cf;
-    cf.load(FileSystemLayer(OGRE_VERSION_NAME).getConfigFilePath("resources.cfg"));
+    String resourcesPath = mFSLayer->getConfigFilePath("resources.cfg");
+    cf.load(resourcesPath);
 
     // Go through all sections & settings in the file
     String secName, typeName, archName;
@@ -88,9 +97,9 @@ void TerrainTests::SetUp()
 //--------------------------------------------------------------------------
 void TerrainTests::TearDown()
 {
-    STBIImageCodec::shutdown();
     OGRE_DELETE mTerrainOpts;
     OGRE_DELETE mRoot;
+    OGRE_DELETE_T(mFSLayer, FileSystemLayer, Ogre::MEMCATEGORY_GENERAL);
 }
 //--------------------------------------------------------------------------
 TEST_F(TerrainTests, create)
@@ -106,22 +115,10 @@ TEST_F(TerrainTests, create)
     imp.minBatchSize = 33;
     imp.maxBatchSize = 65;
     ASSERT_TRUE(t->prepare(imp));
-
-    {
-        DefaultHardwareBufferManager hbm;
-        StreamSerialiser ser(Root::createFileStream("TerrainTest.dat"));
-        t->save(ser);
-        OGRE_DELETE t;
-    }
-
-    // read-back from file
-    t = OGRE_NEW Terrain(mSceneMgr);
-    StreamSerialiser ser(Root::openFileStream("TerrainTest.dat"));
-    ASSERT_TRUE(t->prepare(ser));
-    ASSERT_EQ(t->getSize(), imp.terrainSize);
+    
+    // Note: Do not load as this would require GPU access!
+    //t->load();
 
     OGRE_DELETE t;
-
-    FileSystemLayer::removeFile("TerrainTest.dat");
 }
 //--------------------------------------------------------------------------

@@ -35,7 +35,7 @@ namespace Ogre
 {
     /** Specialisation of HighLevelGpuProgram to provide support for OpenGL 
      Shader Language (GLSL ES) for OpenGL ES 2.0.
-
+     @remarks
      GLSL ES has no target assembler or entry point specification like DirectX 9 HLSL.
      Vertex and Fragment shaders only have one entry point called "main".  
      When a shader is compiled, microcode is generated but can not be accessed by
@@ -57,25 +57,39 @@ namespace Ogre
     {
     public:
         /// Constructor should only be used by GLSLESProgramPipelineManager
-        explicit GLSLESProgramPipeline(const GLShaderList& shaders);
+        GLSLESProgramPipeline(GLSLESProgram* vertexProgram, GLSLESProgram* fragmentProgram);
         virtual ~GLSLESProgramPipeline();
 
         /** Updates program pipeline object uniforms using data from GpuProgramParameters.
          normally called by GLSLESGpuProgram::bindParameters() just before rendering occurs.
          */
-        void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) override;
+        virtual void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType);
+        /** Updates program object uniform blocks using data from GpuProgramParameters.
+         normally called by GLSLGpuProgram::bindParameters() just before rendering occurs.
+         */
+        virtual void updateUniformBlocks(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType);
+        /** Updates program pipeline object uniforms using data from pass iteration GpuProgramParameters.
+         normally called by GLSLESGpuProgram::bindMultiPassParameters() just before multi pass rendering occurs.
+         */
+        virtual void updatePassIterationUniforms(GpuProgramParametersSharedPtr params);
 
         /** Makes a program pipeline object active by making sure it is linked and then putting it in use.
          */
-        void activate(void) override;
+        void activate(void);
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
-        void notifyOnContextLost() override;
+        virtual void notifyOnContextLost();
 #endif
 
     protected:
+        enum {
+            VERTEX_PROGRAM_LINKED = 1,
+            FRAGMENT_PROGRAM_LINKED = 2,
+            ALL_PROGRAMS_LINKED = 3
+        };
+
         /// Compiles and links the separate vertex and fragment programs
-        void compileAndLink(void) override;
+        virtual void compileAndLink(void);
 
         /// Build uniform references from active named uniforms
         virtual void buildGLUniformReferences(void);

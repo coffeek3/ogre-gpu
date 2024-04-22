@@ -42,32 +42,29 @@
 
 #include "OgreInput.h"
 
+/** \addtogroup Optional
+*  @{
+*/
+/** \addtogroup Bites
+*  @{
+*/
 namespace OgreBites
 {
-    /** \addtogroup Optional
-    *  @{
-    */
-    /** \addtogroup Bites
-    *  @{
-    */
 
 #if OGRE_BITES_HAVE_SDL
     class _OgreBitesExport ApplicationContextSDL : public ApplicationContextBase
     {
-    protected:
-        void _destroyWindow(const NativeWindowPair& win) override;
     public:
         explicit ApplicationContextSDL(const Ogre::String& appName = "Ogre3D");
 
-        void setWindowGrab(NativeWindowType* win, bool grab) override;
-        float getDisplayDPI() const override;
-        void shutdown() override;
-        void pollEvents() override;
-        void addInputListener(NativeWindowType* win, InputListener* lis) override;
-        void removeInputListener(NativeWindowType* win, InputListener* lis) override;
-        NativeWindowPair
+        void setWindowGrab(NativeWindowType* win, bool grab);
+        void shutdown();
+        void pollEvents();
+        void addInputListener(NativeWindowType* win, InputListener* lis);
+        void removeInputListener(NativeWindowType* win, InputListener* lis);
+        virtual NativeWindowPair
         createWindow(const Ogre::String& name, uint32_t w = 0, uint32_t h = 0,
-                     Ogre::NameValuePairList miscParams = Ogre::NameValuePairList()) override;
+                     Ogre::NameValuePairList miscParams = Ogre::NameValuePairList());
 
         using ApplicationContextBase::setWindowGrab;
         using ApplicationContextBase::addInputListener;
@@ -84,13 +81,13 @@ namespace OgreBites
         void initAppForAndroid(AAssetManager* assetMgr, ANativeWindow* window);
         void _fireInputEventAndroid(AInputEvent* event, int wheel = 0);
 
-        void locateResources() override;
-        void shutdown() override;
-        void pollEvents() override;
+        virtual void locateResources();
+        virtual void shutdown();
+        void pollEvents();
 
-        NativeWindowPair
+        virtual NativeWindowPair
         createWindow(const Ogre::String& name, uint32_t w = 0, uint32_t h = 0,
-                     Ogre::NameValuePairList miscParams = Ogre::NameValuePairList()) override;
+                     Ogre::NameValuePairList miscParams = Ogre::NameValuePairList());
 
     protected:
         AAssetManager* mAAssetMgr;
@@ -101,7 +98,7 @@ namespace OgreBites
 #else
     typedef ApplicationContextBase ApplicationContext;
 #endif
-    /** @} */
-    /** @} */
 }
+/** @} */
+/** @} */
 #endif

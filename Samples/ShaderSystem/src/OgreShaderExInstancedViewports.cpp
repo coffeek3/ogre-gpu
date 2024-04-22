@@ -32,8 +32,6 @@ THE SOFTWARE.
 #include "OgreShaderProgramSet.h"
 #include "OgreScriptCompiler.h"
 #include "OgreTechnique.h"
-#include "OgreHardwareBufferManager.h"
-#include "OgreRoot.h"
 
 namespace Ogre {
 namespace RTShader {
@@ -55,7 +53,6 @@ ShaderExInstancedViewports::ShaderExInstancedViewports()
 {
     mMonitorsCount              = Vector2(1.0, 1.0);            
     mMonitorsCountChanged       = true;
-    mOwnsGlobalData             = false;
 }
 
 //-----------------------------------------------------------------------
@@ -85,8 +82,7 @@ void ShaderExInstancedViewports::copyFrom(const SubRenderState& rhs)
 //-----------------------------------------------------------------------
 bool ShaderExInstancedViewports::preAddToRenderState( const RenderState* renderState, Pass* srcPass, Pass* dstPass )
 {
-    auto matname = srcPass->getParent()->getParent()->getName();
-    return matname.find("SdkTrays") == String::npos && matname.find("Instancing") == String::npos;
+    return srcPass->getParent()->getParent()->getName().find("SdkTrays") == Ogre::String::npos;
 }
 //-----------------------------------------------------------------------
 bool ShaderExInstancedViewports::resolveParameters(ProgramSet* programSet)
@@ -110,10 +106,10 @@ bool ShaderExInstancedViewports::resolveParameters(ProgramSet* programSet)
     // Resolve ps input position in projective space.
     mPSInPositionProjectiveSpace = psMain->resolveInputParameter(mVSOutPositionProjectiveSpace);
     // Resolve vertex shader uniform monitors count
-    mVSInMonitorsCount = vsProgram->resolveParameter(GCT_FLOAT2, "monitorsCount");
+    mVSInMonitorsCount = vsProgram->resolveParameter(GCT_FLOAT2, -1, (uint16)GPV_GLOBAL, "monitorsCount");
 
     // Resolve pixel shader uniform monitors count
-    mPSInMonitorsCount = psProgram->resolveParameter(GCT_FLOAT2, "monitorsCount");
+    mPSInMonitorsCount = psProgram->resolveParameter(GCT_FLOAT2, -1, (uint16)GPV_GLOBAL, "monitorsCount");
 
 
     // Resolve the current world & view matrices concatenated   
@@ -123,14 +119,14 @@ bool ShaderExInstancedViewports::resolveParameters(ProgramSet* programSet)
     mProjectionMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_PROJECTION_MATRIX);
     
     
-#define SPC_MONITOR_INDEX Parameter::SPC_TEXTURE_COORDINATE1
+#define SPC_MONITOR_INDEX Parameter::SPC_TEXTURE_COORDINATE3
     // Resolve vertex shader  monitor index
     mVSInMonitorIndex = vsMain->resolveInputParameter(SPC_MONITOR_INDEX, GCT_FLOAT4);
 
-#define SPC_MATRIX_R0 Parameter::SPC_TEXTURE_COORDINATE2
-#define SPC_MATRIX_R1 Parameter::SPC_TEXTURE_COORDINATE3
-#define SPC_MATRIX_R2 Parameter::SPC_TEXTURE_COORDINATE4
-#define SPC_MATRIX_R3 Parameter::SPC_TEXTURE_COORDINATE5
+#define SPC_MATRIX_R0 Parameter::SPC_TEXTURE_COORDINATE4
+#define SPC_MATRIX_R1 Parameter::SPC_TEXTURE_COORDINATE5
+#define SPC_MATRIX_R2 Parameter::SPC_TEXTURE_COORDINATE6
+#define SPC_MATRIX_R3 Parameter::SPC_TEXTURE_COORDINATE7
 
     // Resolve vertex shader viewport offset matrix
     mVSInViewportOffsetMatrixR0 = vsMain->resolveInputParameter(SPC_MATRIX_R0, GCT_FLOAT4);
@@ -155,9 +151,12 @@ bool ShaderExInstancedViewports::resolveDependencies(ProgramSet* programSet)
     Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
     Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 
+    vsProgram->addDependency(FFP_LIB_COMMON);
     vsProgram->addDependency(SGX_LIB_INSTANCED_VIEWPORTS);
-
+    
+    psProgram->addDependency(FFP_LIB_COMMON);
     psProgram->addDependency(SGX_LIB_INSTANCED_VIEWPORTS);
+    psProgram->addPreprocessorDefines("FRAGMENT_PROG"); // needed for GLSL
     
     return true;
 }
@@ -243,91 +242,11 @@ void ShaderExInstancedViewports::updateGpuProgramsParams(Renderable* rend, const
     }   
 }
 //-----------------------------------------------------------------------
-void ShaderExInstancedViewports::setMonitorsCount( const Vector2 monitorCount )
+void ShaderExInstancedViewports::setMonitorsCount( const Vector2 monitorsCount )
 {
-    mMonitorsCount = monitorCount;
+    mMonitorsCount = monitorsCount;
     mMonitorsCountChanged = true;
-
-    Ogre::VertexDeclaration* vertexDeclaration = Ogre::HardwareBufferManager::getSingleton().createVertexDeclaration();
-    size_t offset = 0;
-    offset = vertexDeclaration->getVertexSize(0);
-    vertexDeclaration->addElement(0, offset, Ogre::VET_FLOAT4, Ogre::VES_TEXTURE_COORDINATES, 1);
-    offset = vertexDeclaration->getVertexSize(0);
-    vertexDeclaration->addElement(0, offset, Ogre::VET_FLOAT4, Ogre::VES_TEXTURE_COORDINATES, 2);
-    offset = vertexDeclaration->getVertexSize(0);
-    vertexDeclaration->addElement(0, offset, Ogre::VET_FLOAT4, Ogre::VES_TEXTURE_COORDINATES, 3);
-    offset = vertexDeclaration->getVertexSize(0);
-    vertexDeclaration->addElement(0, offset, Ogre::VET_FLOAT4, Ogre::VES_TEXTURE_COORDINATES, 4);
-    offset = vertexDeclaration->getVertexSize(0);
-    vertexDeclaration->addElement(0, offset, Ogre::VET_FLOAT4, Ogre::VES_TEXTURE_COORDINATES, 5);
-
-    Ogre::HardwareVertexBufferSharedPtr vbuf =
-        Ogre::HardwareBufferManager::getSingleton().createVertexBuffer(
-        vertexDeclaration->getVertexSize(0), monitorCount.x * monitorCount.y, Ogre::HardwareBuffer::HBU_STATIC_WRITE_ONLY);
-    vbuf->setInstanceDataStepRate(1);
-    vbuf->setIsInstanceData(true);
-
-    float * buf = (float *)vbuf->lock(Ogre::HardwareBuffer::HBL_DISCARD);
-    for (int x = 0 ; x < monitorCount.x ; x++)
-        for (int y = 0 ; y < monitorCount.y ; y++)
-        {
-            *buf = x; buf++;
-            *buf = y; buf++;
-            *buf = 0; buf++;
-            *buf = 0; buf++;
-
-            Ogre::Quaternion q;
-            Ogre::Radian angle = Ogre::Degree(90 / ( monitorCount.x *  monitorCount.y) * (x + y * monitorCount.x) );
-            q.FromAngleAxis(angle,Ogre::Vector3::UNIT_Y);
-            q.normalise();
-            Ogre::Matrix3 rotMat;
-            q.ToRotationMatrix(rotMat);
-
-            *buf = rotMat.GetColumn(0).x; buf++;
-            *buf = rotMat.GetColumn(0).y; buf++;
-            *buf = rotMat.GetColumn(0).z; buf++;
-            *buf = x * -20; buf++;
-
-            *buf = rotMat.GetColumn(1).x; buf++;
-            *buf = rotMat.GetColumn(1).y; buf++;
-            *buf = rotMat.GetColumn(1).z; buf++;
-            *buf = 0; buf++;
-
-            *buf = rotMat.GetColumn(2).x; buf++;
-            *buf = rotMat.GetColumn(2).y; buf++;
-            *buf = rotMat.GetColumn(2).z; buf++;
-            *buf =  y * 20; buf++;
-
-            *buf = 0; buf++;
-            *buf = 0; buf++;
-            *buf = 0; buf++;
-            *buf = 1; buf++;
-        }
-    vbuf->unlock();
-
-    mOwnsGlobalData = true;
-
-    auto rs = Ogre::Root::getSingleton().getRenderSystem();
-    rs->setGlobalInstanceVertexBuffer(vbuf);
-    rs->setGlobalInstanceVertexDeclaration(vertexDeclaration);
-    rs->setGlobalInstanceCount(monitorCount.x * monitorCount.y);
 }
-ShaderExInstancedViewports::~ShaderExInstancedViewports()
-{
-    if (!mOwnsGlobalData)
-        return;
-
-    auto rs = Ogre::Root::getSingleton().getRenderSystem();
-    if (auto decl = rs->getGlobalInstanceVertexDeclaration())
-    {
-        Ogre::HardwareBufferManager::getSingleton().destroyVertexDeclaration(decl);
-    }
-
-    rs->setGlobalInstanceVertexDeclaration(NULL);
-    rs->setGlobalInstanceCount(1);
-    rs->setGlobalInstanceVertexBuffer( NULL );
-}
-
 //-----------------------------------------------------------------------
 SubRenderState* ShaderExInstancedViewportsFactory::createInstance(ScriptCompiler* compiler, 
                                                          PropertyAbstractNode* prop, Pass* pass, SGScriptTranslator* translator)

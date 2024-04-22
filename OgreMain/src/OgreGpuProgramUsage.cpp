@@ -33,17 +33,17 @@ namespace Ogre
 {
     //-----------------------------------------------------------------------------
     GpuProgramUsage::GpuProgramUsage(GpuProgramType gptype, Pass* parent) :
-        mParent(parent), mProgram(), mRecreateParams(false),mType(gptype)
+        mType(gptype), mParent(parent), mProgram(), mRecreateParams(false)
     {
     }
     //-----------------------------------------------------------------------------
     GpuProgramUsage::GpuProgramUsage(const GpuProgramUsage& oth, Pass* parent)
-        : mParent(parent)
+        : mType(oth.mType)
+        , mParent(parent)
         , mProgram(oth.mProgram)
         // nfz: parameters should be copied not just use a shared ptr to the original
         , mParameters(OGRE_NEW GpuProgramParameters(*oth.mParameters))
         , mRecreateParams(false)
-        , mType(oth.mType)
     {
     }
     //---------------------------------------------------------------------
@@ -67,9 +67,31 @@ namespace Ogre
 
         if (!program)
         {
-            String progType = GpuProgram::getProgramTypeName(type);
+            String progType = "fragment";
+            if (type == GPT_VERTEX_PROGRAM)
+            {
+                progType = "vertex";
+            }
+            else if (type == GPT_GEOMETRY_PROGRAM)
+            {
+                progType = "geometry";
+            }
+            else if (type == GPT_DOMAIN_PROGRAM)
+            {
+                progType = "domain";
+            }
+            else if (type == GPT_HULL_PROGRAM)
+            {
+                progType = "hull";
+            }
+            else if (type == GPT_COMPUTE_PROGRAM)
+            {
+                progType = "compute";
+            }
+
             OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND,
-                        "Unable to locate " + progType + " program called " + name);
+                "Unable to locate " + progType + " program called " + name + ".",
+                "GpuProgramUsage::_getProgramByName");
         }
 
         return program;
@@ -118,7 +140,10 @@ namespace Ogre
     //-----------------------------------------------------------------------------
     size_t GpuProgramUsage::calculateSize(void) const
     {
-        size_t memSize = sizeof(*this);
+        size_t memSize = 0;
+
+        memSize += sizeof(GpuProgramType);
+        memSize += sizeof(bool);
 
         // Tally up passes
         if(mProgram)
@@ -137,12 +162,54 @@ namespace Ogre
         // check type
         if (mProgram->isLoaded() && mProgram->getType() != mType)
         {
-            String myType = GpuProgram::getProgramTypeName(mType);
-            String yourType = GpuProgram::getProgramTypeName(mProgram->getType());
+            String myType = "fragment";
+            if (mType == GPT_VERTEX_PROGRAM)
+            {
+                myType = "vertex";
+            }
+            else if (mType == GPT_GEOMETRY_PROGRAM)
+            {
+                myType = "geometry";
+            }
+            else if (mType == GPT_DOMAIN_PROGRAM)
+            {
+                myType = "domain";
+            }
+            else if (mType == GPT_HULL_PROGRAM)
+            {
+                myType = "hull";
+            }
+            else if (mType == GPT_COMPUTE_PROGRAM)
+            {
+                myType = "compute";
+            }
+
+            String yourType = "fragment";
+            if (mProgram->getType() == GPT_VERTEX_PROGRAM)
+            {
+                yourType = "vertex";
+            }
+            else if (mProgram->getType() == GPT_GEOMETRY_PROGRAM)
+            {
+                yourType = "geometry";
+            }
+            else if (mProgram->getType() == GPT_DOMAIN_PROGRAM)
+            {
+                yourType = "domain";
+            }
+            else if (mProgram->getType() == GPT_HULL_PROGRAM)
+            {
+                yourType = "hull";
+            }
+            else if (mType == GPT_COMPUTE_PROGRAM)
+            {
+                yourType = "compute";
+            }
 
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
                 mProgram->getName() + " is a " + yourType + " program, but you are assigning it to a " 
-                + myType + " program slot. This is invalid");
+                + myType + " program slot. This is invalid.",
+                "GpuProgramUsage::setProgramName");
 
         }
     }

@@ -18,19 +18,11 @@ deactivate ResourceManager
 end
 deactivate ResourceGroupManager
 
-Application -> ResourceManager: load(name, group)
+Application -> ResourceManager: create(name, group)
 activate ResourceManager
 ResourceManager -> Resource: << new >>
-activate Resource
-Resource -> Resource: prepare
-Resource -> ResourceGroupManager: openResource(name, group)
-activate ResourceGroupManager
-ResourceGroupManager --> Resource: DataStreamPtr
-deactivate ResourceGroupManager
-deactivate Resource
 ResourceManager --> Application: ResourcePtr
 deactivate ResourceManager
-
 Application -> ResourceGroupManager: loadResourceGroup(group)
 loop group
 ResourceGroupManager -> Resource: load

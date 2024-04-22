@@ -24,14 +24,16 @@ conditions of the standard open source license.
 class ListenerFactoryLogic : public Ogre::CompositorLogic
 {
 public:
-    void compositorInstanceCreated(Ogre::CompositorInstance* newInstance) override
+    /** @copydoc CompositorLogic::compositorInstanceCreated */
+    virtual void compositorInstanceCreated(Ogre::CompositorInstance* newInstance) 
     {
         Ogre::CompositorInstance::Listener* listener = createListener(newInstance);
         newInstance->addListener(listener);
         mListeners[newInstance] = listener;
     }
-
-    void compositorInstanceDestroyed(Ogre::CompositorInstance* destroyedInstance) override
+    
+    /** @copydoc CompositorLogic::compositorInstanceDestroyed */
+    virtual void compositorInstanceDestroyed(Ogre::CompositorInstance* destroyedInstance)
     {
         destroyedInstance->removeListener(mListeners[destroyedInstance]);
         delete mListeners[destroyedInstance];

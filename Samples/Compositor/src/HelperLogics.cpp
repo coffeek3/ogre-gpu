@@ -25,8 +25,8 @@ class HeatVisionListener: public Ogre::CompositorInstance::Listener
 public:
     HeatVisionListener();
     virtual ~HeatVisionListener();
-    void notifyMaterialSetup(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat) override;
-    void notifyMaterialRender(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat) override;
+    virtual void notifyMaterialSetup(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat);
+    virtual void notifyMaterialRender(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat);
 protected:
     Ogre::GpuProgramParametersSharedPtr fpParams;
     float start, end, curr;
@@ -48,8 +48,8 @@ public:
     virtual ~HDRListener();
     void notifyViewportSize(int width, int height);
     void notifyCompositor(Ogre::CompositorInstance* instance);
-    void notifyMaterialSetup(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat) override;
-    void notifyMaterialRender(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat) override;
+    virtual void notifyMaterialSetup(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat);
+    virtual void notifyMaterialRender(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat);
 };
 //---------------------------------------------------------------------------
 class GaussianListener : public Ogre::CompositorInstance::Listener
@@ -65,8 +65,8 @@ public:
     GaussianListener();
     virtual ~GaussianListener();
     void notifyViewportSize(int width, int height);
-    void notifyMaterialSetup(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat) override;
-    void notifyMaterialRender(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat) override;
+    virtual void notifyMaterialSetup(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat);
+    virtual void notifyMaterialRender(Ogre::uint32 pass_id, Ogre::MaterialPtr &mat);
 };
 //---------------------------------------------------------------------------
 Ogre::CompositorInstance::Listener* HDRLogic::createListener(Ogre::CompositorInstance* instance)
@@ -160,11 +160,15 @@ void HDRListener::notifyViewportSize(int width, int height)
 void HDRListener::notifyCompositor(Ogre::CompositorInstance* instance)
 {
     // Get some RTT dimensions for later calculations
-    for (const auto *t : instance->getTechnique()->getTextureDefinitions())
+    const Ogre::CompositionTechnique::TextureDefinitions& defs =
+        instance->getTechnique()->getTextureDefinitions();
+    Ogre::CompositionTechnique::TextureDefinitions::const_iterator defIter;
+    for (defIter = defs.begin(); defIter != defs.end(); ++defIter)
     {
-        if(t->name == "rt_bloom0")
+        Ogre::CompositionTechnique::TextureDefinition* def = *defIter;
+        if(def->name == "rt_bloom0")
         {
-            mBloomSize = (int)t->width; // should be square
+            mBloomSize = (int)def->width; // should be square
             // Calculate gaussian texture offsets & weights
             float deviation = 3.0f;
             float texelSize = 1.0f / (float)mBloomSize;
@@ -201,6 +205,7 @@ void HDRListener::notifyCompositor(Ogre::CompositorInstance* instance)
                 mBloomTexOffsetsVert[i][0] = 0.0f;
                 mBloomTexOffsetsVert[i][1] = -mBloomTexOffsetsVert[i - 7][1];
             }
+
         }
     }
 }

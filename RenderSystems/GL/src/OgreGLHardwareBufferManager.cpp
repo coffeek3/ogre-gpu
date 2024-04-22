@@ -26,7 +26,8 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 #include "OgreGLHardwareBufferManager.h"
-#include "OgreGLHardwareBuffer.h"
+#include "OgreGLHardwareVertexBuffer.h"
+#include "OgreGLHardwareIndexBuffer.h"
 #include "OgreGLRenderSystem.h"
 #include "OgreGLRenderToVertexBuffer.h"
 #include "OgreHardwareBuffer.h"
@@ -68,16 +69,21 @@ namespace Ogre {
         OGRE_FREE_SIMD(mScratchBufferPool, MEMCATEGORY_GEOMETRY);
     }
     //-----------------------------------------------------------------------
+    GLStateCacheManager * GLHardwareBufferManager::getStateCacheManager()
+    {
+        return mRenderSystem->_getStateCacheManager();
+    }
+    //-----------------------------------------------------------------------
     HardwareVertexBufferSharedPtr GLHardwareBufferManager::createVertexBuffer(
         size_t vertexSize, size_t numVerts, HardwareBuffer::Usage usage, bool useShadowBuffer)
     {
-        auto impl = new GLHardwareVertexBuffer(GL_ARRAY_BUFFER, vertexSize * numVerts, usage, useShadowBuffer);
-        auto buf = std::make_shared<HardwareVertexBuffer>(this, vertexSize, numVerts, impl);
+        GLHardwareVertexBuffer* buf = 
+            new GLHardwareVertexBuffer(this, vertexSize, numVerts, usage, useShadowBuffer);
         {
-            OGRE_LOCK_MUTEX(mVertexBuffersMutex);
-            mVertexBuffers.insert(buf.get());
+                    OGRE_LOCK_MUTEX(mVertexBuffersMutex);
+            mVertexBuffers.insert(buf);
         }
-        return buf;
+        return HardwareVertexBufferSharedPtr(buf);
     }
     //-----------------------------------------------------------------------
     HardwareIndexBufferSharedPtr 
@@ -85,11 +91,13 @@ namespace Ogre {
         HardwareIndexBuffer::IndexType itype, size_t numIndexes, 
         HardwareBuffer::Usage usage, bool useShadowBuffer)
     {
-        // Calculate the size of the indexes
-        auto indexSize = HardwareIndexBuffer::indexSize(itype);
-        auto impl = new GLHardwareBuffer(GL_ELEMENT_ARRAY_BUFFER, indexSize * numIndexes, usage, useShadowBuffer);
-
-        return std::make_shared<HardwareIndexBuffer>(this, itype, numIndexes, impl);
+        GLHardwareIndexBuffer* buf = 
+            new GLHardwareIndexBuffer(this, itype, numIndexes, usage, useShadowBuffer);
+        {
+                    OGRE_LOCK_MUTEX(mIndexBuffersMutex);
+            mIndexBuffers.insert(buf);
+        }
+        return HardwareIndexBufferSharedPtr(buf);
     }
     //---------------------------------------------------------------------
     RenderToVertexBufferSharedPtr 
@@ -98,10 +106,29 @@ namespace Ogre {
         return RenderToVertexBufferSharedPtr(new GLRenderToVertexBuffer);
     }
     //---------------------------------------------------------------------
+    HardwareUniformBufferSharedPtr 
+        GLHardwareBufferManager::createUniformBuffer(size_t sizeBytes, HardwareBuffer::Usage usage,bool useShadowBuffer, const String& name)
+    {
+        OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, 
+                    "Uniform buffers not supported in OpenGL RenderSystem.",
+                    "GLHardwareBufferManager::createUniformBuffer");
+    }
+    HardwareCounterBufferSharedPtr
+        GLHardwareBufferManager::createCounterBuffer(size_t sizeBytes,
+                                                         HardwareBuffer::Usage usage,
+                                                         bool useShadowBuffer, const String& name)
+    {
+        OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
+                    "Counter buffers not supported in OpenGL RenderSystem.",
+                    "GLHardwareBufferManager::createCounterBuffer");
+    }
+
+    //---------------------------------------------------------------------
     GLenum GLHardwareBufferManager::getGLUsage(unsigned int usage)
     {
-        return (usage == HBU_GPU_TO_CPU) ? GL_STATIC_READ
-                                         : (usage == HBU_GPU_ONLY) ? GL_STATIC_DRAW : GL_DYNAMIC_DRAW;
+        return  (usage & HardwareBuffer::HBU_DISCARDABLE) ? GL_STREAM_DRAW_ARB :
+                (usage & HardwareBuffer::HBU_STATIC) ? GL_STATIC_DRAW_ARB :
+                GL_DYNAMIC_DRAW_ARB;
     }
     //---------------------------------------------------------------------
     GLenum GLHardwareBufferManager::getGLType(unsigned int type)
@@ -120,6 +147,9 @@ namespace Ogre {
             case VET_SHORT2_NORM:
             case VET_SHORT4_NORM:
                 return GL_SHORT;
+            case VET_COLOUR:
+            case VET_COLOUR_ABGR:
+            case VET_COLOUR_ARGB:
             case VET_UBYTE4:
             case VET_UBYTE4_NORM:
                 return GL_UNSIGNED_BYTE;

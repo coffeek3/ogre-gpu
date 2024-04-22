@@ -28,8 +28,8 @@ class MeshLodTests : public RootWithoutRenderSystemFixture
 public:
     MeshPtr mMesh;
 
-    void SetUp() override;
-    void TearDown() override;
+    void SetUp();
+    void TearDown();
     void runMeshLodConfigTests(LodConfig::Advanced& advanced);
     void blockedWaitForLodGeneration(const MeshPtr& mesh);
     void addProfile(LodConfig& config);
@@ -116,7 +116,7 @@ void MeshLodTests::blockedWaitForLodGeneration(const MeshPtr& mesh)
     for (int i = 0; i < timeout; i++) 
     {
         OGRE_THREAD_SLEEP(1);
-        wq->processMainThreadTasks(); // Injects the Lod if ready
+        wq->processResponses(); // Injects the Lod if ready
         if (mesh->getNumLodLevels() != 1) {
             success = true;
             break;

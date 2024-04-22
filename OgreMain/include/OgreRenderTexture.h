@@ -52,8 +52,8 @@ namespace Ogre
         virtual ~RenderTexture();
 
         using RenderTarget::copyContentsToMemory;
-        void copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer = FB_AUTO) override;
-        PixelFormat suggestPixelFormat() const override;
+        virtual void copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer = FB_AUTO);
+        PixelFormat suggestPixelFormat() const;
 
     protected:
         HardwarePixelBuffer *mBuffer;
@@ -81,10 +81,22 @@ namespace Ogre
             - Not all bound surfaces have the same internal format 
         */
 
-        virtual void bindSurface(size_t attachment, RenderTexture *target);
+        virtual void bindSurface(size_t attachment, RenderTexture *target)
+        {
+            for (size_t i = mBoundSurfaces.size(); i <= attachment; ++i)
+            {
+                mBoundSurfaces.push_back(0);
+            }
+            mBoundSurfaces[attachment] = target;
+
+            bindSurfaceImpl(attachment, target);
+        }
+
+
 
         /** Unbind attachment.
         */
+
         virtual void unbindSurface(size_t attachment)
         {
             if (attachment < mBoundSurfaces.size())
@@ -97,17 +109,22 @@ namespace Ogre
         /** Error throwing implementation, it's not possible to write a MultiRenderTarget
             to disk. 
         */
-        void copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer = FB_AUTO) override;
+        virtual void copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer = FB_AUTO);
 
         /// Irrelevant implementation since cannot copy
-        PixelFormat suggestPixelFormat() const override { return PF_UNKNOWN; }
+        PixelFormat suggestPixelFormat() const { return PF_UNKNOWN; }
 
         typedef std::vector<RenderTexture*> BoundSufaceList;
         /// Get a list of the surfaces which have been bound
         const BoundSufaceList& getBoundSurfaceList() const { return mBoundSurfaces; }
 
         /** Get a pointer to a bound surface */
-        RenderTexture* getBoundSurface(size_t index) { return mBoundSurfaces.at(index); }
+        RenderTexture* getBoundSurface(size_t index)
+        {
+            assert (index < mBoundSurfaces.size());
+            return mBoundSurfaces[index];
+        }
+
 
     protected:
         BoundSufaceList mBoundSurfaces;

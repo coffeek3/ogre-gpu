@@ -31,29 +31,95 @@
 #include "OgreGL3PlusPrerequisites.h"
 #include "OgreGpuProgram.h"
 #include "OgreHardwareVertexBuffer.h"
-#include "OgreGL3PlusHardwareBuffer.h"
+#include "OgreGL3PlusHardwareUniformBuffer.h"
+#include "OgreGL3PlusHardwareShaderStorageBuffer.h"
+#include "OgreGL3PlusHardwareCounterBuffer.h"
 #include "OgreGLSLProgramCommon.h"
 #include "OgreGLSLShader.h"
 
 namespace Ogre {
+    /** Structure used to keep track of named atomic counter uniforms
+        in the linked program object.  Same as GLUniformReference, but
+        contains an additional offset parameter which currently only
+        atomic counters feature.
+    */
+    struct GLAtomicCounterReference
+    {
+        /// GL binding handle (similar to location)
+        GLint mBinding;
+        /// GL offset (only used for atomic counters)
+        GLint mOffset;
+        /// Which type of program params will this value come from?
+        GpuProgramType mSourceProgType;
+        /// The constant definition it relates to
+        const GpuConstantDefinition* mConstantDef;
+    };
+
+    typedef std::vector<GLAtomicCounterReference> GLAtomicCounterReferenceList;
+    typedef GLAtomicCounterReferenceList::iterator GLAtomicCounterReferenceIterator;
+    typedef std::map<GpuSharedParametersPtr, HardwareUniformBufferSharedPtr> SharedParamsBufferMap;
+    typedef std::vector<HardwareCounterBufferSharedPtr> GLCounterBufferList;
+    typedef GLCounterBufferList::iterator GLCounterBufferIterator;
 
     /** C++ encapsulation of GLSL program object.
      */
     class _OgreGL3PlusExport GLSLProgram : public GLSLProgramCommon
     {
     public:
-        static void bindFixedAttributes(GLuint program);
+        void bindFixedAttributes(GLuint program);
 
-        /// Get the the binary data of a program from the microcode cache
-        static bool getMicrocodeFromCache(uint32 id, GLuint programHandle);
+        GLSLShader* getVertexShader() const { return static_cast<GLSLShader*>(mVertexShader); }
+        GLSLShader* getHullShader() const { return mHullShader; }
+        GLSLShader* getDomainShader() const { return mDomainShader; }
+        GLSLShader* getGeometryShader() const { return mGeometryShader; }
+        GLSLShader* getFragmentShader() const { return mFragmentShader; }
+        GLSLShader* getComputeShader() const { return mComputeShader; }
 
-        /// add the microcode to the cache
-        static void writeMicrocodeToCache(uint32 id, GLuint programHandle);
+        bool isUsingShader(GLSLShaderCommon* shader) const
+        {
+            return mVertexShader == shader || (GLSLShaderCommon*)mGeometryShader == shader ||
+                   (GLSLShaderCommon*)mFragmentShader == shader ||
+                   (GLSLShaderCommon*)mHullShader == shader ||
+                   (GLSLShaderCommon*)mDomainShader == shader ||
+                   (GLSLShaderCommon*)mComputeShader == shader;
+        }
+
+        virtual void updateAtomicCounters(GpuProgramParametersSharedPtr params, uint16 mask,
+                                          GpuProgramType fromProgType) = 0;
 
         void setTransformFeedbackVaryings(const std::vector<String>& nameStrings);
     protected:
         /// Constructor should only be used by GLSLMonolithicProgramManager and GLSLSeparableProgramManager
-        GLSLProgram(const GLShaderList& shaders);
+        GLSLProgram(GLSLShader* vertexProgram,
+                    GLSLShader* hullProgram,
+                    GLSLShader* domainProgram,
+                    GLSLShader* geometryProgram,
+                    GLSLShader* fragmentProgram,
+                    GLSLShader* computeProgram);
+
+        /// Container of atomic counter uniform references that are active in the program object
+        GLAtomicCounterReferenceList mGLAtomicCounterReferences;
+        /// Map of shared parameter blocks to uniform buffer references
+        SharedParamsBufferMap mSharedParamsBufferMap;
+        /// Container of counter buffer references that are active in the program object
+        GLCounterBufferList mGLCounterBufferReferences;
+
+        /// Linked hull (control) shader.
+        GLSLShader* mHullShader;
+        /// Linked domain (evaluation) shader.
+        GLSLShader* mDomainShader;
+        /// Linked geometry shader.
+        GLSLShader* mGeometryShader;
+        /// Linked fragment shader.
+        GLSLShader* mFragmentShader;
+        /// Linked compute shader.
+        GLSLShader* mComputeShader;
+
+        uint32 getCombinedHash();
+
+        Ogre::String getCombinedName(void);
+        /// Get the the binary data of a program from the microcode cache
+        void getMicrocodeFromCache(uint32 id);
     };
 
 

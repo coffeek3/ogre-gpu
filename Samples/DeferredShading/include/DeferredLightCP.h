@@ -31,7 +31,7 @@ public:
     DeferredLightRenderOperation(Ogre::CompositorInstance* instance, const Ogre::CompositionPass* pass);
     
     /** @copydoc CompositorInstance::RenderSystemOperation::execute */
-    void execute(Ogre::SceneManager *sm, Ogre::RenderSystem *rs) override;
+    virtual void execute(Ogre::SceneManager *sm, Ogre::RenderSystem *rs);
 
     virtual ~DeferredLightRenderOperation();
 private:
@@ -65,8 +65,8 @@ class DeferredLightCompositionPass : public Ogre::CustomCompositionPass
 public:
 
     /** @copydoc CustomCompositionPass::createOperation */
-    Ogre::CompositorInstance::RenderSystemOperation* createOperation(
-        Ogre::CompositorInstance* instance, const Ogre::CompositionPass* pass) override
+    virtual Ogre::CompositorInstance::RenderSystemOperation* createOperation(
+        Ogre::CompositorInstance* instance, const Ogre::CompositionPass* pass)
     {
         return OGRE_NEW DeferredLightRenderOperation(instance, pass);
     }

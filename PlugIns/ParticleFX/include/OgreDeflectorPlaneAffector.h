@@ -30,7 +30,7 @@ THE SOFTWARE.
 
 #include "OgreParticleFXPrerequisites.h"
 #include "OgreParticleAffector.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 
 
 namespace Ogre {
@@ -40,39 +40,46 @@ namespace Ogre {
     /** \addtogroup ParticleFX
     *  @{
     */
-    /** This affector defines a plane which deflects particles which collide with it.
+    /** This class defines a ParticleAffector which deflects particles.
+    @remarks
+        This affector (see ParticleAffector) offers a simple (and inaccurate) physical deflection.
+        All particles which hit the plane are reflected.
+    @par
+        The plane is defined by a point (plane_point) and the normal (plane_normal).
+        In addition it is possible to change the strength of the recoil by using the bounce parameter.
     */
-    class DeflectorPlaneAffector : public ParticleAffector
+    class _OgreParticleFXExport DeflectorPlaneAffector : public ParticleAffector
     {
     public:
         /** Command object for plane point (see ParamCommand).*/
         class CmdPlanePoint : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
         /** Command object for plane normal (see ParamCommand).*/
         class CmdPlaneNormal : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
         /** Command object for bounce (see ParamCommand).*/
         class CmdBounce : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
         /// Default constructor
         DeflectorPlaneAffector(ParticleSystem* psys);
 
-        void _affectParticles(ParticleSystem* pSystem, Real timeElapsed) override;
+        /** See ParticleAffector. */
+        void _affectParticles(ParticleSystem* pSystem, Real timeElapsed);
 
         /** Sets the plane point of the deflector plane. */
         void setPlanePoint(const Vector3& pos);

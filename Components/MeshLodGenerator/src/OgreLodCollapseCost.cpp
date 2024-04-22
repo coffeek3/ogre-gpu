@@ -33,79 +33,32 @@ namespace Ogre
     void LodCollapseCost::initCollapseCosts( LodData* data )
     {
         data->mCollapseCostHeap.clear();
-        for (auto& v : data->mVertexList) {
-            if (!v.edges.empty()) {
-                initVertexCollapseCost(data, &v);
+        LodData::VertexList::iterator it = data->mVertexList.begin();
+        LodData::VertexList::iterator itEnd = data->mVertexList.end();
+        for (; it != itEnd; it++) {
+            if (!it->edges.empty()) {
+                initVertexCollapseCost(data, &*it);
             } else {
 #if OGRE_DEBUG_MODE
                 LogManager::getSingleton().stream() << "In " << data->mMeshName << " never used vertex found with ID: " << data->mCollapseCostHeap.size() << ". "
                     << "Vertex position: ("
-                    << v.position.x << ", "
-                    << v.position.y << ", "
-                    << v.position.z << ") "
+                    << it->position.x << ", "
+                    << it->position.y << ", "
+                    << it->position.z << ") "
                     << "It will be excluded from Lod level calculations.";
 #endif
             }
         }
     }
 
-    bool LodCollapseCost::isEdgeCollapsible(LodData::Vertex * src, LodData::Vertex * dst)
-    {
-        // For every primitive on the src vertex we need a primitive in the same submesh connecting src and dst.
-        if (mPreventPunchingHoles)
-        {
-            for (auto& testTri : src->triangles)
-            {
-                auto srcSubmeshID = testTri->submeshID;
-                bool canConnect = false;
-
-                for (auto& solveTri : dst->triangles)
-                {
-                    if (solveTri->submeshID == srcSubmeshID && solveTri->hasVertex(src) && solveTri->hasVertex(dst))
-                    {
-                        canConnect = true;
-                        break;
-                    }
-                }
-
-                if (canConnect == false)
-                    return false;
-            }
-        }
-        if (mPreventBreakingLines)
-        {
-            for (auto& testLine : src->lines)
-            {
-                auto srcSubmeshID = testLine->submeshID;
-                bool canConnect = false;
-
-                for (auto& solveLine : dst->lines)
-                {
-                    if (solveLine->submeshID == srcSubmeshID && solveLine->hasVertex(src) && solveLine->hasVertex(dst))
-                    {
-                        canConnect = true;
-                        break;
-                    }
-                }
-
-                if (canConnect == false)
-                    return false;
-            }
-        }
-        return true;
-    }
-
     void LodCollapseCost::computeVertexCollapseCost( LodData* data, LodData::Vertex* vertex, Real& collapseCost, LodData::Vertex*& collapseTo )
     {
-        for (auto& e : vertex->edges) {
-            if (isEdgeCollapsible(vertex, e.dst)) {
-                e.collapseCost = computeEdgeCollapseCost(data, vertex, &e);
-            } else {
-                e.collapseCost = LodData::NEVER_COLLAPSE_COST;
-            }
-            if (collapseCost > e.collapseCost) {
-                collapseCost = e.collapseCost;
-                collapseTo = e.dst;
+        LodData::VEdges::iterator it = vertex->edges.begin();
+        for (; it != vertex->edges.end(); ++it) {
+            it->collapseCost = computeEdgeCollapseCost(data, vertex, &*it);
+            if (collapseCost > it->collapseCost) {
+                collapseCost = it->collapseCost;
+                collapseTo = it->dst;
             }
         }
     }
@@ -144,9 +97,12 @@ namespace Ogre
 
     bool LodCollapseCost::isBorderVertex(const LodData::Vertex* vertex) const
     {
-        for (auto& e : vertex->edges) {
-            if (e.refCount == 1)
+        LodData::VEdges::const_iterator it = vertex->edges.begin();
+        LodData::VEdges::const_iterator itEnd = vertex->edges.end();
+        for (; it != itEnd; ++it) {
+            if (it->refCount == 1) {
                 return true;
+            }
         }
         return false;
     }

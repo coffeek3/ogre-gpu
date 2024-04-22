@@ -31,15 +31,17 @@ THE SOFTWARE.
 
 #include "OgreString.h"
 
+using namespace Ogre;
+
 #ifdef __OBJC__
 
 #import <UIKit/UIView.h>
 
 @interface EAGL2View : UIView {
-    Ogre::String mWindowName;
+    String mWindowName;
 }
 
-@property (nonatomic,assign) Ogre::String mWindowName;
+@property (nonatomic,assign) String mWindowName;
 
 @end
 

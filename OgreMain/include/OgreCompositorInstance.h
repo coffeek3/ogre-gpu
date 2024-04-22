@@ -34,8 +34,6 @@ THE SOFTWARE.
 #include "OgreCompositionTechnique.h"
 #include "OgreHeaderPrefix.h"
 
-#include <bitset>
-
 namespace Ogre {
 
     /** \addtogroup Core
@@ -44,6 +42,7 @@ namespace Ogre {
     /** \addtogroup Effects
     *  @{
     */
+    const size_t RENDER_QUEUE_COUNT = RENDER_QUEUE_MAX+1;       
             
     /** An instance of a Compositor object for one Viewport. It is part of the CompositorChain
         for a Viewport.
@@ -108,6 +107,7 @@ namespace Ogre {
             /// Set state to SceneManager and RenderSystem
             virtual void execute(SceneManager *sm, RenderSystem *rs) = 0;
         };
+        typedef std::map<int, MaterialPtr> QuadMaterialMap;
         typedef std::pair<int, RenderSystemOperation*> RenderSystemOpPair;
         typedef std::vector<RenderSystemOpPair> RenderSystemOpPairs;
         /** Operation setup for a RenderTarget (collected).
@@ -118,12 +118,12 @@ namespace Ogre {
             TargetOperation()
             { 
             }
-            TargetOperation(RenderTarget* inTarget)
-                : target(inTarget), currentQueueGroupID(0), visibilityMask(0xFFFFFFFF), lodBias(1.0f),
-                  onlyInitial(false), hasBeenRendered(false), findVisibleObjects(false),
-                  materialScheme(MaterialManager::DEFAULT_SCHEME_NAME), shadowsEnabled(true),
-                  alignCameraToFace(-1)
-            {
+            TargetOperation(RenderTarget *inTarget):
+                target(inTarget), currentQueueGroupID(0), visibilityMask(0xFFFFFFFF),
+                lodBias(1.0f),
+                onlyInitial(false), hasBeenRendered(false), findVisibleObjects(false), 
+                materialScheme(MaterialManager::DEFAULT_SCHEME_NAME), shadowsEnabled(true)
+            { 
             }
             /// Target
             RenderTarget *target;
@@ -164,9 +164,6 @@ namespace Ogre {
             String materialScheme;
             /** Whether shadows will be enabled */
             bool shadowsEnabled;
-
-            String cameraOverride;
-            int alignCameraToFace;
         };
         typedef std::vector<TargetOperation> CompiledState;
         
@@ -182,7 +179,7 @@ namespace Ogre {
 
         /** Set alive/active flag. The compositor instance will create resources when alive,
             and destroy them when inactive.
-
+        @remarks
             Killing an instance means also disabling it: setAlive(false) implies
             setEnabled(false)
         */
@@ -220,15 +217,15 @@ namespace Ogre {
         @return
             The texture pointer, corresponds to a real texture.
         */
-        const TexturePtr& getTextureInstance(const String& name, size_t mrtIndex);
+        TexturePtr getTextureInstance(const String& name, size_t mrtIndex);
 
         /** Get the render target for a given render texture name. 
-
+        @remarks
             You can use this to add listeners etc, but do not use it to update the
             targets manually or any other modifications, the compositor instance 
             is in charge of this.
         */
-        RenderTarget* getRenderTarget(const String& name, int slice = 0);
+        RenderTarget* getRenderTarget(const String& name);
 
        
         /** Recursively collect target states (except for final Pass).
@@ -244,11 +241,11 @@ namespace Ogre {
         
         /** Get Compositor of which this is an instance
         */
-        Compositor *getCompositor() const { return mCompositor; }
+        Compositor *getCompositor();
         
         /** Get CompositionTechnique used by this instance
         */
-        CompositionTechnique *getTechnique() const { return mTechnique; }
+        CompositionTechnique *getTechnique();
 
         /** Change the technique we're using to render this compositor. 
         @param tech
@@ -260,7 +257,7 @@ namespace Ogre {
         void setTechnique(CompositionTechnique* tech, bool reuseTextures = true);
 
         /** Pick a technique to use to render this compositor based on a scheme. 
-
+        @remarks
             If there is no specific supported technique with this scheme name, 
             then the first supported technique with no specific scheme will be used.
         @see CompositionTechnique::setSchemeName
@@ -278,7 +275,7 @@ namespace Ogre {
         const String& getScheme() const { return mTechnique ? mTechnique->getSchemeName() : BLANKSTRING; }
 
         /** Notify this instance that the primary surface has been resized. 
-
+        @remarks
             This will allow the instance to recreate its resources that 
             are dependent on the size. 
         */
@@ -312,7 +309,7 @@ namespace Ogre {
         */
         void _fireNotifyResourcesCreated(bool forResizeOnly);
         
-        /** Notify listeners resources
+        /** Notify listeners ressources
         */
         void _fireNotifyResourcesReleased(bool forResizeOnly);
     private:
@@ -360,8 +357,6 @@ namespace Ogre {
         /** Create local rendertextures and other resources. Builds mLocalTextures.
         */
         void createResources(bool forResizeOnly);
-
-        void setupRenderTarget(RenderTarget* target, uint16 depthBufferId);
         
         /** Destroy local rendertextures and other resources.
         */
@@ -372,7 +367,7 @@ namespace Ogre {
 
         /** Get RenderTarget for a named local texture.
         */
-        RenderTarget *getTargetForTex(const String &name, int slice);
+        RenderTarget *getTargetForTex(const String &name);
         
         /** Get source texture name for a named local texture.
         @param name
@@ -380,7 +375,7 @@ namespace Ogre {
         @param mrtIndex
             For MRTs, which attached surface to retrieve.
         */
-        const TexturePtr &getSourceForTex(const String &name, size_t mrtIndex = 0);
+        const String &getSourceForTex(const String &name, size_t mrtIndex = 0);
 
         /** Queue a render system operation.
         */

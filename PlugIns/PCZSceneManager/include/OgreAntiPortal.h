@@ -24,6 +24,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
+PortalBase.h  -  PortalBase is the base class for Portal and AntiPortal.
+
 */
 
 #ifndef ANTIPORTAL_H
@@ -41,7 +43,7 @@ namespace Ogre
         virtual ~AntiPortal();
 
         /** @copydoc MovableObject::getMovableType */
-        const String& getMovableType() const override;
+        const String& getMovableType() const;
 
     };
 
@@ -49,7 +51,7 @@ namespace Ogre
     class _OgrePCZPluginExport AntiPortalFactory : public PortalBaseFactory
     {
     protected:
-        MovableObject* createInstanceImpl(const String& name, const NameValuePairList* params) override;
+        MovableObject* createInstanceImpl(const String& name, const NameValuePairList* params);
     public:
         AntiPortalFactory() {}
         ~AntiPortalFactory() {}
@@ -57,11 +59,13 @@ namespace Ogre
         static String FACTORY_TYPE_NAME;
         static unsigned long FACTORY_TYPE_FLAG;
 
-        const String& getType() const override
+        const String& getType() const
         { return FACTORY_TYPE_NAME; }
 
+        void destroyInstance(MovableObject* obj);
+
         /** Return true here as we want to get a unique type flag. */
-        bool requestTypeFlags() const override
+        bool requestTypeFlags() const
         { return true; }
 
     };

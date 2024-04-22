@@ -88,22 +88,43 @@ namespace Ogre {
     MeshSerializer::~MeshSerializer()
     {
         // delete map
-        for (auto & i : mVersionData)
+        for (MeshVersionDataList::iterator i = mVersionData.begin();
+            i != mVersionData.end(); ++i)
         {
-            OGRE_DELETE i;
+            OGRE_DELETE *i;
         }
         mVersionData.clear();
 
     }
     //---------------------------------------------------------------------
     void MeshSerializer::exportMesh(const Mesh* pMesh, const String& filename,
+        Endian endianMode)
+    {
+        std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
+        f->open(filename.c_str(), std::ios::binary | std::ios::out);
+        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(f));
+
+        exportMesh(pMesh, stream, endianMode);
+
+        stream->close();
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializer::exportMesh(const Mesh* pMesh, const String& filename,
                                     MeshVersion version, Endian endianMode)
     {
-        DataStreamPtr stream = _openFileStream(filename, std::ios::binary | std::ios::out);
+        std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
+        f->open(filename.c_str(), std::ios::binary | std::ios::out);
+        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(f));
         
         exportMesh(pMesh, stream, version, endianMode);
         
         stream->close();
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializer::exportMesh(const Mesh* pMesh, DataStreamPtr stream,
+        Endian endianMode)
+    {
+        exportMesh(pMesh, stream, MESH_VERSION_LATEST, endianMode);
     }
     //---------------------------------------------------------------------
     void MeshSerializer::exportMesh(const Mesh* pMesh, DataStreamPtr stream,
@@ -119,11 +140,12 @@ namespace Ogre {
             impl = mVersionData[0]->impl;
         else 
         {
-            for (auto & i : mVersionData)
+            for (MeshVersionDataList::iterator i = mVersionData.begin(); 
+                 i != mVersionData.end(); ++i)
             {
-                if (version == i->version)
+                if (version == (*i)->version)
                 {
-                    impl = i->impl;
+                    impl = (*i)->impl;
                     break;
                 }
             }
@@ -137,7 +159,7 @@ namespace Ogre {
         impl->exportMesh(pMesh, stream, endianMode);
     }
     //---------------------------------------------------------------------
-    void MeshSerializer::importMesh(const DataStreamPtr& stream, Mesh* pDest)
+    void MeshSerializer::importMesh(DataStreamPtr& stream, Mesh* pDest)
     {
         determineEndianness(stream);
 
@@ -159,11 +181,12 @@ namespace Ogre {
 
         // Find the implementation to use
         MeshSerializerImpl* impl = 0;
-        for (auto & i : mVersionData)
+        for (MeshVersionDataList::iterator i = mVersionData.begin(); 
+             i != mVersionData.end(); ++i)
         {
-            if (i->versionString == ver)
+            if ((*i)->versionString == ver)
             {
-                impl = i->impl;
+                impl = (*i)->impl;
                 break;
             }
         }           
@@ -176,20 +199,13 @@ namespace Ogre {
         // Warn on old version of mesh
         if (ver != mVersionData[0]->versionString)
         {
-            LogManager::getSingleton().logWarning(pDest->getName() + " uses an old format " + ver +
-                                                  "; upgrade with the OgreMeshUpgrader tool");
+            LogManager::getSingleton().logWarning( pDest->getName() +
+                " is an older format (" + ver + "); you should upgrade it as soon as possible" +
+                " using the OgreMeshUpgrade tool.");
         }
 
         if(mListener)
             mListener->processMeshCompleted(pDest);
-
-        auto rs = Root::getSingletonPtr() ? Root::getSingleton().getRenderSystem() : NULL;
-        if (!rs || !rs->getCapabilities()->hasCapability(RSC_VERTEX_FORMAT_INT_10_10_10_2))
-        {
-            // unpacks to floats, if packed
-            pDest->_convertVertexElement(VES_NORMAL, VET_FLOAT3);
-            pDest->_convertVertexElement(VES_TANGENT, VET_FLOAT4);
-        }
     }
     //---------------------------------------------------------------------
     void MeshSerializer::setListener(Ogre::MeshSerializerListener *listener)

@@ -42,7 +42,7 @@ namespace Ogre {
     */
 
     /** Particle emitter which emits particles randomly from points inside a ring (e.g. a tube).
-
+    @remarks
         This particle emitter emits particles from a ring-shaped area.
         The initial direction of these particles can either be a single
         direction (i.e. a line), a random scattering inside a cone, or a random
@@ -50,7 +50,7 @@ namespace Ogre {
         is the angle across which to scatter the particles either side of the
         base direction of the emitter. 
     */
-    class RingEmitter : public AreaEmitter
+    class _OgreParticleFXExport RingEmitter : public AreaEmitter
     {
     public:
         /// @see AreaEmitter
@@ -58,21 +58,21 @@ namespace Ogre {
         class CmdInnerX : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /** Command object for inner size (see ParamCommand).*/
         class CmdInnerY : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
         RingEmitter(ParticleSystem* psys);
 
         /// @see ParticleEmitter
-        void _initParticle(Particle* pParticle) override;
+        void _initParticle(Particle* pParticle);
 
         /** Sets the size of the clear space inside the area from where NO particles are emitted.
         @param x, y

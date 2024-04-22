@@ -32,9 +32,6 @@ THE SOFTWARE.
 #include "OgreRenderSystem.h"
 #include "OgreRenderWindow.h"
 
-// Convenience macro from ARB_vertex_buffer_object spec
-#define VBO_BUFFER_OFFSET(i) ((char *)size_t(i))
-
 namespace Ogre {
     class GLContext;
     class GLSLProgramCommon;
@@ -55,7 +52,7 @@ namespace Ogre {
 
         // This contains the complete list of supported extensions
         std::set<String> mExtensionList;
-        GPUVendor mVendor;
+        String mVendor;
 
         /** Manager object for creating render textures.
             Direct render to texture via FBO is preferable
@@ -64,29 +61,20 @@ namespace Ogre {
         */
         GLRTTManager *mRTTManager;
 
-        void initConfigOptions() override;
+        void initConfigOptions();
         void refreshConfig();
-
-        typedef std::list<GLContext*> GLContextList;
-        /// List of background thread contexts
-        GLContextList mBackgroundContextList;
-        OGRE_MUTEX(mThreadInitMutex);
-
-        /** One time initialization for the RenderState of a context. Things that
-            only need to be set once, like the LightingModel can be defined here.
-        */
-        virtual void _oneTimeContextInitialization() = 0;
     public:
-        /**
-         Specific options:
+        struct VideoMode {
+            uint32 width;
+            uint32 height;
+            int16 refreshRate;
+            uint8  bpp;
 
-        | Key |  Default | Description |
-        |-----|---------------|---------|
-        | Reversed Z-Buffer | false | Use reverse depth buffer to improve depth precision (GL3+ only) |
-        | Separate Shader Objects | false | Compile shaders individually instad of using monolithic programs. Better introspection. Allows mixing GLSL and SPIRV shaders (GL3+ only)  |
-        | Fixed Pipeline Enabled | true | Use fixed function units where possible. Disable to test migration to shader-only pipeline (GL only) |
-        */
-        void setConfigOption(const String &name, const String &value) override;
+            String getDescription() const;
+        };
+        typedef std::vector<VideoMode>    VideoModes;
+
+        void setConfigOption(const String &name, const String &value);
 
         virtual ~GLRenderSystemCommon() {}
 
@@ -110,6 +98,8 @@ namespace Ogre {
         */
         bool checkExtension(const String& ext) const;
 
+        String validateConfigOptions() { return BLANKSTRING; }
+
         /** Unregister a render target->context mapping. If the context of target
             is the current context, change the context to the main context so it
             can be destroyed safely.
@@ -123,15 +113,30 @@ namespace Ogre {
                                             const HardwareVertexBufferSharedPtr& vertexBuffer,
                                             const size_t vertexStart) = 0;
 
-        Real getMinimumDepthInputValue(void) override { return -1.0f; }            // Range [-1.0f, 1.0f]
-        Real getMaximumDepthInputValue(void) override { return 1.0f; }             // Range [-1.0f, 1.0f]
+        Real getHorizontalTexelOffset(void) { return 0.0; }               // No offset in GL
+        Real getVerticalTexelOffset(void) { return 0.0; }                 // No offset in GL
+        Real getMinimumDepthInputValue(void) { return -1.0f; }            // Range [-1.0f, 1.0f]
+        Real getMaximumDepthInputValue(void) { return 1.0f; }             // Range [-1.0f, 1.0f]
 
-        void _convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest, bool) override;
+        VertexElementType getColourVertexElementType(void) const {
+            return VET_COLOUR_ABGR;
+        }
+
+        void reinitialise(void)
+        {
+            this->shutdown();
+            this->_initialise();
+        }
+
+        void _convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest, bool)
+        {
+            // no conversion request for OpenGL
+            dest = matrix;
+        }
 
         /// Mimics D3D9RenderSystem::_getDepthStencilFormatFor, if no FBO RTT manager, outputs GL_NONE
-        virtual void _getDepthStencilFormatFor(PixelFormat internalColourFormat,
-                                               uint32* depthFormat,
-                                               uint32* stencilFormat);
+        void _getDepthStencilFormatFor(PixelFormat internalColourFormat, uint32* depthFormat,
+                                       uint32* stencilFormat);
 
         /** Create VAO on current context */
         virtual uint32 _createVao() { return 0; }
@@ -143,11 +148,6 @@ namespace Ogre {
         virtual void _destroyFbo(GLContext* context, uint32 fbo) {}
         /** Complete destruction of VAOs and FBOs deferred while creator context was not current */
         void _completeDeferredVaoFboDestruction();
-
-        void registerThread() override;
-        void unregisterThread() override;
-        void preExtraThreadsStarted() override;
-        void postExtraThreadsStarted() override;
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
         virtual void resetRenderer(RenderWindow* pRenderWnd) = 0;

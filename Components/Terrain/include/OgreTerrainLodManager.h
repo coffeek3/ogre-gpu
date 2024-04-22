@@ -49,7 +49,7 @@ namespace Ogre
         This class is used for managing terrain LOD data's loading, unloading.
     */
 
-    class _OgreTerrainExport TerrainLodManager
+    class _OgreTerrainExport TerrainLodManager : public WorkQueue::RequestHandler, public WorkQueue::ResponseHandler, public TerrainAlloc
     {
     public:
         static const uint32 TERRAINLODDATA_CHUNK_ID;
@@ -70,6 +70,8 @@ namespace Ogre
             uint16 currentPreparedLod;
             uint16 currentLoadedLod;
             uint16 requestedLod;
+            _OgreTerrainExport friend std::ostream& operator<<(std::ostream& o, const LoadLodRequest& r)
+            { return o; }
         };
 
         struct LodInfo
@@ -89,13 +91,19 @@ namespace Ogre
         void close();
         bool isOpen() const;
 
+        static const uint16 WORKQUEUE_LOAD_LOD_DATA_REQUEST;
+        virtual bool canHandleRequest(const WorkQueue::Request* req, const WorkQueue* srcQ);
+        virtual bool canHandleResponse(const WorkQueue::Response* res, const WorkQueue* srcQ);
+        virtual WorkQueue::Response* handleRequest(const WorkQueue::Request* req, const WorkQueue* srcQ);
+        virtual void handleResponse(const WorkQueue::Response* res, const WorkQueue* srcQ);
+
         void updateToLodLevel(int lodLevel, bool synchronous = false);
         /// Save each LOD level separately compressed so seek is possible
         static void saveLodData(StreamSerialiser& stream, Terrain* terrain);
 
         /** Copy geometry data from buffer to mHeightData/mDeltaData
           @param lodLevel A LOD level to work with
-          @param data, dataSize Buffer which holds geometry data if separated form
+          @param data Buffer which holds geometry data if separated form
           @remarks Data in buffer has to be both height and delta data. First half is height data.
                 Seconds half is delta data.
           */
@@ -120,9 +128,6 @@ namespace Ogre
             return mLodInfoTable[lodLevel];
         }
     private:
-        WorkQueue::Response* handleRequest(const WorkQueue::Request* req, const WorkQueue* srcQ);
-        void handleResponse(const WorkQueue::Response* res, const WorkQueue* srcQ);
-
         void init();
         void buildLodInfoTable();
 
@@ -148,6 +153,7 @@ namespace Ogre
         Terrain* mTerrain;
         DataStreamPtr mDataStream;
         size_t mStreamOffset;
+        uint16 mWorkQueueChannel;
 
         LodInfo* mLodInfoTable;
         int mTargetLodLevel;    /// Which LOD level is demanded

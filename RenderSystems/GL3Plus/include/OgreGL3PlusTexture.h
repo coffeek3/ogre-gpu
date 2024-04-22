@@ -51,12 +51,12 @@ namespace Ogre {
 
         void createShaderAccessPoint(uint bindPoint, TextureAccess access = TA_READ_WRITE,
                                      int mipmapLevel = 0, int textureArrayIndex = 0,
-                                     PixelFormat format = PF_UNKNOWN) override;
+                                     PixelFormat format = PF_UNKNOWN);
     protected:
         /// @copydoc Texture::createInternalResourcesImpl
-        void createInternalResourcesImpl(void) override;
+        void createInternalResourcesImpl(void);
         /// @copydoc Resource::freeInternalResourcesImpl
-        void freeInternalResourcesImpl(void) override;
+        void freeInternalResourcesImpl(void);
 
         /** internal method, create GL3PlusHardwarePixelBuffers for every face and
             mipmap level. This method must be called after the GL texture object was created,

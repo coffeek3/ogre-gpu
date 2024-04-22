@@ -57,9 +57,16 @@ EXRCodec::~EXRCodec()
     LogManager::getSingleton().logMessage("EXRCodec deinitialised");
 }
 
-void EXRCodec::decode(const DataStreamPtr& input, const Any& output) const
+DataStreamPtr EXRCodec::encode(const MemoryDataStreamPtr& input, const CodecDataPtr& pData) const
 {
-    Image* image = any_cast<Image*>(output);
+    OgreAssert(false, "not implemented");
+    return DataStreamPtr();
+}
+
+Codec::DecodeResult EXRCodec::decode(const DataStreamPtr& input) const
+{
+    ImageData * imgData = new ImageData;
+    MemoryDataStreamPtr output;
 
     try {
         // Make a mutable clone of input to be able to change file pointer
@@ -79,13 +86,11 @@ void EXRCodec::decode(const DataStreamPtr& input, const Any& output) const
         if(channels.findChannel("A"))
             components = 4;
         
-        auto format = components==3 ? PF_FLOAT32_RGB : PF_FLOAT32_RGBA;
-
         // Allocate memory
-        image->create(format, width, height);
+        output.reset(new MemoryDataStream(width*height*components*4));
     
         // Construct frame buffer
-        uchar *pixels = image->getData();
+        uchar *pixels = output->getPtr();
         FrameBuffer frameBuffer;
         frameBuffer.insert("R",             // name
                     Slice (PixelType::FLOAT,       // type
@@ -112,17 +117,39 @@ void EXRCodec::decode(const DataStreamPtr& input, const Any& output) const
       
         file.setFrameBuffer (frameBuffer);
         file.readPixels (dw.min.y, dw.max.y);
+    
+        imgData->format = components==3 ? PF_FLOAT32_RGB : PF_FLOAT32_RGBA;
+        imgData->width = width;
+        imgData->height = height;
+        imgData->depth = 1;
+        imgData->size = width*height*components*4;
+        imgData->num_mipmaps = 0;
+        imgData->flags = 0;
     } catch (const std::exception &exc) {
+        delete imgData;
         throw(Exception(Exception::ERR_INTERNAL_ERROR,
             "OpenEXR Error",
             exc.what()));
     }
+    
+    DecodeResult ret;
+    ret.first = output; 
+    ret.second = CodecDataPtr(imgData);
+    return ret;
 }
+
+void EXRCodec::encodeToFile(const MemoryDataStreamPtr& input, const String& outFileName,
+                            const CodecDataPtr& pData) const
+{
+    OgreAssert(false, "not implemented");
+}
+
 
 String EXRCodec::getType() const 
 {
     return "exr";
 }
+
 
 String EXRCodec::magicNumberToFileExt(const char* magicNumberPtr, size_t maxbytes) const
 {

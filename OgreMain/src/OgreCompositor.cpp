@@ -36,7 +36,8 @@ THE SOFTWARE.
 namespace Ogre {
 
 //-----------------------------------------------------------------------
-Compositor::Compositor(ResourceManager* creator, const String& name, ResourceHandle handle, const String& group, bool isManual, ManualResourceLoader* loader):
+Compositor::Compositor(ResourceManager* creator, const String& name, ResourceHandle handle,
+            const String& group, bool isManual, ManualResourceLoader* loader):
     Resource(creator, name, handle, group, isManual, loader),
     mCompilationRequired(true)
 {
@@ -70,11 +71,26 @@ void Compositor::removeTechnique(size_t index)
     mCompilationRequired = true;
 }
 //-----------------------------------------------------------------------
+
+CompositionTechnique *Compositor::getTechnique(size_t index)
+{
+    assert (index < mTechniques.size() && "Index out of bounds.");
+    return mTechniques[index];
+}
+//-----------------------------------------------------------------------
+
+size_t Compositor::getNumTechniques()
+{
+    return mTechniques.size();
+}
+//-----------------------------------------------------------------------
 void Compositor::removeAllTechniques()
 {
-    for (auto *t : mTechniques)
+    Techniques::iterator i, iend;
+    iend = mTechniques.end();
+    for (i = mTechniques.begin(); i != iend; ++i)
     {
-        OGRE_DELETE t;
+        OGRE_DELETE (*i);
     }
     mTechniques.clear();
     mSupportedTechniques.clear();
@@ -84,6 +100,19 @@ void Compositor::removeAllTechniques()
 Compositor::TechniqueIterator Compositor::getTechniqueIterator(void)
 {
     return TechniqueIterator(mTechniques.begin(), mTechniques.end());
+}
+//-----------------------------------------------------------------------
+
+CompositionTechnique *Compositor::getSupportedTechnique(size_t index)
+{
+    assert (index < mSupportedTechniques.size() && "Index out of bounds.");
+    return mSupportedTechniques[index];
+}
+//-----------------------------------------------------------------------
+
+size_t Compositor::getNumSupportedTechniques()
+{
+    return mSupportedTechniques.size();
 }
 //-----------------------------------------------------------------------
 
@@ -116,38 +145,51 @@ void Compositor::compile()
 {
     /// Sift out supported techniques
     mSupportedTechniques.clear();
+    Techniques::iterator i, iend;
+    iend = mTechniques.end();
 
-    for (auto t : mTechniques)
+    // Try looking for exact technique support with no texture fallback
+    for (i = mTechniques.begin(); i != iend; ++i)
     {
-        // Allow texture support with degraded pixel format
-        if (t->isSupported(true))
+        // Look for exact texture support first
+        if((*i)->isSupported(false))
         {
-            mSupportedTechniques.push_back(t);
+            mSupportedTechniques.push_back(*i);
         }
     }
 
     if (mSupportedTechniques.empty())
-        LogManager::getSingleton().logError("Compositor '" + getName() + "' has no supported techniques");
+    {
+        // Check again, being more lenient with textures
+        for (i = mTechniques.begin(); i != iend; ++i)
+        {
+            // Allow texture support with degraded pixel format
+            if((*i)->isSupported(true))
+            {
+                mSupportedTechniques.push_back(*i);
+            }
+        }
+    }
 
     mCompilationRequired = false;
 }
 //---------------------------------------------------------------------
 CompositionTechnique* Compositor::getSupportedTechnique(const String& schemeName)
 {
-    for(auto & t : mSupportedTechniques)
+    for(Techniques::iterator i = mSupportedTechniques.begin(); i != mSupportedTechniques.end(); ++i)
     {
-        if (t->getSchemeName() == schemeName)
+        if ((*i)->getSchemeName() == schemeName)
         {
-            return t;
+            return *i;
         }
     }
 
     // didn't find a matching one
-    for(auto & t : mSupportedTechniques)
+    for(Techniques::iterator i = mSupportedTechniques.begin(); i != mSupportedTechniques.end(); ++i)
     {
-        if (t->getSchemeName().empty())
+        if ((*i)->getSchemeName().empty())
         {
-            return t;
+            return *i;
         }
     }
 
@@ -178,11 +220,22 @@ void Compositor::createGlobalTextures()
         if (def->scope == CompositionTechnique::TS_GLOBAL) 
         {
             //Check that this is a legit global texture
-            OgreAssert(def->refCompName.empty(), "Global compositor texture definition can not be a reference");
-            OgreAssert(def->width && def->height, "Global compositor texture definition must have absolute size");
+            if (!def->refCompName.empty()) 
+            {
+                OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+                    "Global compositor texture definition can not be a reference",
+                    "Compositor::createGlobalTextures");
+            }
+            if (def->width == 0 || def->height == 0) 
+            {
+                OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+                    "Global compositor texture definition must have absolute size",
+                    "Compositor::createGlobalTextures");
+            }
             if (def->pooled) 
             {
-                LogManager::getSingleton().logWarning("Pooling global compositor textures has no effect");
+                LogManager::getSingleton().logMessage(
+                    "Pooling global compositor textures has no effect", LML_CRITICAL);
             }
             globalTextureNames.insert(def->name);
 
@@ -275,7 +328,13 @@ void Compositor::createGlobalTextures()
         if (numGlobals != globalTextureNames.size())
             isConsistent = false;
 
-        OgreAssert(isConsistent, "Different composition techniques define different global textures");
+        if (!isConsistent) 
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+                "Different composition techniques define different global textures",
+                "Compositor::createGlobalTextures");
+        }
+
     }
     
 }
@@ -306,7 +365,7 @@ const String& Compositor::getTextureInstanceName(const String& name, size_t mrtI
     return getTextureInstance(name, mrtIndex)->getName();
 }
 //-----------------------------------------------------------------------       
-const TexturePtr& Compositor::getTextureInstance(const String& name, size_t mrtIndex)
+TexturePtr Compositor::getTextureInstance(const String& name, size_t mrtIndex)
 {
     //Try simple texture
     GlobalTextureMap::iterator i = mGlobalTextures.find(name);
@@ -327,12 +386,12 @@ const TexturePtr& Compositor::getTextureInstance(const String& name, size_t mrtI
         
 }
 //---------------------------------------------------------------------
-RenderTarget* Compositor::getRenderTarget(const String& name, int slice)
+RenderTarget* Compositor::getRenderTarget(const String& name)
 {
     // try simple texture
     GlobalTextureMap::iterator i = mGlobalTextures.find(name);
     if(i != mGlobalTextures.end())
-        return i->second->getBuffer(slice)->getRenderTarget();
+        return i->second->getBuffer()->getRenderTarget();
 
     // try MRTs
     GlobalMRTMap::iterator mi = mGlobalMRTs.find(name);

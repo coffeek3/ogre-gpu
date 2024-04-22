@@ -1,4 +1,4 @@
-varying vec4 ambientUV;
+varying vec2 ambientUV;
 
 // Basic fragment program to display UV
 void main()

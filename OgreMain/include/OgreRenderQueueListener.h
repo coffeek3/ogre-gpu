@@ -41,7 +41,7 @@ namespace Ogre {
     */
     /** Abstract interface which classes must implement if they wish to receive
         events from the render queue. 
-
+    @remarks
         The OGRE render queue is divided into several queue groups, as defined by
         uint8. A class may implement this interface, and register itself
         as a listener by calling SceneManager::addRenderQueueListener. After doing so,
@@ -66,32 +66,36 @@ namespace Ogre {
         virtual void postRenderQueues() {}
 
         /** Event raised before a queue group is rendered. 
-
+        @remarks
             This method is called by the SceneManager before each queue group is
             rendered. 
         @param queueGroupId The id of the queue group which is about to be rendered
-        @param cameraName Name of the camera which is triggering this to be
-            called
+        @param invocation Name of the invocation which is causing this to be 
+            called (@see RenderQueueInvocation)
         @param skipThisInvocation A boolean passed by reference which is by default set to 
             false. If the event sets this to true, the queue will be skipped and not
             rendered. Note that in this case the renderQueueEnded event will not be raised
             for this queue group.
         */
-        virtual void renderQueueStarted(uint8 queueGroupId, const String& cameraName, bool& skipThisInvocation) {}
+        virtual void renderQueueStarted(uint8 queueGroupId, const String& invocation, 
+            bool& skipThisInvocation)
+        { (void)queueGroupId; (void)invocation; (void)skipThisInvocation; }
 
         /** Event raised after a queue group is rendered. 
-
+        @remarks
             This method is called by the SceneManager after each queue group is
             rendered. 
         @param queueGroupId The id of the queue group which has just been rendered
-        @param cameraName Name of the camera which is triggering this to be
-            called
+        @param invocation Name of the invocation which is causing this to be 
+            called (@see RenderQueueInvocation)
         @param repeatThisInvocation A boolean passed by reference which is by default set to 
             false. If the event sets this to true, the queue which has just been
             rendered will be repeated, and the renderQueueStarted and renderQueueEnded
             events will also be fired for it again.
         */
-        virtual void renderQueueEnded(uint8 queueGroupId, const String& cameraName, bool& repeatThisInvocation) {}
+        virtual void renderQueueEnded(uint8 queueGroupId, const String& invocation, 
+            bool& repeatThisInvocation)
+        { (void)queueGroupId; (void)invocation; (void)repeatThisInvocation; }
     };
     /** @} */
     /** @} */

@@ -32,6 +32,7 @@ THE SOFTWARE
 #include "OgreApplicationContext.h"
 #include "OgreInput.h"
 #include "OgreRTShaderSystem.h"
+#include "OgreApplicationContext.h"
 #include <iostream>
 
 using namespace Ogre;

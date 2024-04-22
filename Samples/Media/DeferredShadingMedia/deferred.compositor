@@ -4,8 +4,7 @@ compositor DeferredShading/GBuffer
 {
 	technique
 	{
-		// GBuffer textures
-		// PF_BYTE_RGBA would be sufficient for color, but D3D9 requires same bitdepth for all MRTs
+		// temporary textures
 		texture mrt_output target_width target_height PF_FLOAT16_RGBA PF_FLOAT16_RGBA chain_scope
 		
 		target mrt_output
@@ -22,8 +21,9 @@ compositor DeferredShading/GBuffer
 			// could do this with something like a visibility mask too
 			pass render_scene
 			{
+				//These values are synchronized with the code
 				first_render_queue 10
-				last_render_queue  80
+				last_render_queue  79	
 			}
 		}
 	}
@@ -65,10 +65,19 @@ compositor DeferredShading/ShowLit
 				input 1 mrt_output 1
 			}
 			
-			//Render transparents and other post-GBuffer render queue objects
+			//Render the objects that skipped rendering into the gbuffer
 			pass render_scene
 			{
-				first_render_queue 90
+				material_scheme NoGBuffer
+				first_render_queue 10
+				last_render_queue 79
+			}
+			
+			//Render the post-GBuffer render queue objects
+			pass render_scene
+			{
+				//This value is synchronized with the code
+				first_render_queue 80
 			}
 		}
 	}

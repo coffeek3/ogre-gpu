@@ -43,7 +43,7 @@ namespace Ogre {
     {
     public:
         /// @copydoc OptimisedUtil::softwareVertexSkinning
-        void softwareVertexSkinning(
+        virtual void softwareVertexSkinning(
             const float *srcPosPtr, float *destPosPtr,
             const float *srcNormPtr, float *destNormPtr,
             const float *blendWeightPtr, const unsigned char* blendIndexPtr,
@@ -52,45 +52,45 @@ namespace Ogre {
             size_t srcNormStride, size_t destNormStride,
             size_t blendWeightStride, size_t blendIndexStride,
             size_t numWeightsPerVertex,
-            size_t numVertices) override;
+            size_t numVertices);
 
         /// @copydoc OptimisedUtil::softwareVertexMorph
-        void softwareVertexMorph(
-            float t,
+        virtual void softwareVertexMorph(
+            Real t,
             const float *srcPos1, const float *srcPos2,
             float *dstPos,
             size_t pos1VSize, size_t pos2VSize, size_t dstVSize, 
             size_t numVertices,
-            bool morphNormals) override;
+            bool morphNormals);
 
         /// @copydoc OptimisedUtil::concatenateAffineMatrices
-        void concatenateAffineMatrices(
+        virtual void concatenateAffineMatrices(
             const Affine3& baseMatrix,
             const Affine3* srcMatrices,
             Affine3* dstMatrices,
-            size_t numMatrices) override;
+            size_t numMatrices);
 
         /// @copydoc OptimisedUtil::calculateFaceNormals
-        void calculateFaceNormals(
+        virtual void calculateFaceNormals(
             const float *positions,
             const EdgeData::Triangle *triangles,
             Vector4 *faceNormals,
-            size_t numTriangles) override;
+            size_t numTriangles);
 
         /// @copydoc OptimisedUtil::calculateLightFacing
-        void calculateLightFacing(
+        virtual void calculateLightFacing(
             const Vector4& lightPos,
             const Vector4* faceNormals,
             char* lightFacings,
-            size_t numFaces) override;
+            size_t numFaces);
 
         /// @copydoc OptimisedUtil::extrudeVertices
-        void extrudeVertices(
+        virtual void extrudeVertices(
             const Vector4& lightPos,
             Real extrudeDist,
             const float* srcPositions,
             float* destPositions,
-            size_t numVertices) override;
+            size_t numVertices);
     };
     //---------------------------------------------------------------------
     //---------------------------------------------------------------------
@@ -234,7 +234,7 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void OptimisedUtilGeneral::softwareVertexMorph(
-        float t,
+        Real t,
         const float *pSrc1, const float *pSrc2,
         float *pDst,
         size_t pos1VSize, size_t pos2VSize, size_t dstVSize,
@@ -245,7 +245,7 @@ namespace Ogre {
         size_t src2Skip = pos2VSize/sizeof(float) - 3 - (morphNormals ? 3 : 0);
         size_t dstSkip = dstVSize/sizeof(float) - 3 - (morphNormals ? 3 : 0);
         
-        Vector3f nlerpNormal;
+        Vector3 nlerpNormal;
         for (size_t i = 0; i < numVertices; ++i)
         {
             // x
@@ -263,16 +263,16 @@ namespace Ogre {
                 // normals must be in the same buffer as pos
                 // perform an nlerp
                 // we don't have enough information for a spherical interp
-                nlerpNormal[0] = *pSrc1 + t * (*pSrc2 - *pSrc1);
+                nlerpNormal.x = *pSrc1 + t * (*pSrc2 - *pSrc1);
                 ++pSrc1; ++pSrc2;
-                nlerpNormal[1] = *pSrc1 + t * (*pSrc2 - *pSrc1);
+                nlerpNormal.y = *pSrc1 + t * (*pSrc2 - *pSrc1);
                 ++pSrc1; ++pSrc2;
-                nlerpNormal[2] = *pSrc1 + t * (*pSrc2 - *pSrc1);
+                nlerpNormal.z = *pSrc1 + t * (*pSrc2 - *pSrc1);
                 ++pSrc1; ++pSrc2;
                 nlerpNormal.normalise();
-                *pDst++ = nlerpNormal[0];
-                *pDst++ = nlerpNormal[1];
-                *pDst++ = nlerpNormal[2];
+                *pDst++ = nlerpNormal.x;
+                *pDst++ = nlerpNormal.y;                
+                *pDst++ = nlerpNormal.z;                
             }
             
             pSrc1 += src1Skip;

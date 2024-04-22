@@ -30,37 +30,37 @@ THE SOFTWARE.
 
 #include "OgrePlugin.h"
 #include "OgreBspSceneManager.h"
+#include "OgreBspSceneLoader.h"
 
 namespace Ogre
 {
-    class Quake3ShaderManager;
 
     /** Plugin instance for BSPSceneManager */
-    class _OgreBspPluginExport BspSceneManagerPlugin : public Plugin
+    class BspSceneManagerPlugin : public Plugin
     {
     public:
         BspSceneManagerPlugin();
-        ~BspSceneManagerPlugin();
 
 
         /// @copydoc Plugin::getName
-        const String& getName() const override;
+        const String& getName() const;
 
         /// @copydoc Plugin::install
-        void install() override;
+        void install();
 
         /// @copydoc Plugin::initialise
-        void initialise() override;
+        void initialise();
 
         /// @copydoc Plugin::shutdown
-        void shutdown() override;
+        void shutdown();
 
         /// @copydoc Plugin::uninstall
-        void uninstall() override;
+        void uninstall();
     protected:
         BspSceneManagerFactory* mBspFactory;
-        Quake3ShaderManager* mShaderMgr;
-        std::unique_ptr<Codec> mCodec;
+        BspSceneLoader* mBspSceneLoader;
+
+
     };
 }
 

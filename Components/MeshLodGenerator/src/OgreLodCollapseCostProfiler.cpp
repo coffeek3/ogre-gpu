@@ -35,34 +35,35 @@ namespace Ogre
     {
         OgreAssert(0, "Only computeVertexCollapseCost should call this function.");
         return 0;
-    }
+    }   
 
     void LodCollapseCostProfiler::computeVertexCollapseCost( LodData* data, LodData::Vertex* vertex, Real& collapseCost, LodData::Vertex*& collapseTo )
     {
+        LodData::VEdges::iterator it = vertex->edges.begin();
         if(!mHasProfile[LodData::getVectorIDFromPointer(data->mVertexList, vertex)]){
-            for (auto& e : vertex->edges) {
-                e.collapseCost = mCostCalculator->computeEdgeCollapseCost(data, vertex, &e);
-                if (collapseCost > e.collapseCost) {
-                    collapseCost = e.collapseCost;
-                    collapseTo = e.dst;
+            for (; it != vertex->edges.end(); ++it) {
+                it->collapseCost = mCostCalculator->computeEdgeCollapseCost(data, vertex, &*it);
+                if (collapseCost > it->collapseCost) {
+                    collapseCost = it->collapseCost;
+                    collapseTo = it->dst;
                 }
             }
         } else {
             std::pair<ProfileLookup::iterator, ProfileLookup::iterator> ret = mProfileLookup.equal_range(vertex);
-            for (auto& e : vertex->edges) {
-                e.collapseCost = LodData::UNINITIALIZED_COLLAPSE_COST;
-                for(ProfileLookup::iterator it = ret.first; it != ret.second; ++it){
-                    if(it->second.dst == e.dst ){
-                        e.collapseCost = it->second.cost;
+            for (; it != vertex->edges.end(); ++it) {
+                it->collapseCost = LodData::UNINITIALIZED_COLLAPSE_COST;
+                for(ProfileLookup::iterator it2 = ret.first; it2 != ret.second; ++it2){
+                    if(it2->second.dst == it->dst ){
+                        it->collapseCost = it2->second.cost;
                         break;
                     }
                 }
-                if(e.collapseCost == LodData::UNINITIALIZED_COLLAPSE_COST){
-                    e.collapseCost = mCostCalculator->computeEdgeCollapseCost(data, vertex, &e);
+                if(it->collapseCost == LodData::UNINITIALIZED_COLLAPSE_COST){
+                    it->collapseCost = mCostCalculator->computeEdgeCollapseCost(data, vertex, &*it);
                 }
-                if (collapseCost > e.collapseCost) {
-                    collapseCost = e.collapseCost;
-                    collapseTo = e.dst;
+                if (collapseCost > it->collapseCost) {
+                    collapseCost = it->collapseCost;
+                    collapseTo = it->dst;
                 }
             }
         }
@@ -72,18 +73,20 @@ namespace Ogre
     {
         mHasProfile.clear();
         mHasProfile.resize(data->mVertexList.size(), false);
-        for(auto& p : mProfile){
+        LodProfile::iterator it = mProfile.begin();
+        LodProfile::iterator itEnd = mProfile.end();
+        for(;it != itEnd;it++){
             LodData::Vertex v;
-            v.position = p.src;
+            v.position = it->src;
             LodData::UniqueVertexSet::iterator src = data->mUniqueVertexSet.find(&v);
             OgreAssert(src != data->mUniqueVertexSet.end(), "Invalid vertex position in Lod profile");
             mHasProfile[LodData::getVectorIDFromPointer(data->mVertexList, *src)] = true;
-            v.position = p.dst;
+            v.position = it->dst;
             LodData::UniqueVertexSet::iterator dst = data->mUniqueVertexSet.find(&v);
             OgreAssert(dst != data->mUniqueVertexSet.end(), "Invalid vertex position in Lod profile");
             ProfiledEdge e;
             e.dst = *dst;
-            e.cost = p.cost;
+            e.cost = it->cost;
             OgreAssert(e.cost >= 0 && e.cost != LodData::UNINITIALIZED_COLLAPSE_COST, "Invalid collapse cost");
             mProfileLookup.emplace(*src, e);
         }

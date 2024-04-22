@@ -91,12 +91,13 @@ void main(void)
 	worldPos = vec4(calculateBlendPosition(vertex.xyz, blendDQ), 1.0);
 	worldNorm = calculateBlendNormal(normal, blendDQ);
 #else
-	mat3x4 worldMatrix;
+	mat4 worldMatrix;
 	worldMatrix[0] = texture2D( matrixTexture, uv1.xw + uv2.xy );
 	worldMatrix[1] = texture2D( matrixTexture, uv1.yw + uv2.xy );
 	worldMatrix[2] = texture2D( matrixTexture, uv1.zw + uv2.xy );
+	worldMatrix[3] = vec4( 0, 0, 0, 1 );
 
-	worldPos		= vec4(vertex * worldMatrix, 1);
+	worldPos		= vertex * worldMatrix;
 	worldNorm		= normal * mat3(worldMatrix);
 #endif
 
@@ -115,7 +116,8 @@ void main(void)
 	gl_Position			= viewProjMatrix * worldPos;
 	
 #if DEPTH_SHADOWCASTER
-	depth				= gl_Position.zw;
+	depth.x				= (gl_Position.z - depthRange.x) * depthRange.w;
+	depth.y				= depthRange.w;
 #else
 	_uv0		= uv0.xy;
 	oNormal		= worldNorm;
@@ -123,6 +125,7 @@ void main(void)
 
 	#if DEPTH_SHADOWRECEIVER
 		oLightSpacePos		= texViewProjMatrix * worldPos;
+		oLightSpacePos.z	= (oLightSpacePos.z - depthRange.x) * depthRange.w;
 	#endif
 #endif
 }

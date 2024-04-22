@@ -78,7 +78,7 @@ namespace Ogre
         For more information, @see InstancedEntity
         For information on how Ogre manages multiple Instance batches, @see InstanceManager
 
-
+    @remarks
         Design discussion webpage
     @author
         Matias N. Goldberg ("dark_sylinc")
@@ -89,7 +89,7 @@ namespace Ogre
     {
     public:
         typedef std::vector<InstancedEntity*>  InstancedEntityVec;
-        typedef std::vector<Vector4f>           CustomParamsVec;
+        typedef std::vector<Vector4>           CustomParamsVec;
     protected:
         typedef TransformBase<3, float>        Matrix3x4f;
         RenderOperation     mRenderOperation;
@@ -121,6 +121,8 @@ namespace Ogre
         bool                mBoundsUpdated; //Set to false by derived classes that need it
         Camera              *mCurrentCamera;
 
+        unsigned short      mMaterialLodIndex;
+
         bool                mDirtyAnimation; //Set to false at start of each _updateRenderQueue
 
         /// False if a technique doesn't support skeletal animation
@@ -144,7 +146,7 @@ namespace Ogre
         virtual void setupVertices( const SubMesh* baseSubMesh ) = 0;
         virtual void setupIndices( const SubMesh* baseSubMesh ) = 0;
         virtual void createAllInstancedEntities(void);
-        void deleteAllInstancedEntities(void);
+        virtual void deleteAllInstancedEntities(void);
         virtual void deleteUnusedInstancedEntities(void);
         /// Creates a new InstancedEntity instance
         virtual InstancedEntity* generateInstancedEntity(size_t num);
@@ -185,7 +187,7 @@ namespace Ogre
         const Mesh::IndexMap* _getIndexToBoneMap() const { return mIndexToBoneMap; }
 
         /** Returns true if this technique supports skeletal animation
-
+        @remarks
             A virtual function could have been used, but using a simple variable overridden
             by the derived class is faster than virtual call overhead. And both are clean
             ways of implementing it.
@@ -200,7 +202,7 @@ namespace Ogre
         @par
             Note this is a helper function, as such it takes a submesh base to compute
             the parameters, instead of using the object's own. This allows
-            querying for a technique without requiring to actually build it.
+            querying for a technique without requiering to actually build it.
         @param baseSubMesh The base submesh that will be using to build it.
         @param flags Flags to pass to the InstanceManager. @see InstanceManagerFlags
         @return The max instances limit
@@ -210,10 +212,10 @@ namespace Ogre
         /** Constructs all the data needed to use this batch, as well as the
             InstanceEntities. Placed here because in the constructor virtual
             tables may not have been yet filled.
-        @param baseSubMesh A sub mesh which the instances will be based upon from
-
+        @param baseSubMesh A sub mesh which the instances will be based upon from.
+        @remarks
             Call this only ONCE. This is done automatically by Ogre::InstanceManager
-            Caller is responsible for freeing buffers in this RenderOperation
+            Caller is responsable for freeing buffers in this RenderOperation
             Buffers inside the RenderOp may be null if the built failed.
         @return
             A render operation which is very useful to pass to other InstanceBatches
@@ -229,10 +231,9 @@ namespace Ogre
             reference from Render Op.
             For example, Hardware based instancing uses it's own vertex buffer for the
             last source binding, but shares the other sources.
-        @param baseSubMesh A sub mesh which the instances will be based upon from
         @param renderOperation The RenderOp to reference.
-
-            Caller is responsible for freeing buffers passed as input arguments
+        @remarks
+            Caller is responsable for freeing buffers passed as input arguments
             This function replaces the need to call build()
         */
         virtual void buildFrom( const SubMesh *baseSubMesh, const RenderOperation &renderOperation );
@@ -286,7 +287,7 @@ namespace Ogre
             This option makes the batch behave pretty much like Static Geometry, but with the GPU RAM
             memory advantages (less VRAM, less bandwidth) and not LOD support. Very useful for
             billboards of trees, repeating vegetation, etc.
-
+            @remarks
                 This function moves a lot of processing time from the CPU to the GPU. If the GPU
                 is already a bottleneck, you may see a decrease in performance instead!
                 Call this function again (with bStatic=true) if you've made a change to an
@@ -303,14 +304,14 @@ namespace Ogre
         /** Returns a pointer to a new InstancedEntity ready to use
             Note it's actually preallocated, so no memory allocation happens at
             this point.
-
+            @remarks
                 Returns NULL if all instances are being used
         */
         InstancedEntity* createInstancedEntity();
 
         /** Removes an InstancedEntity from the scene retrieved with
             getNewInstancedEntity, putting back into a queue
-
+            @remarks
                 Throws an exception if the instanced entity wasn't created by this batch
                 Removed instanced entities save little CPU time, but _not_ GPU
         */
@@ -325,33 +326,35 @@ namespace Ogre
         void _markTransformSharingDirty() { mTransformSharingDirty = true; }
 
         /** @see InstancedEntity::setCustomParam */
-        void _setCustomParam( InstancedEntity *instancedEntity, unsigned char idx, const Vector4f &newParam );
+        void _setCustomParam( InstancedEntity *instancedEntity, unsigned char idx, const Vector4 &newParam );
 
         /** @see InstancedEntity::getCustomParam */
-        const Vector4f& _getCustomParam( InstancedEntity *instancedEntity, unsigned char idx );
+        const Vector4& _getCustomParam( InstancedEntity *instancedEntity, unsigned char idx );
 
         //Renderable overloads
         /** @copydoc Renderable::getMaterial */
-        const MaterialPtr& getMaterial(void) const override      { return mMaterial; }
+        const MaterialPtr& getMaterial(void) const      { return mMaterial; }
         /** @copydoc Renderable::getRenderOperation */
-        void getRenderOperation( RenderOperation& op ) override  { op = mRenderOperation; }
+        void getRenderOperation( RenderOperation& op )  { op = mRenderOperation; }
 
         /** @copydoc Renderable::getSquaredViewDepth */
-        Real getSquaredViewDepth( const Camera* cam ) const override;
+        Real getSquaredViewDepth( const Camera* cam ) const;
         /** @copydoc Renderable::getLights */
-        const LightList& getLights( void ) const override;
+        const LightList& getLights( void ) const;
+        /** @copydoc Renderable::getTechnique */
+        Technique* getTechnique(void) const;
 
         /** @copydoc MovableObject::getMovableType */
-        const String& getMovableType(void) const override;
+        const String& getMovableType(void) const;
         /** @copydoc MovableObject::_notifyCurrentCamera */
-        void _notifyCurrentCamera( Camera* cam ) override;
+        void _notifyCurrentCamera( Camera* cam );
         /** @copydoc MovableObject::getBoundingBox */
-        const AxisAlignedBox& getBoundingBox(void) const override;
+        const AxisAlignedBox& getBoundingBox(void) const;
         /** @copydoc MovableObject::getBoundingRadius */
-        Real getBoundingRadius(void) const override;
+        Real getBoundingRadius(void) const;
 
-        void _updateRenderQueue(RenderQueue* queue) override;
-        void visitRenderables( Renderable::Visitor* visitor, bool debugRenderables = false ) override;
+        virtual void _updateRenderQueue(RenderQueue* queue);
+        void visitRenderables( Renderable::Visitor* visitor, bool debugRenderables = false );
 
         // resolve ambiguity of get/setUserAny due to inheriting from Renderable and MovableObject
         using Renderable::getUserAny;

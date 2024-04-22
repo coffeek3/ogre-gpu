@@ -66,7 +66,13 @@ public:
     {
         OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "This sample is not yet finished."
                 " Sorry!", "Sample_TerrainTessellation::testCapabilities");
-        if (!caps->hasCapability(RSC_TESSELLATION_PROGRAM))
+
+        if (!caps->hasCapability(RSC_VERTEX_PROGRAM) || !caps->hasCapability(RSC_FRAGMENT_PROGRAM))
+        {
+            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, "Your graphics card does not support vertex and fragment"
+                " programs, so you cannot run this sample. Sorry!", "Sample_TerrainTessellation::testCapabilities");
+        }
+        if (!caps->hasCapability(RSC_TESSELLATION_HULL_PROGRAM) || !caps->hasCapability(RSC_TESSELLATION_DOMAIN_PROGRAM))
         {
             OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Your graphics card does not support tesselation shaders. Sorry!",
                 "Sample_TerrainTessellation:testCapabilities");
@@ -264,7 +270,10 @@ protected:
         mCamera->setNearClipDistance(0.1);
         mCamera->setFarClipDistance(50000);
 
-        mCamera->setFarClipDistance(0);   // enable infinite far clip distance
+        if (mRoot->getRenderSystem()->getCapabilities()->hasCapability(RSC_INFINITE_FAR_PLANE))
+        {
+            mCamera->setFarClipDistance(0);   // enable infinite far clip distance if we can
+        }
     }
 
     void setupLights()

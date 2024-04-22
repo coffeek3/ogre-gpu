@@ -47,13 +47,14 @@ namespace Ogre
 
 
     /** This class represents a collection of pages which make up a world. 
-
+    @remarks
         It's important to bear in mind that the PagedWorld only delineates the
         world and knows how to find out about the contents of it. It does not, 
         by design, contain all elements of the world, in memory, at once. 
     */
     class _OgrePagingExport PagedWorld : public PageAlloc
     {
+    protected:
         String mName;
         PageManager* mManager;
         PageProvider* mPageProvider;
@@ -93,7 +94,7 @@ namespace Ogre
         void save(StreamSerialiser& stream);
 
         /** Create a new section of the world based on a specialised type.
-
+        @remarks
             World sections are areas of the world that use a particular
             PageStrategy, with a certain set of parameters specific to that
             strategy, and potentially some other rules. 
@@ -112,7 +113,7 @@ namespace Ogre
 
 
         /** Create a new manually defined section of the world.
-
+        @remarks
             World sections are areas of the world that use a particular
             PageStrategy, with a certain set of parameters specific to that
             strategy. So you would have more than one section in a world only 
@@ -129,7 +130,7 @@ namespace Ogre
 
 
         /** Create a manually defined new section of the world.
-
+        @remarks
             World sections are areas of the world that use a particular
             PageStrategy, with a certain set of parameters specific to that
             strategy. So you would have more than one section in a world only 
@@ -160,7 +161,7 @@ namespace Ogre
         const SectionMap& getSections() const { return mSections; }
 
         /** Set the PageProvider which can provide streams for Pages in this world. 
-
+        @remarks
             This is the top-level way that you can direct how Page data is loaded. 
             When data for a Page is requested for a PagedWorldSection, the following
             sequence of classes will be checked to see if they have a provider willing
@@ -176,7 +177,7 @@ namespace Ogre
         PageProvider* getPageProvider() const { return mPageProvider; }
 
         /** Give a world  the opportunity to prepare page content procedurally. 
-
+        @remarks
         You should not call this method directly. This call may well happen in 
         a separate thread so it should not access GPU resources, use _loadProceduralPage
         for that
@@ -184,7 +185,7 @@ namespace Ogre
         */
         virtual bool _prepareProceduralPage(Page* page, PagedWorldSection* section);
         /** Give a world  the opportunity to prepare page content procedurally. 
-
+        @remarks
         You should not call this method directly. This call will happen in 
         the main render thread so it can access GPU resources. Use _prepareProceduralPage
         for background preparation.
@@ -192,7 +193,7 @@ namespace Ogre
         */
         virtual bool _loadProceduralPage(Page* page, PagedWorldSection* section);
         /** Give a world  the opportunity to unload page content procedurally. 
-
+        @remarks
         You should not call this method directly. This call will happen in 
         the main render thread so it can access GPU resources. Use _unprepareProceduralPage
         for background preparation.
@@ -200,7 +201,7 @@ namespace Ogre
         */
         virtual bool _unloadProceduralPage(Page* page, PagedWorldSection* section);
         /** Give a world  the opportunity to unprepare page content procedurally. 
-
+        @remarks
         You should not call this method directly. This call may well happen in 
         a separate thread so it should not access GPU resources, use _unloadProceduralPage
         for that
@@ -210,7 +211,7 @@ namespace Ogre
         /** Get a serialiser set up to read Page data for the given PageID. 
         @param pageID The ID of the page being requested
         @param section The parent section to which this page will belong
-
+        @remarks
         The StreamSerialiser returned is the responsibility of the caller to
         delete. 
         */
@@ -219,7 +220,7 @@ namespace Ogre
         /** Get a serialiser set up to read Page data for the given PageID. 
         @param pageID The ID of the page being requested
         @param section The parent section to which this page will belong
-
+        @remarks
         The StreamSerialiser returned is the responsibility of the caller to
         delete. 
         */
@@ -237,7 +238,7 @@ namespace Ogre
         _OgrePagingExport friend std::ostream& operator <<( std::ostream& o, const PagedWorld& p );
 
 
-    private:
+    protected:
         SectionMap mSections;
         NameGenerator mSectionNameGenerator;
     };

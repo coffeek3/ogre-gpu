@@ -32,15 +32,16 @@
 #include "OgreRTShaderSystem.h"
 #include "OgreMaterialManager.h"
 
-namespace OgreBites {
 /** \addtogroup Optional
 *  @{
 */
 /** \addtogroup Bites
 *  @{
 */
-/** Default implementation of a Listener to use with the Ogre::RTShader system.
-    When a target scheme callback is invoked with the shader generator scheme it tries to create an equivalent shader
+namespace OgreBites {
+/** This class demonstrates basic usage of the RTShader system.
+    It sub class the material manager listener class and when a target scheme callback
+    is invoked with the shader generator scheme it tries to create an equivalent shader
     based technique based on the default technique of the given material.
 */
 class _OgreBitesExport SGTechniqueResolverListener : public Ogre::MaterialManager::Listener {
@@ -55,15 +56,15 @@ public:
     Ogre::Technique* handleSchemeNotFound(unsigned short schemeIndex,
                                           const Ogre::String& schemeName,
                                           Ogre::Material* originalMaterial, unsigned short lodIndex,
-                                          const Ogre::Renderable* rend) override;
+                                          const Ogre::Renderable* rend);
 
-    bool afterIlluminationPassesCreated(Ogre::Technique* tech) override;
+    bool afterIlluminationPassesCreated(Ogre::Technique* tech);
 
-    bool beforeIlluminationPassesCleared(Ogre::Technique* tech) override;
+    bool beforeIlluminationPassesCleared(Ogre::Technique* tech);
 
 protected:
     Ogre::RTShader::ShaderGenerator* mShaderGenerator; // The shader generator instance.
 };
-/** @} */
-/** @} */
 }
+/** @} */
+/** @} */

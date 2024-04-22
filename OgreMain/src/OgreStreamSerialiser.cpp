@@ -124,7 +124,8 @@ namespace Ogre
 
         }
 
-        OgreAssert(mStream, "Stream is null");
+        checkStream();
+
     }
     //---------------------------------------------------------------------
     StreamSerialiser::~StreamSerialiser()
@@ -136,8 +137,8 @@ namespace Ogre
                 "Warning: stream " << mStream->getName() << " was not fully read / written; " <<
                 mChunkStack.size() << " chunks remain unterminated.";
         }
-        for (auto & i : mChunkStack)
-            delete i;
+        for (ChunkStack::iterator i = mChunkStack.begin(); i != mChunkStack.end(); ++i)
+            delete *i;
         mChunkStack.clear();
 
     }
@@ -167,9 +168,11 @@ namespace Ogre
         if (mReadWriteHeader)
             readHeader();
 
-        OgreAssert(mEndian != ENDIAN_AUTO,
-                   "Endian mode has not been determined, did you disable header without setting?");
-
+        if (mEndian == ENDIAN_AUTO)
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Endian mode has not been determined, did you disable header without setting?", 
+            "StreamSerialiser::readChunkBegin");
+        
         Chunk* chunk = readChunkImpl();
         mChunkStack.push_back(chunk);
 
@@ -205,7 +208,7 @@ namespace Ogre
     {
         Chunk* c = popChunk(id);
 
-        OgreAssert(mStream, "Stream is null");
+        checkStream();
 
         mStream->seek(c->offset);
 
@@ -215,7 +218,7 @@ namespace Ogre
     //---------------------------------------------------------------------
     uint32 StreamSerialiser::peekNextChunkID()
     {
-        OgreAssert(mStream, "Stream is null");
+        checkStream();
 
         if (eof())
             return 0;
@@ -224,8 +227,10 @@ namespace Ogre
         if (mReadWriteHeader)
             readHeader();
 
-        OgreAssert(mEndian != ENDIAN_AUTO,
-                   "Endian mode has not been determined, did you disable header without setting?");
+        if (mEndian == ENDIAN_AUTO)
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Endian mode has not been determined, did you disable header without setting?", 
+            "StreamSerialiser::peekNextChunkID");
 
         size_t homePos = mStream->tell();
         uint32 ret;
@@ -239,7 +244,7 @@ namespace Ogre
     {
         Chunk* c = popChunk(id);
 
-        OgreAssert(mStream, "Stream is null");
+        checkStream();
 
         // skip to the end of the chunk if we were not there already
         // this lets us quite reading a chunk anywhere and have the read marker
@@ -321,23 +326,28 @@ namespace Ogre
     }
     //---------------------------------------------------------------------
     bool StreamSerialiser::eof() const
-    {
-        OgreAssert(mStream, "Stream is null");
+    { 
+        checkStream();
         return mStream->eof(); 
     }
     //---------------------------------------------------------------------
     void StreamSerialiser::checkStream(bool failOnEof, bool validateReadable, bool validateWriteable) const
     {
-        OgreAssert(mStream, "Stream is null");
+        if (!mStream)
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Invalid operation, stream is null", "StreamSerialiser::checkStream");
 
         if (failOnEof && mStream->eof())
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Invalid operation, end of file on stream");
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Invalid operation, end of file on stream", "StreamSerialiser::checkStream");
 
         if (validateReadable && !mStream->isReadable())
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Invalid operation, file is not readable");
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Invalid operation, file is not readable", "StreamSerialiser::checkStream");
 
         if (validateWriteable && !mStream->isWriteable())
-            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Invalid operation, file is not writeable");
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Invalid operation, file is not writeable", "StreamSerialiser::checkStream");
     }
     //---------------------------------------------------------------------
     void StreamSerialiser::writeHeader()
@@ -364,8 +374,10 @@ namespace Ogre
         if (mReadWriteHeader)
             writeHeader();
 
-        OgreAssert(mEndian != ENDIAN_AUTO,
-                   "Endian mode has not been determined, did you disable header without setting?");
+        if (mEndian == ENDIAN_AUTO)
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+                "Endian mode has not been determined, did you disable header without setting?", 
+                "StreamSerialiser::writeChunkBegin");
 
         writeChunkImpl(id, version);
 
@@ -398,7 +410,7 @@ namespace Ogre
     //---------------------------------------------------------------------
     size_t StreamSerialiser::getOffsetFromChunkStart() const
     {
-        OgreAssert(mStream, "Stream is null");
+        checkStream(false, false, false);
 
         if (mChunkStack.empty())
         {
@@ -832,10 +844,14 @@ namespace Ogre
     //---------------------------------------------------------------------
     StreamSerialiser::Chunk* StreamSerialiser::popChunk(uint id)
     {
-        OgreAssert(!mChunkStack.empty(), "No active chunk!");
+        if (mChunkStack.empty())
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "No active chunk!", "StreamSerialiser::popChunk");
 
         const Chunk* chunk = mChunkStack.back();
-        OgreAssert(chunk->id == id, "Incorrect chunk id!");
+        if (chunk->id != id)
+            OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+            "Incorrect chunk id!", "StreamSerialiser::popChunk");
 
         Chunk* c = mChunkStack.back();
         mChunkStack.pop_back();

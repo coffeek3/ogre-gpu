@@ -2,10 +2,8 @@
 #define _RC10_REGISTER_H
 
 #include <stdlib.h>
-#ifdef _WIN32
-#include <windows.h>
-#endif
-#include <glad/glad.h>
+#include "OgreGLPrerequisites.h"
+#include <GL/glew.h>
 
 #define RCP_NUM_GENERAL_COMBINERS 8
 

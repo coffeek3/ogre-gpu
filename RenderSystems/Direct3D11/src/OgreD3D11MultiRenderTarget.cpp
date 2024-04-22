@@ -74,13 +74,6 @@ namespace Ogre
         }
 
         mRenderTargets[attachment] = target;
-
-        if(PixelUtil::isDepth(target->suggestPixelFormat()))
-        {
-            attachDepthBuffer(target->getDepthBuffer());
-            return;
-        }
-
         mRenderTargetViews[attachment] =
             d3d11RenderTarget ? d3d11RenderTarget->getRenderTargetView() : NULL;
 

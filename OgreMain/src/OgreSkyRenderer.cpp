@@ -26,35 +26,37 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 
-#include <memory>
-
 #include "OgreStableHeaders.h"
 
 #include "OgreEntity.h"
 #include "OgreSubEntity.h"
-#include "OgreViewport.h"
 
 namespace Ogre {
-SceneManager::SkyRenderer::SkyRenderer(SceneManager* owner)
-    : mSceneManager(owner), mSceneNode(0), mEnabled(false)
+SceneManager::SkyRenderer::SkyRenderer(SceneManager* owner) :
+        mSceneManager(owner),
+        mSkyPlaneEntity(0),
+        mSkyPlaneNode(0),
+        mSkyDomeNode(0),
+        mSkyBoxNode(0),
+        mSkyPlaneEnabled(false),
+        mSkyBoxEnabled(false),
+        mSkyDomeEnabled(false)
 {
+    // init sky
+    for (size_t i = 0; i < 5; ++i)
+    {
+        mSkyDomeEntity[i] = 0;
+    }
 }
 
-void SceneManager::SkyRenderer::nodeDestroyed(const Node*)
+void SceneManager::SkyRenderer::clear()
 {
     // Remove sky nodes since they've been deleted
-    mSceneNode = 0;
-    mEnabled = false;
+    mSkyBoxNode = mSkyPlaneNode = mSkyDomeNode = 0;
+    mSkyBoxEnabled = mSkyPlaneEnabled = mSkyDomeEnabled = false;
 }
 
-void SceneManager::SkyRenderer::setEnabled(bool enable)
-{
-    if(enable == mEnabled) return;
-    mEnabled = enable;
-    enable ? mSceneManager->addListener(this) : mSceneManager->removeListener(this);
-}
-
-void SceneManager::SkyPlaneRenderer::setSkyPlane(
+void SceneManager::SkyRenderer::setSkyPlane(
                                bool enable,
                                const Plane& plane,
                                const String& materialName,
@@ -81,6 +83,8 @@ void SceneManager::SkyPlaneRenderer::setSkyPlane(
         m->setDepthWriteEnabled(false);
         // Ensure loaded
         m->load();
+
+        mSkyPlaneRenderQueue = renderQueue;
 
         // Set up the plane
         MeshPtr planeMesh = MeshManager::getSingleton().getByName(meshName, groupName);
@@ -119,31 +123,30 @@ void SceneManager::SkyPlaneRenderer::setSkyPlane(
         }
         // Create, use the same name for mesh and entity
         // manually construct as we don't want this to be destroyed on destroyAllMovableObjects
-        MovableObjectFactory* factory = Root::getSingleton().getMovableObjectFactory(MOT_ENTITY);
+        MovableObjectFactory* factory =
+            Root::getSingleton().getMovableObjectFactory(EntityFactory::FACTORY_TYPE_NAME);
         NameValuePairList params;
         params["mesh"] = meshName;
         mSkyPlaneEntity = static_cast<Entity*>(factory->createInstance(meshName, mSceneManager, &params));
         mSkyPlaneEntity->setMaterialName(materialName, groupName);
         mSkyPlaneEntity->setCastShadows(false);
-        mSkyPlaneEntity->setRenderQueueGroup(renderQueue);
 
-        MovableObjectCollection* objectMap = mSceneManager->getMovableObjectCollection(MOT_ENTITY);
+        MovableObjectCollection* objectMap = mSceneManager->getMovableObjectCollection(EntityFactory::FACTORY_TYPE_NAME);
         objectMap->map[meshName] = mSkyPlaneEntity;
 
         // Create node and attach
-        if (!mSceneNode)
+        if (!mSkyPlaneNode)
         {
-            mSceneNode = mSceneManager->createSceneNode();
-            mSceneNode->setListener(this);
+            mSkyPlaneNode = mSceneManager->createSceneNode(meshName + "Node");
         }
         else
         {
-            mSceneNode->detachAllObjects();
+            mSkyPlaneNode->detachAllObjects();
         }
-        mSceneNode->attachObject(mSkyPlaneEntity);
+        mSkyPlaneNode->attachObject(mSkyPlaneEntity);
 
     }
-    setEnabled(enable);
+    mSkyPlaneEnabled = enable;
     mSkyPlaneGenParameters.skyPlaneBow = bow;
     mSkyPlaneGenParameters.skyPlaneScale = gscale;
     mSkyPlaneGenParameters.skyPlaneTiling = tiling;
@@ -151,7 +154,7 @@ void SceneManager::SkyPlaneRenderer::setSkyPlane(
     mSkyPlaneGenParameters.skyPlaneYSegments = ysegments;
 }
 
-void SceneManager::SkyBoxRenderer::setSkyBox(
+void SceneManager::SkyRenderer::setSkyBox(
                              bool enable,
                              const String& materialName,
                              Real distance,
@@ -186,64 +189,111 @@ void SceneManager::SkyBoxRenderer::setSkyBox(
             m = MaterialManager::getSingleton().getDefaultSettings();
         }
 
+        mSkyBoxRenderQueue = renderQueue;
+
         // Create node
-        if (!mSceneNode)
+        if (!mSkyBoxNode)
         {
-            mSceneNode = mSceneManager->createSceneNode();
-            mSceneNode->setListener(this);
+            mSkyBoxNode = mSceneManager->createSceneNode("SkyBoxNode");
         }
 
         // Create object
         if (!mSkyBoxObj)
         {
-            mSkyBoxObj = std::make_unique<ManualObject>("SkyBox");
+            mSkyBoxObj.reset(new ManualObject("SkyBox"));
             mSkyBoxObj->setCastShadows(false);
-            mSceneNode->attachObject(mSkyBoxObj.get());
+            mSkyBoxNode->attachObject(mSkyBoxObj.get());
         }
         else
         {
             if (!mSkyBoxObj->isAttached())
             {
-                mSceneNode->attachObject(mSkyBoxObj.get());
+                mSkyBoxNode->attachObject(mSkyBoxObj.get());
             }
             mSkyBoxObj->clear();
         }
 
-        mSkyBoxObj->setRenderQueueGroup(renderQueue);
-        mSkyBoxObj->begin(materialName, RenderOperation::OT_TRIANGLE_STRIP, groupName);
+        mSkyBoxObj->setRenderQueueGroup(mSkyBoxRenderQueue);
+        mSkyBoxObj->begin(materialName, RenderOperation::OT_TRIANGLE_LIST, groupName);
 
-        // rendering cube, only using 14 vertices
-        const Vector3 cube_strip[14] = {
-            {-1.f, 1.f, 1.f},   // Front-top-left
-            {1.f, 1.f, 1.f},    // Front-top-right
-            {-1.f, -1.f, 1.f},  // Front-bottom-left
-            {1.f, -1.f, 1.f},   // Front-bottom-right
-            {1.f, -1.f, -1.f},  // Back-bottom-right
-            {1.f, 1.f, 1.f},    // Front-top-right
-            {1.f, 1.f, -1.f},   // Back-top-right
-            {-1.f, 1.f, 1.f},   // Front-top-left
-            {-1.f, 1.f, -1.f},  // Back-top-left
-            {-1.f, -1.f, 1.f},  // Front-bottom-left
-            {-1.f, -1.f, -1.f}, // Back-bottom-left
-            {1.f, -1.f, -1.f},  // Back-bottom-right
-            {-1.f, 1.f, -1.f},  // Back-top-left
-            {1.f, 1.f, -1.f}    // Back-top-right
-        };
-
-        for (const auto& vtx : cube_strip)
+        // Set up the box (6 planes)
+        for (uint16 i = 0; i < 6; ++i)
         {
-            mSkyBoxObj->position(orientation * (vtx * distance));
+            Vector3 middle;
+            Vector3 up, right;
+
+            switch(i)
+            {
+            case BP_FRONT:
+                middle = Vector3(0, 0, -distance);
+                up = Vector3::UNIT_Y * distance;
+                right = Vector3::UNIT_X * distance;
+                break;
+            case BP_BACK:
+                middle = Vector3(0, 0, distance);
+                up = Vector3::UNIT_Y * distance;
+                right = Vector3::NEGATIVE_UNIT_X * distance;
+                break;
+            case BP_LEFT:
+                middle = Vector3(-distance, 0, 0);
+                up = Vector3::UNIT_Y * distance;
+                right = Vector3::NEGATIVE_UNIT_Z * distance;
+                break;
+            case BP_RIGHT:
+                middle = Vector3(distance, 0, 0);
+                up = Vector3::UNIT_Y * distance;
+                right = Vector3::UNIT_Z * distance;
+                break;
+            case BP_UP:
+                middle = Vector3(0, distance, 0);
+                up = Vector3::UNIT_Z * distance;
+                right = Vector3::UNIT_X * distance;
+                break;
+            case BP_DOWN:
+                middle = Vector3(0, -distance, 0);
+                up = Vector3::NEGATIVE_UNIT_Z * distance;
+                right = Vector3::UNIT_X * distance;
+                break;
+            }
+            // Modify by orientation
+            middle = orientation * middle;
+            up = orientation * up;
+            right = orientation * right;
+
+            // 3D cubic texture
             // Note UVs mirrored front/back
-            mSkyBoxObj->textureCoord(vtx.normalisedCopy() * Vector3(1, 1, -1));
-        }
+            // I could save a few vertices here by sharing the corners
+            // since 3D coords will function correctly but it's really not worth
+            // making the code more complicated for the sake of 16 verts
+            // top left
+            Vector3 pos;
+            pos = middle + up - right;
+            mSkyBoxObj->position(pos);
+            mSkyBoxObj->textureCoord(pos.normalisedCopy() * Vector3(1,1,-1));
+            // bottom left
+            pos = middle - up - right;
+            mSkyBoxObj->position(pos);
+            mSkyBoxObj->textureCoord(pos.normalisedCopy() * Vector3(1,1,-1));
+            // bottom right
+            pos = middle - up + right;
+            mSkyBoxObj->position(pos);
+            mSkyBoxObj->textureCoord(pos.normalisedCopy() * Vector3(1,1,-1));
+            // top right
+            pos = middle + up + right;
+            mSkyBoxObj->position(pos);
+            mSkyBoxObj->textureCoord(pos.normalisedCopy() * Vector3(1,1,-1));
+
+            uint16 base = i * 4;
+            mSkyBoxObj->quad(base, base+1, base+2, base+3);
+        } // for each plane
 
         mSkyBoxObj->end();
     }
-    setEnabled(enable);
+    mSkyBoxEnabled = enable;
     mSkyBoxGenParameters.skyBoxDistance = distance;
 }
 
-void SceneManager::SkyDomeRenderer::setSkyDome(
+void SceneManager::SkyRenderer::setSkyDome(
                               bool enable,
                               const String& materialName,
                               Real curvature,
@@ -268,15 +318,17 @@ void SceneManager::SkyDomeRenderer::setSkyDome(
         // Ensure loaded
         m->load();
 
+        //mSkyDomeDrawFirst = drawFirst;
+        mSkyDomeRenderQueue = renderQueue;
+
         // Create node
-        if (!mSceneNode)
+        if (!mSkyDomeNode)
         {
-            mSceneNode = mSceneManager->createSceneNode();
-            mSceneNode->setListener(this);
+            mSkyDomeNode = mSceneManager->createSceneNode("SkyDomeNode");
         }
         else
         {
-            mSceneNode->detachAllObjects();
+            mSkyDomeNode->detachAllObjects();
         }
 
         // Set up the dome (5 planes)
@@ -296,25 +348,24 @@ void SceneManager::SkyDomeRenderer::setSkyDome(
                 mSkyDomeEntity[i] = 0;
             }
             // construct manually so we don't have problems if destroyAllMovableObjects called
-            MovableObjectFactory* factory = Root::getSingleton().getMovableObjectFactory(MOT_ENTITY);
+            MovableObjectFactory* factory =
+                Root::getSingleton().getMovableObjectFactory(EntityFactory::FACTORY_TYPE_NAME);
 
             NameValuePairList params;
             params["mesh"] = planeMesh->getName();
             mSkyDomeEntity[i] = static_cast<Entity*>(factory->createInstance(entName, mSceneManager, &params));
             mSkyDomeEntity[i]->setMaterialName(m->getName(), groupName);
             mSkyDomeEntity[i]->setCastShadows(false);
-            mSkyDomeEntity[i]->setRenderQueueGroup(renderQueue);
 
-
-            MovableObjectCollection* objectMap = mSceneManager->getMovableObjectCollection(MOT_ENTITY);
+            MovableObjectCollection* objectMap = mSceneManager->getMovableObjectCollection(EntityFactory::FACTORY_TYPE_NAME);
             objectMap->map[entName] = mSkyDomeEntity[i];
 
             // Attach to node
-            mSceneNode->attachObject(mSkyDomeEntity[i]);
+            mSkyDomeNode->attachObject(mSkyDomeEntity[i]);
         } // for each plane
 
     }
-    setEnabled(enable);
+    mSkyDomeEnabled = enable;
     mSkyDomeGenParameters.skyDomeCurvature = curvature;
     mSkyDomeGenParameters.skyDomeDistance = distance;
     mSkyDomeGenParameters.skyDomeTiling = tiling;
@@ -323,7 +374,79 @@ void SceneManager::SkyDomeRenderer::setSkyDome(
     mSkyDomeGenParameters.skyDomeYSegments_keep = ySegmentsToKeep;
 }
 
-MeshPtr SceneManager::SkyDomeRenderer::createSkydomePlane(
+//-----------------------------------------------------------------------
+MeshPtr SceneManager::SkyRenderer::createSkyboxPlane(
+                                      BoxPlane bp,
+                                      Real distance,
+                                      const Quaternion& orientation,
+                                      const String& groupName)
+{
+    Plane plane;
+    String meshName;
+    Vector3 up;
+
+    meshName = mSceneManager->mName + "SkyBoxPlane_";
+    // Set up plane equation
+    plane.d = distance;
+    switch(bp)
+    {
+    case BP_FRONT:
+        plane.normal = Vector3::UNIT_Z;
+        up = Vector3::UNIT_Y;
+        meshName += "Front";
+        break;
+    case BP_BACK:
+        plane.normal = -Vector3::UNIT_Z;
+        up = Vector3::UNIT_Y;
+        meshName += "Back";
+        break;
+    case BP_LEFT:
+        plane.normal = Vector3::UNIT_X;
+        up = Vector3::UNIT_Y;
+        meshName += "Left";
+        break;
+    case BP_RIGHT:
+        plane.normal = -Vector3::UNIT_X;
+        up = Vector3::UNIT_Y;
+        meshName += "Right";
+        break;
+    case BP_UP:
+        plane.normal = -Vector3::UNIT_Y;
+        up = Vector3::UNIT_Z;
+        meshName += "Up";
+        break;
+    case BP_DOWN:
+        plane.normal = Vector3::UNIT_Y;
+        up = -Vector3::UNIT_Z;
+        meshName += "Down";
+        break;
+    }
+    // Modify by orientation
+    plane.normal = orientation * plane.normal;
+    up = orientation * up;
+
+
+    // Check to see if existing plane
+    MeshManager& mm = MeshManager::getSingleton();
+    MeshPtr planeMesh = mm.getByName(meshName, groupName);
+    if(planeMesh)
+    {
+        // destroy existing
+        mm.remove(planeMesh->getHandle());
+    }
+    // Create new
+    Real planeSize = distance * 2;
+    const int BOX_SEGMENTS = 1;
+    planeMesh = mm.createPlane(meshName, groupName, plane, planeSize, planeSize,
+        BOX_SEGMENTS, BOX_SEGMENTS, false, 1, 1, 1, up);
+
+    //planeMesh->_dumpContents(meshName);
+
+    return planeMesh;
+
+}
+
+MeshPtr SceneManager::SkyRenderer::createSkydomePlane(
                                        BoxPlane bp,
                                        Real curvature,
                                        Real tiling,
@@ -397,45 +520,51 @@ MeshPtr SceneManager::SkyDomeRenderer::createSkydomePlane(
 
 }
 
-void SceneManager::SkyPlaneRenderer::_updateRenderQueue(RenderQueue* queue)
+void SceneManager::SkyRenderer::queueSkiesForRendering(RenderQueue* queue, Camera* cam)
 {
-    if (mSkyPlaneEntity->isVisible())
+    // Update nodes
+    // Translate the box by the camera position (constant distance)
+    if (mSkyPlaneNode)
     {
-        mSkyPlaneEntity->_updateRenderQueue(queue);
+        // The plane position relative to the camera has already been set up
+        mSkyPlaneNode->setPosition(cam->getDerivedPosition());
     }
-}
 
-void SceneManager::SkyBoxRenderer::_updateRenderQueue(RenderQueue* queue)
-{
-    if (mSkyBoxObj->isVisible())
+    if (mSkyBoxNode)
+    {
+        mSkyBoxNode->setPosition(cam->getDerivedPosition());
+    }
+
+    if (mSkyDomeNode)
+    {
+        mSkyDomeNode->setPosition(cam->getDerivedPosition());
+    }
+
+    if (mSkyPlaneEnabled
+        && mSkyPlaneEntity && mSkyPlaneEntity->isVisible()
+        && mSkyPlaneEntity->getSubEntity(0) && mSkyPlaneEntity->getSubEntity(0)->isVisible())
+    {
+        queue->addRenderable(mSkyPlaneEntity->getSubEntity(0), mSkyPlaneRenderQueue, OGRE_RENDERABLE_DEFAULT_PRIORITY);
+    }
+
+    if (mSkyBoxEnabled
+        && mSkyBoxObj && mSkyBoxObj->isVisible())
     {
         mSkyBoxObj->_updateRenderQueue(queue);
     }
-}
 
-void SceneManager::SkyDomeRenderer::_updateRenderQueue(RenderQueue* queue)
-{
-    for (uint plane = 0; plane < 5; ++plane)
+    if (mSkyDomeEnabled)
     {
-        if (!mSkyDomeEntity[plane]->isVisible()) continue;
-
-        mSkyDomeEntity[plane]->_updateRenderQueue(queue);
+        for (uint plane = 0; plane < 5; ++plane)
+        {
+            if (mSkyDomeEntity[plane] && mSkyDomeEntity[plane]->isVisible()
+                && mSkyDomeEntity[plane]->getSubEntity(0) && mSkyDomeEntity[plane]->getSubEntity(0)->isVisible())
+            {
+                queue->addRenderable(
+                    mSkyDomeEntity[plane]->getSubEntity(0), mSkyDomeRenderQueue, OGRE_RENDERABLE_DEFAULT_PRIORITY);
+            }
+        }
     }
 }
 
-void SceneManager::SkyRenderer::postFindVisibleObjects(SceneManager* source, IlluminationRenderStage irs,
-                                                       Viewport* vp)
-{
-    // Queue skies, if viewport seems it
-    if (!vp->getSkiesEnabled() || irs == IRS_RENDER_TO_TEXTURE)
-        return;
-
-    if(!mEnabled || !mSceneNode)
-        return;
-
-    // Update nodes
-    // Translate the box by the camera position (constant distance)
-    mSceneNode->setPosition(vp->getCamera()->getDerivedPosition());
-    _updateRenderQueue(source->getRenderQueue());
-}
 }

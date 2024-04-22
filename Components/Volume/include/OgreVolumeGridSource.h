@@ -28,7 +28,7 @@ THE SOFTWARE.
 #ifndef __Ogre_Volume_GridSource_H__
 #define __Ogre_Volume_GridSource_H__
 
-#include "OgreVector.h"
+#include "OgreVector4.h"
 
 #include "OgreVolumePrerequisites.h"
 #include "OgreVolumeSource.h"
@@ -81,11 +81,11 @@ namespace Volume {
         
         /** Overridden from VolumeSource.
         */
-        Vector3 getIntersectionStart(const Ray &ray, Real maxDistance) const override;
+        virtual Vector3 getIntersectionStart(const Ray &ray, Real maxDistance) const;
         
         /** Overridden from VolumeSource.
         */
-        Vector3 getIntersectionEnd(const Ray &ray, Real maxDistance) const override;
+        virtual Vector3 getIntersectionEnd(const Ray &ray, Real maxDistance) const;
 
         /** Gets the volume value of a position.
         @param x
@@ -152,11 +152,11 @@ namespace Volume {
 
         /** Overridden from VolumeSource.
         */
-        Vector4 getValueAndGradient(const Vector3 &position) const override;
+        virtual Vector4 getValueAndGradient(const Vector3 &position) const;
         
         /** Overridden from VolumeSource.
         */
-        Real getValue(const Vector3 &position) const override;
+        virtual Real getValue(const Vector3 &position) const;
 
         /** Gets the width of the texture.
         @return

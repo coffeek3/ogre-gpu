@@ -24,6 +24,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
+DefaultZone.h  -  Default implementation of PCZone header file.
+
+Default Implementation of PCZone
+-----------------------------------------------------------------------------
+begin                : Tue Feb 20 2007
+author               : Eric Cha
+email                : ericc@xenopi.com
+Code Style Update    :
+-----------------------------------------------------------------------------
 */
 
 #ifndef DEFAULTZONE_H
@@ -44,47 +53,47 @@ namespace Ogre
 
         /** Set the enclosure node for this Zone
         */
-        void setEnclosureNode(PCZSceneNode *) override;
+        void setEnclosureNode(PCZSceneNode *);
 
         /** Adds an SceneNode to this Zone.
-
+        @remarks
         The PCZSceneManager calls this function to add a node
         to the zone.  
         */
-        void _addNode( PCZSceneNode * ) override;
+        void _addNode( PCZSceneNode * );
 
         /** Removes all references to a SceneNode from this Zone.
         */
-        void removeNode( PCZSceneNode * ) override;
+        void removeNode( PCZSceneNode * );
 
         /** Indicates whether or not this zone requires zone-specific data for 
          *  each scene node
          */
-        bool requiresZoneSpecificNodeData(void) override;
+        bool requiresZoneSpecificNodeData(void);
 
         /** (recursive) check the given node against all portals in the zone
         */
-        void _checkNodeAgainstPortals(PCZSceneNode *, Portal * ) override;
+        void _checkNodeAgainstPortals(PCZSceneNode *, Portal * );
 
         /** (recursive) check the given light against all portals in the zone
         */
         void _checkLightAgainstPortals(PCZLight *, 
                                        unsigned long, 
                                        PCZFrustum *,
-                                       Portal *) override;
+                                       Portal *);
 
         /* Update the zone data for each portal 
         */
-        void updatePortalsZoneData(void) override;
+        void updatePortalsZoneData(void);
 
         /** Mark nodes dirty base on moving portals. */
-        void dirtyNodeByMovingPortals(void) override;
+        void dirtyNodeByMovingPortals(void);
 
         /* Update a node's home zone */
-        PCZone * updateNodeHomeZone(PCZSceneNode * pczsn, bool allowBackTouces) override;
+        PCZone * updateNodeHomeZone(PCZSceneNode * pczsn, bool allowBackTouces);
 
         /** Find and add visible objects to the render queue.
-
+        @remarks
         Starts with objects in the zone and proceeds through visible portals   
         This is a recursive call (the main call should be to _findVisibleObjects)
         */
@@ -94,7 +103,7 @@ namespace Ogre
                               VisibleObjectsBoundsInfo* visibleBounds, 
                               bool onlyShadowCasters,
                               bool displayNodes,
-                              bool showBoundingBoxes) override;
+                              bool showBoundingBoxes);
 
         /* Functions for finding Nodes that intersect various shapes */
         void _findNodes( const AxisAlignedBox &t, 
@@ -102,39 +111,39 @@ namespace Ogre
                          PortalList &visitedPortals,
                          bool includeVisitors,
                          bool recurseThruPortals,
-                         PCZSceneNode *exclude) override;
+                         PCZSceneNode *exclude);
         void _findNodes( const Sphere &t, 
                          PCZSceneNodeList &list, 
                          PortalList &visitedPortals,
                          bool includeVisitors,
                          bool recurseThruPortals,
-                         PCZSceneNode *exclude ) override;
+                         PCZSceneNode *exclude );
         void _findNodes( const PlaneBoundedVolume &t, 
                          PCZSceneNodeList &list, 
                          PortalList &visitedPortals,
                          bool includeVisitors,
                          bool recurseThruPortals,
-                         PCZSceneNode *exclude ) override;
+                         PCZSceneNode *exclude );
         void _findNodes( const Ray &t, 
                          PCZSceneNodeList &list, 
                          PortalList &visitedPortals,
                          bool includeVisitors,
                          bool recurseThruPortals,
-                         PCZSceneNode *exclude ) override;
+                         PCZSceneNode *exclude );
 
         /** Sets the options for the Zone */
-        bool setOption( const String &, const void * ) override;
+        bool setOption( const String &, const void * );
 
         /** called when the scene manager creates a camera because
             some zone managers (like TerrainZone) need the camera info.
         */
-        void notifyCameraCreated( Camera* c ) override;
+        void notifyCameraCreated( Camera* c );
         /* called by PCZSM during setWorldGeometryRenderQueue() */
-        void notifyWorldGeometryRenderQueue(uint8 qid) override;
+        virtual void notifyWorldGeometryRenderQueue(uint8 qid);
         /* Called when a _renderScene is called in the SceneManager */
-        void notifyBeginRenderScene(void) override;
+        virtual void notifyBeginRenderScene(void);
         /* called by PCZSM during setZoneGeometry() */
-        void setZoneGeometry(const String &filename, PCZSceneNode * parentNode) override;
+        virtual void setZoneGeometry(const String &filename, PCZSceneNode * parentNode);
 
     protected:
 

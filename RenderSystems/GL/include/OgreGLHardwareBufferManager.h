@@ -52,18 +52,25 @@ namespace Ogre {
         ~GLHardwareBufferManager();
         /// Creates a vertex buffer
         HardwareVertexBufferSharedPtr createVertexBuffer(size_t vertexSize, 
-            size_t numVerts, HardwareBuffer::Usage usage, bool useShadowBuffer = false) override;
+            size_t numVerts, HardwareBuffer::Usage usage, bool useShadowBuffer = false);
         /// Create a hardware vertex buffer
         HardwareIndexBufferSharedPtr createIndexBuffer(
             HardwareIndexBuffer::IndexType itype, size_t numIndexes, 
-            HardwareBuffer::Usage usage, bool useShadowBuffer = false) override;
+            HardwareBuffer::Usage usage, bool useShadowBuffer = false);
         /// Create a render to vertex buffer
-        RenderToVertexBufferSharedPtr createRenderToVertexBuffer() override;
+        RenderToVertexBufferSharedPtr createRenderToVertexBuffer();
+        /// Create a uniform buffer
+        HardwareUniformBufferSharedPtr createUniformBuffer(size_t sizeBytes, HardwareBuffer::Usage usage,bool useShadowBuffer, const String& name = "");
+        HardwareCounterBufferSharedPtr createCounterBuffer(size_t sizeBytes,
+                                                           HardwareBuffer::Usage usage = HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY_DISCARDABLE,
+                                                           bool useShadowBuffer = false, const String& name = "");
         /// Utility function to get the correct GL usage based on HBU's
         static GLenum getGLUsage(unsigned int usage);
 
         /// Utility function to get the correct GL type based on VET's
         static GLenum getGLType(unsigned int type);
+
+        GLStateCacheManager * getStateCacheManager();
 
         /** Allocator method to allow us to use a pool of memory as a scratch
             area for hardware buffers. This is because glMapBuffer is incredibly

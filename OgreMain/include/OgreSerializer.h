@@ -32,6 +32,10 @@ THE SOFTWARE.
 #include "OgrePrerequisites.h"
 #include "OgreHeaderPrefix.h"
 
+#ifndef OGRE_SERIALIZER_VALIDATE_CHUNKSIZE
+#define OGRE_SERIALIZER_VALIDATE_CHUNKSIZE OGRE_DEBUG_MODE
+#endif
+
 namespace Ogre {
 
     /** \addtogroup Core
@@ -41,7 +45,7 @@ namespace Ogre {
     *  @{
     */
     /** Generic class for serialising data to / from binary stream-based files.
-
+    @remarks
         This class provides a number of useful methods for exporting / importing data
         from stream-oriented binary files (e.g. .mesh and .skeleton).
     */
@@ -73,9 +77,8 @@ namespace Ogre {
         // Internal methods
         void writeFileHeader(void);
         void writeChunkHeader(uint16 id, size_t size);
-        static size_t calcChunkHeaderSize() { return sizeof(uint16) + sizeof(uint32); }
-        /// string + terminating \n character
-        static size_t calcStringSize(const String& string) { return string.length() + 1; }
+        size_t calcChunkHeaderSize();
+        size_t calcStringSize(const String& string);
 
         void writeFloats(const float* const pfloat, size_t count);
         void writeFloats(const double* const pfloat, size_t count);
@@ -88,35 +91,36 @@ namespace Ogre {
         void writeString(const String& string);
         void writeData(const void* const buf, size_t size, size_t count);
         
-        void readFileHeader(const DataStreamPtr& stream);
-        unsigned short readChunk(const DataStreamPtr& stream);
+        void readFileHeader(DataStreamPtr& stream);
+        unsigned short readChunk(DataStreamPtr& stream);
         
-        void readBools(const DataStreamPtr& stream, bool* pDest, size_t count);
-        void readFloats(const DataStreamPtr& stream, float* pDest, size_t count);
-        void readFloats(const DataStreamPtr& stream, double* pDest, size_t count);
-        void readShorts(const DataStreamPtr& stream, uint16* pDest, size_t count);
-        void readInts(const DataStreamPtr& stream, uint32* pDest, size_t count);
-        void readObject(const DataStreamPtr& stream, Vector3& pDest);
-        void readObject(const DataStreamPtr& stream, Quaternion& pDest);
+        void readBools(DataStreamPtr& stream, bool* pDest, size_t count);
+        void readFloats(DataStreamPtr& stream, float* pDest, size_t count);
+        void readFloats(DataStreamPtr& stream, double* pDest, size_t count);
+        void readShorts(DataStreamPtr& stream, uint16* pDest, size_t count);
+        void readInts(DataStreamPtr& stream, uint32* pDest, size_t count);
+        void readObject(DataStreamPtr& stream, Vector3& pDest);
+        void readObject(DataStreamPtr& stream, Quaternion& pDest);
 
-        static String readString(const DataStreamPtr& stream);
-
+        String readString(DataStreamPtr& stream);
+        String readString(DataStreamPtr& stream, size_t numChars);
+        
         void flipToLittleEndian(void* pData, size_t size, size_t count = 1);
         void flipFromLittleEndian(void* pData, size_t size, size_t count = 1);
 
         /// Determine the endianness of the incoming stream compared to native
-        void determineEndianness(const DataStreamPtr& stream);
+        void determineEndianness(DataStreamPtr& stream);
         /// Determine the endianness to write with based on option
         void determineEndianness(Endian requestedEndian);
 
-        // OGRE_SERIALIZER_VALIDATE_CHUNKSIZE
+#if OGRE_SERIALIZER_VALIDATE_CHUNKSIZE
         typedef std::vector<size_t> ChunkSizeStack;
         ChunkSizeStack mChunkSizeStack;
         bool mReportChunkErrors;
-
+#endif
         void pushInnerChunk(const DataStreamPtr& stream);
         void popInnerChunk(const DataStreamPtr& stream);
-        void backpedalChunkHeader(const DataStreamPtr& stream);
+        void backpedalChunkHeader(DataStreamPtr& stream);
     };
     /** @} */
     /** @} */

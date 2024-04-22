@@ -24,6 +24,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 -----------------------------------------------------------------------------
+PCZLight.h  -  description
+-----------------------------------------------------------------------------
+begin                : Wed May 23 2007
+author               : Eric Cha
+email                : ericc@xenopi.com
+Code Style Update    :
+-----------------------------------------------------------------------------
 */
 
 #ifndef PCZLIGHT_H
@@ -34,12 +41,6 @@ THE SOFTWARE.
 
 namespace Ogre
 {
-    /** \addtogroup Plugins
-    *  @{
-    */
-    /** \addtogroup PCZSceneManager
-    *  @{
-    */
     class PCZone;
 
     typedef std::list<PCZone*> ZoneList;
@@ -63,7 +64,7 @@ namespace Ogre
         ~PCZLight();
 
         /** Overridden from MovableObject */
-        const String& getMovableType(void) const override;
+        const String& getMovableType(void) const;
 
         /** Clear the affectedZonesList 
         */
@@ -93,7 +94,7 @@ namespace Ogre
         void removeZoneFromAffectedZonesList(PCZone * zone);
 
         /// MovableObject notified when SceneNode changes
-        void _notifyMoved(void) override;
+        virtual void _notifyMoved(void);   
 
         /// Clear update flag
         void clearNeedsUpdate(void)   { mNeedsUpdate = false; } 
@@ -119,17 +120,18 @@ namespace Ogre
     class _OgrePCZPluginExport PCZLightFactory : public MovableObjectFactory
     {
     protected:
-        MovableObject* createInstanceImpl( const String& name, const NameValuePairList* params) override;
+        MovableObject* createInstanceImpl( const String& name, const NameValuePairList* params);
     public:
         PCZLightFactory() {}
         ~PCZLightFactory() {}
 
         static String FACTORY_TYPE_NAME;
 
-        const String& getType(void) const override;
+        const String& getType(void) const;
+        void destroyInstance( MovableObject* obj);  
+
     };
-    /** @} */
-    /** @} */
+
 
 } // Namespace
 #endif

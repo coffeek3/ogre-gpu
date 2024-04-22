@@ -30,10 +30,10 @@ THE SOFTWARE.
 namespace Ogre {
     //-----------------------------------------------------------------------
     SubMesh::SubMesh()
-        : vertexData(0)
-        , parent(0)
-        , useSharedVertices(true)
+        : useSharedVertices(true)
         , operationType(RenderOperation::OT_TRIANGLE_LIST)
+        , vertexData(0)
+        , parent(0)
         , mBoneAssignmentsOutOfDate(false)
         , mVertexAnimationType(VAT_NONE)
         , mVertexAnimationIncludesNormals(false)
@@ -79,8 +79,11 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void SubMesh::addBoneAssignment(const VertexBoneAssignment& vertBoneAssign)
     {
-        OgreAssert(!useSharedVertices,
-                   "This SubMesh uses shared geometry, you must assign bones to the Mesh, not the SubMesh");
+        if (useSharedVertices)
+        {
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "This SubMesh uses shared geometry,  you "
+                "must assign bones to the Mesh, not the SubMesh", "SubMesh.addBoneAssignment");
+        }
         mBoneAssignments.emplace(vertBoneAssign.vertexIndex, vertBoneAssign);
         mBoneAssignmentsOutOfDate = true;
     }
@@ -110,6 +113,82 @@ namespace Ogre {
     {
         return BoneAssignmentIterator(mBoneAssignments.begin(),
             mBoneAssignments.end());
+    }
+    //---------------------------------------------------------------------
+    SubMesh::AliasTextureIterator SubMesh::getAliasTextureIterator(void) const
+    {
+        return AliasTextureIterator(mTextureAliases.begin(),
+            mTextureAliases.end());
+    }
+    //---------------------------------------------------------------------
+    void SubMesh::addTextureAlias(const String& aliasName, const String& textureName)
+    {
+        mTextureAliases[aliasName] = textureName;
+    }
+    //---------------------------------------------------------------------
+    void SubMesh::removeTextureAlias(const String& aliasName)
+    {
+        mTextureAliases.erase(aliasName);
+    }
+    //---------------------------------------------------------------------
+    void SubMesh::removeAllTextureAliases(void)
+    {
+        mTextureAliases.clear();
+    }
+    //---------------------------------------------------------------------
+    bool SubMesh::updateMaterialUsingTextureAliases(void)
+    {
+        bool newMaterialCreated = false;
+        // if submesh has texture aliases
+        // ask the material manager if the current submesh material exists
+        if (hasTextureAliases() && mMaterial)
+        {
+            // get the current submesh material
+            const String& materialName = mMaterial->getName();
+            // get test result for if change will occur when the texture aliases are applied
+            if (mMaterial->applyTextureAliases(mTextureAliases, false))
+            {
+                Ogre::String newMaterialName;
+
+                // If this material was already derived from another material
+                // due to aliasing, let's strip off the aliasing suffix and
+                // generate a new one using our current aliasing table.
+
+                Ogre::String::size_type pos = materialName.find("?TexAlias(", 0);
+                if( pos != Ogre::String::npos )
+                    newMaterialName = materialName.substr(0, pos);
+                else
+                    newMaterialName = materialName;
+
+                newMaterialName += "?TexAlias(";
+                // Iterate deterministically over the aliases (always in the same
+                // order via std::map's sorted iteration nature).
+                AliasTextureIterator aliasIter = getAliasTextureIterator();
+                while( aliasIter.hasMoreElements() )
+                {
+                    newMaterialName += aliasIter.peekNextKey();
+                    newMaterialName += "=";
+                    newMaterialName += aliasIter.getNext();
+                    newMaterialName += " ";
+                }
+                newMaterialName += ")";
+                    
+                // Reuse the material if it's already been created. This decreases batch
+                // count and keeps material explosion under control.
+                MaterialPtr newMaterial = MaterialManager::getSingleton().getByName(newMaterialName, mMaterial->getGroup());
+                if(!newMaterial)
+                {
+                    newMaterial = mMaterial->clone(newMaterialName);
+                    // apply texture aliases to new material
+                    newMaterial->applyTextureAliases(mTextureAliases);
+                }
+                // place new material name in submesh
+                mMaterial = newMaterial;
+                newMaterialCreated = true;
+            }
+        }
+
+        return newMaterialCreated;
     }
     //---------------------------------------------------------------------
     void SubMesh::removeLodLevels(void)
@@ -178,10 +257,11 @@ namespace Ogre {
             mMin.x = mMin.y = mMin.z = Math::POS_INFINITY;
             mMax.x = mMax.y = mMax.z = Math::NEG_INFINITY;
 
-            for (unsigned int idx : mIndices)
+            for (std::set<uint32>::const_iterator i = mIndices.begin ();
+                 i != mIndices.end (); ++i)
             {
                 float *v;
-                poselem->baseVertexPointerToElement (vdata + idx * vsz, &v);
+                poselem->baseVertexPointerToElement (vdata + *i * vsz, &v);
                 extend (v);
             }
         }
@@ -281,15 +361,16 @@ namespace Ogre {
             // Find the largest box with more than one vertex :)
             Cluster *split_box = NULL;
             Real split_volume = -1;
-            for (auto & boxe : boxes)
+            for (std::vector<Cluster>::iterator b = boxes.begin ();
+                 b != boxes.end (); ++b)
             {
-                if (boxe.empty ())
+                if (b->empty ())
                     continue;
-                Real v = boxe.volume ();
+                Real v = b->volume ();
                 if (v > split_volume)
                 {
                     split_volume = v;
-                    split_box = &boxe;
+                    split_box = &*b;
                 }
             }
 
@@ -316,21 +397,24 @@ namespace Ogre {
 
         // Fine, now from every cluster choose the vertex that is most
         // distant from the geometrical center and from other extremes.
-        for (const auto & boxe : boxes)
+        for (std::vector<Cluster>::const_iterator b = boxes.begin ();
+             b != boxes.end (); ++b)
         {
             Real rating = 0;
             Vector3 best_vertex;
 
-            for (unsigned int i : boxe.mIndices)
+            for (std::set<uint32>::const_iterator i = b->mIndices.begin ();
+                 i != b->mIndices.end (); ++i)
             {
                 float *v;
-                poselem->baseVertexPointerToElement (vdata + i * vsz, &v);
+                poselem->baseVertexPointerToElement (vdata + *i * vsz, &v);
 
                 Vector3 vv (v [0], v [1], v [2]);
                 Real r = (vv - center).squaredLength ();
 
-                for (auto extremityPoint : extremityPoints)
-                    r += (extremityPoint - vv).squaredLength ();
+                for (std::vector<Vector3>::const_iterator e = extremityPoints.begin ();
+                     e != extremityPoints.end (); ++e)
+                    r += (*e - vv).squaredLength ();
                 if (r > rating)
                 {
                     rating = r;
@@ -385,6 +469,8 @@ namespace Ogre {
         // Copy any bone assignments
         newSub->mBoneAssignments = this->mBoneAssignments;
         newSub->mBoneAssignmentsOutOfDate = this->mBoneAssignmentsOutOfDate;
+        // Copy texture aliases
+        newSub->mTextureAliases = this->mTextureAliases;
 
         // Copy lod face lists
         newSub->mLodFaceList.reserve(this->mLodFaceList.size());

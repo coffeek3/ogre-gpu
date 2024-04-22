@@ -58,7 +58,19 @@ namespace Ogre {
     void ConfigFile::loadDirect(const String& filename, const String& separators, 
         bool trimWhitespace)
     {
-        load(_openFileStream(filename, std::ios::in | std::ios::binary), separators, trimWhitespace);
+        /* Open the configuration file */
+        std::ifstream fp;
+        // Always open in binary mode
+        fp.open(filename.c_str(), std::ios::in | std::ios::binary);
+        if(!fp)
+            OGRE_EXCEPT(
+            Exception::ERR_FILE_NOT_FOUND, "'" + filename + "' file not found!", "ConfigFile::load" );
+
+        // Wrap as a stream
+        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(filename, &fp, false));
+
+        load(stream, separators, trimWhitespace);
+
     }
     //-----------------------------------------------------------------------
     void ConfigFile::loadFromResourceSystem(const String& filename, 

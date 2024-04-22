@@ -135,11 +135,18 @@ public:
     */
     ushort getIndirectionLevel()    const { return mIndirectionLevel; }
 
-    /** write the parameter name and the usage mask like this 'color.xyz' */
-    void write(std::ostream& os) const;
+    /** Returns the parameter name and the usage mask like this 'color.xyz' */
+    String toString()   const;
+
+    /** Returns the given mask as string representation. */
+    static String getMaskAsString(int mask);
 
     /** Return the float count of the given mask. */
     static int getFloatCount(int mask);
+
+    /** Return the gpu constant type of the given mask. */
+    static GpuConstantType getGpuConstantType(int mask);
+
 protected:
     /// The parameter being carried by the operand
     ParameterPtr mParameter;
@@ -182,7 +189,6 @@ struct _OgreRTSSExport InOut : Operand
 struct _OgreRTSSExport At : Operand
 {
     At(ParameterPtr p) : Operand(p, OPS_IN, OPM_ALL, 1) {}
-    At(int f) : Operand(ParameterFactory::createConstParam(f), OPS_IN, OPM_ALL, 1) {}
 };
 
 /** A class that represents an atomic code section of shader based program function.
@@ -247,7 +253,7 @@ public:
     /** 
     @see FunctionAtom::writeSourceCode
     */
-    void writeSourceCode(std::ostream& os, const String& targetLanguage) const override;
+    virtual void writeSourceCode(std::ostream& os, const String& targetLanguage) const;
 
     /** Return the function name */
     const String& getFunctionName() const { return mFunctionName; }
@@ -280,7 +286,7 @@ public:
         bool operator()(FunctionInvocation const& lhs, FunctionInvocation const& rhs) const;
     };
 
-private:
+protected:
     FunctionInvocation() {}
 
     String mReturnType;
@@ -293,7 +299,7 @@ public:
     explicit AssignmentAtom(int groupOrder) { mGroupExecutionOrder = groupOrder; }
     /// @note the argument order is reversed comered to all other function invocations
     AssignmentAtom(const Out& lhs, const In& rhs, int groupOrder);
-    void writeSourceCode(std::ostream& os, const String& targetLanguage) const override;
+    void writeSourceCode(std::ostream& os, const String& targetLanguage) const;
 };
 
 /// shorthand for "dst = texture(sampler, uv);" instead of using FFP_SampleTexture
@@ -302,7 +308,7 @@ class _OgreRTSSExport SampleTextureAtom : public FunctionAtom
 public:
     explicit SampleTextureAtom(int groupOrder) { mGroupExecutionOrder = groupOrder; }
     SampleTextureAtom(const In& sampler, const In& texcoord, const Out& dst, int groupOrder);
-    void writeSourceCode(std::ostream& os, const String& targetLanguage) const override;
+    void writeSourceCode(std::ostream& os, const String& targetLanguage) const;
 };
 
 /// shorthand for "dst = a OP b;"
@@ -310,21 +316,9 @@ class _OgreRTSSExport BinaryOpAtom : public FunctionAtom
 {
     char mOp;
 public:
-    BinaryOpAtom(char op, int groupOrder) : mOp(op) { mGroupExecutionOrder = groupOrder; }
+    explicit BinaryOpAtom(char op, int groupOrder) : mOp(op) { mGroupExecutionOrder = groupOrder; }
     BinaryOpAtom(char op, const In& a, const In& b, const Out& dst, int groupOrder);
-    void writeSourceCode(std::ostream& os, const String& targetLanguage) const override;
-};
-
-/// shorthand for "dst = BUILTIN(args);"
-class _OgreRTSSExport BuiltinFunctionAtom : public FunctionAtom
-{
-public:
-    BuiltinFunctionAtom(const char* builtin, int groupOrder)
-    {
-        mFunctionName = builtin;
-        mGroupExecutionOrder = groupOrder;
-    }
-    void writeSourceCode(std::ostream& os, const String& targetLanguage) const override;
+    void writeSourceCode(std::ostream& os, const String& targetLanguage) const;
 };
 
 typedef std::vector<FunctionAtom*>                 FunctionAtomInstanceList;

@@ -49,14 +49,17 @@ namespace Ogre {
     void SkeletonSerializer::exportSkeleton(const Skeleton* pSkeleton, 
         const String& filename, SkeletonVersion ver, Endian endianMode)
     {
-        DataStreamPtr stream = _openFileStream(filename, std::ios::binary | std::ios::out);
+        std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
+        f->open(filename.c_str(), std::ios::binary | std::ios::out);
+        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(f));
+
         exportSkeleton(pSkeleton, stream, ver, endianMode);
 
         stream->close();
     }
     //---------------------------------------------------------------------
     void SkeletonSerializer::exportSkeleton(const Skeleton* pSkeleton, 
-        const DataStreamPtr& stream, SkeletonVersion ver, Endian endianMode)
+        DataStreamPtr stream, SkeletonVersion ver, Endian endianMode)
     {
         setWorkingVersion(ver);
         // Decide on endian mode
@@ -94,8 +97,11 @@ namespace Ogre {
         }
 
         // Write links
-        for(const auto& link : pSkeleton->getLinkedSkeletonAnimationSources())
+        Skeleton::LinkedSkeletonAnimSourceIterator linkIt = 
+            pSkeleton->getLinkedSkeletonAnimationSourceIterator();
+        while(linkIt.hasMoreElements())
         {
+            const LinkedSkeletonAnimationSource& link = linkIt.getNext();
             writeSkeletonAnimationLink(pSkeleton, link);
         }       
         popInnerChunk(stream);
@@ -275,9 +281,10 @@ namespace Ogre {
         }
 
         // Write all tracks
-        for (const auto& it : anim->_getNodeTrackList())
+        Animation::NodeTrackIterator trackIt = anim->getNodeTrackIterator();
+        while(trackIt.hasMoreElements())
         {
-            writeAnimationTrack(pSkel, it.second);
+            writeAnimationTrack(pSkel, trackIt.getNext());
         }
         }
         popInnerChunk(mStream);
@@ -392,9 +399,10 @@ namespace Ogre {
         }
 
         // Nested animation tracks
-        for (const auto& it : pAnim->_getNodeTrackList())
+        Animation::NodeTrackIterator trackIt = pAnim->getNodeTrackIterator();
+        while(trackIt.hasMoreElements())
         {
-            size += calcAnimationTrackSize(pSkel, it.second);
+            size += calcAnimationTrackSize(pSkel, trackIt.getNext());
         }
 
         return size;

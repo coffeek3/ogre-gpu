@@ -32,18 +32,18 @@ class _OgreSampleClassExport Sample_Compositor : public SdkSample
  public:
     Sample_Compositor();
 
-    void setupContent(void) override;
-    void cleanupContent(void) override;
+    void setupContent(void);
+    void cleanupContent(void);
 
-    bool frameRenderingQueued(const FrameEvent& evt) override;
+    bool frameRenderingQueued(const FrameEvent& evt);
 
-    void checkBoxToggled(OgreBites::CheckBox * box) override;
-    void buttonHit(OgreBites::Button* button) override;
-    void itemSelected(OgreBites::SelectMenu* menu) override;
+    void checkBoxToggled(OgreBites::CheckBox * box);
+    void buttonHit(OgreBites::Button* button);
+    void itemSelected(OgreBites::SelectMenu* menu);
 
  protected:
 
-    void setupView(void) override;
+    void setupView(void);
     void setupControls(void);
     void setupScene(void);
     void createEffects(void);
@@ -130,20 +130,10 @@ void Sample_Compositor::setupContent(void)
     registerCompositors();
 
     setupControls();
+
+#if OGRE_PLATFORM != OGRE_PLATFORM_APPLE_IOS
     setDragLook(true);
-}
-
-static bool blacklisted(const String& name)
-{
-    const char* blacklist[] = {"Ogre/Scene/", "DeferredShading", "SSAO", "TestMRT", "Compute", "Fresnel", "CubeMap"};
-
-    for(auto it : blacklist)
-    {
-        if(name.find(it) == 0)
-            return true;
-    }
-
-    return false;
+#endif
 }
 
 void Sample_Compositor::registerCompositors(void)
@@ -159,9 +149,20 @@ void Sample_Compositor::registerCompositors(void)
     {
         Ogre::ResourcePtr resource = resourceIterator.getNext();
         const Ogre::String& compositorName = resource->getName();
-
-        // Don't add blacklisted compositor to view
-        if (blacklisted(compositorName))
+        // Don't add base Ogre/Scene compositor to view
+        if (Ogre::StringUtil::startsWith(compositorName, "Ogre/Scene/", false))
+            continue;
+        // Don't add the deferred shading compositors, thats a different demo.
+        if (Ogre::StringUtil::startsWith(compositorName, "DeferredShading", false))
+            continue;
+        // Don't add the SSAO compositors, thats a different demo.
+        if (Ogre::StringUtil::startsWith(compositorName, "SSAO", false))
+            continue;
+        // Don't add the TestMRT compositor, it needs extra scene setup so doesn't currently work.
+        if (Ogre::StringUtil::startsWith(compositorName, "TestMRT", false))
+            continue;
+        // Don't add the Compute compositors, thats a different demo.
+        if (Ogre::StringUtil::startsWith(compositorName, "Compute", false))
             continue;
 
         mCompositorNames.push_back(compositorName);
@@ -175,9 +176,9 @@ void Sample_Compositor::registerCompositors(void)
         {
             Ogre::CompositorManager::getSingleton().addCompositor(vp, compositorName, addPosition);
             Ogre::CompositorManager::getSingleton().setCompositorEnabled(vp, compositorName, false);
-        } catch (Ogre::Exception& e) {
+        } catch (...) {
             /// Warn user
-            LogManager::getSingleton().logMessage(e.getDescription(), LML_CRITICAL);
+            LogManager::getSingleton().logMessage("Could not load compositor " + compositorName, LML_CRITICAL);
         }
     }
 
@@ -399,13 +400,13 @@ void Sample_Compositor::setupScene(void)
     // Set ambient light
     mSceneMgr->setAmbientLight(Ogre::ColourValue(0.3, 0.3, 0.2));
 
-    Ogre::Light* l = mSceneMgr->createLight(Light::LT_DIRECTIONAL);
+    Ogre::Light* l = mSceneMgr->createLight("Light2");
+    Ogre::Vector3 dir(-1,-1,0);
+    dir.normalise();
+    l->setType(Ogre::Light::LT_DIRECTIONAL);
+    l->setDirection(dir);
     l->setDiffuseColour(1, 1, 0.8);
     l->setSpecularColour(1, 1, 1);
-
-    auto ln = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-    ln->setDirection(Vector3(-1,-1,0).normalisedCopy());
-    ln->attachObject(l);
 
 
     Ogre::Entity* pEnt;
@@ -453,6 +454,33 @@ bool Sample_Compositor::frameRenderingQueued(const FrameEvent& evt)
 /// Create the hard coded postfilter effects
 void Sample_Compositor::createEffects(void)
 {
+    // Glass compositor is loaded from script but here is the hard coded equivalent
+    /// Glass effect
+    //          CompositorPtr comp2 = CompositorManager::getSingleton().create(
+    //                          "Glass", ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME
+    //                  );
+    //          {
+    //                  CompositionTechnique *t = comp2->createTechnique();
+    //                  {
+    //                          CompositionTechnique::TextureDefinition *def = t->createTextureDefinition("rt0");
+    //                          def->width = 0;
+    //                          def->height = 0;
+    //                          def->format = PF_R8G8B8;
+    //                  }
+    //                  {
+    //                          CompositionTargetPass *tp = t->createTargetPass();
+    //                          tp->setInputMode(CompositionTargetPass::IM_PREVIOUS);
+    //                          tp->setOutputName("rt0");
+    //                  }
+    //                  {
+    //                          CompositionTargetPass *tp = t->getOutputTargetPass();
+    //                          tp->setInputMode(CompositionTargetPass::IM_NONE);
+    //                          { CompositionPass *pass = tp->createPass(CompositionPass::PT_RENDERQUAD);
+    //                          pass->setMaterialName("Ogre/Compositor/GlassPass");
+    //                          pass->setInput(0, "rt0");
+    //                          }
+    //                  }
+    //          }
     /// Motion blur effect
     Ogre::CompositorPtr comp3 = Ogre::CompositorManager::getSingleton().create(
         "Motion Blur", Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME

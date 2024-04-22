@@ -91,8 +91,12 @@ namespace Ogre {
     {
         OGRE_LOCK_AUTO_MUTEX;
         LogList::iterator i = mLogs.find(name);
-        OgreAssert(i != mLogs.end(), "Log not found");
-        return i->second;
+        if (i != mLogs.end())
+            return i->second;
+        else
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Log not found. ", "LogManager::getLog");
+
+
     }
     //-----------------------------------------------------------------------
     void LogManager::destroyLog(const String& name)
@@ -117,7 +121,9 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void LogManager::destroyLog(Log* log)
     {
-        OgreAssert(log, "Cannot destroy a null log");
+        if(!log)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot destroy a null log.", "LogManager::destroyLog");
+
         destroyLog(log->getName());
     }
     //-----------------------------------------------------------------------
@@ -145,25 +151,17 @@ namespace Ogre {
         OGRE_LOCK_AUTO_MUTEX;
         if (mDefaultLog)
         {
-            OGRE_IGNORE_DEPRECATED_BEGIN
             mDefaultLog->setLogDetail(ll);
-            OGRE_IGNORE_DEPRECATED_END
-        }
-    }
-    //-----------------------------------------------------------------------
-    void LogManager::setMinLogLevel(LogMessageLevel lml)
-    {
-        OGRE_LOCK_AUTO_MUTEX;
-        if (mDefaultLog)
-        {
-            mDefaultLog->setMinLogLevel(lml);
         }
     }
     //---------------------------------------------------------------------
     Log::Stream LogManager::stream(LogMessageLevel lml, bool maskDebug)
     {
             OGRE_LOCK_AUTO_MUTEX;
-        OgreAssert(mDefaultLog, "Default log not found");
-        return mDefaultLog->stream(lml, maskDebug);
+        if (mDefaultLog)
+            return mDefaultLog->stream(lml, maskDebug);
+        else
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Default log not found. ", "LogManager::stream");
+
     }
 }

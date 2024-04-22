@@ -37,6 +37,19 @@ namespace Ogre {
     /** \addtogroup General
     *  @{
     */
+    struct SPFMDeleteT {
+        template<class T>
+        void operator()(T* p) {
+            OGRE_DELETE_T(p, T, MEMCATEGORY_GENERAL);
+        }
+    };
+    const SPFMDeleteT SPFM_DELETE_T;
+
+    struct SPFMNone {
+        void operator()(void*) {}
+    };
+    const SPFMNone SPFM_NONE;
+
     using std::static_pointer_cast;
     using std::dynamic_pointer_cast;
 
@@ -58,7 +71,7 @@ namespace Ogre {
         template<class Y>
         SharedPtr(const shared_ptr<Y>& r) : shared_ptr<T>(r) {}
         operator const shared_ptr<T>&() { return static_cast<shared_ptr<T>&>(*this); }
-        SharedPtr<T>& operator=(const Ogre::SharedPtr<T>& rhs) {shared_ptr<T>::operator=(rhs); return *this;}
+
         // so swig recognizes it should forward the operators
         T* operator->() const { return shared_ptr<T>::operator->(); }
 

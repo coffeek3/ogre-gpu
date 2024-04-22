@@ -93,7 +93,7 @@ namespace Ogre
 
             unsigned sameNameIndex = sameNameCounter[std::wstring(desc1.Description)]++;
 
-            auto driver = std::make_shared<D3D11Driver>(pDXGIAdapter.Get(), desc1, sameNameIndex);
+            SharedPtr<D3D11Driver> driver(OGRE_NEW_T(D3D11Driver, MEMCATEGORY_GENERAL)(pDXGIAdapter.Get(), desc1, sameNameIndex), SPFM_DELETE_T);
 
             LogManager::getSingleton().logMessage("D3D11: \"" + driver->DriverDescription() + "\"");
 

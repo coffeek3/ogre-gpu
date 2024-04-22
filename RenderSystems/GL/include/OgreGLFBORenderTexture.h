@@ -46,18 +46,18 @@ namespace Ogre {
     public:
         GLFBORenderTexture(GLFBOManager *manager, const String &name, const GLSurfaceDesc &target, bool writeGamma, uint fsaa);
 
-        void getCustomAttribute(const String& name, void* pData) override;
+        virtual void getCustomAttribute(const String& name, void* pData);
 
         /// Override needed to deal with multisample buffers
-        void swapBuffers() override;
+        virtual void swapBuffers();
 
         /// Override so we can attach the depth buffer to the FBO
-        bool attachDepthBuffer( DepthBuffer *depthBuffer ) override;
-        void detachDepthBuffer() override;
-        void _detachDepthBuffer() override;
+        virtual bool attachDepthBuffer( DepthBuffer *depthBuffer );
+        virtual void detachDepthBuffer();
+        virtual void _detachDepthBuffer();
 
-        GLContext* getContext() const override { return mFB.getContext(); }
-        GLFrameBufferObjectCommon* getFBO() override { return &mFB; }
+        GLContext* getContext() const { return mFB.getContext(); }
+        GLFrameBufferObjectCommon* getFBO() { return &mFB; }
     protected:
         GLFrameBufferObject mFB;
     };
@@ -73,18 +73,20 @@ namespace Ogre {
         /** Bind a certain render target if it is a FBO. If it is not a FBO, bind the
             main frame buffer.
         */
-        void bind(RenderTarget *target) override;
+        void bind(RenderTarget *target);
         
         /** Unbind a certain render target. No-op for FBOs.
         */
-        void unbind(RenderTarget *target) override {};
+        void unbind(RenderTarget *target) {};
         
         /** Get best depth and stencil supported for given internalFormat
         */
-        void getBestDepthStencil(PixelFormat internalFormat, GLenum *depthFormat, GLenum *stencilFormat) override;
-
-        GLFBORenderTexture *createRenderTexture(const String &name,
-            const GLSurfaceDesc &target, bool writeGamma, uint fsaa) override;
+        void getBestDepthStencil(PixelFormat internalFormat, GLenum *depthFormat, GLenum *stencilFormat);
+        
+        /** Create a texture rendertarget object
+        */
+        virtual GLFBORenderTexture *createRenderTexture(const String &name, 
+            const GLSurfaceDesc &target, bool writeGamma, uint fsaa);
         
         /** Request a render buffer. If format is GL_NONE, return a zero buffer.
         */

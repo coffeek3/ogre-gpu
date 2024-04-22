@@ -30,12 +30,6 @@ THE SOFTWARE.
 
 #include "OgrePrerequisites.h"
 
-#ifdef bswap16
-#undef bswap16
-#undef bswap32
-#undef bswap64
-#endif
-
 #ifndef __has_builtin
     // Compatibility with non-clang compilers
     #define __has_builtin(x) 0
@@ -155,7 +149,7 @@ namespace Ogre {
             return n;
         }
         /** Determines whether the number is power-of-two or not.
-            @note 0 and 1 are treat as power of two.
+            @note 0 and 1 are tread as power of two.
         */
         template<typename T>
         static OGRE_FORCE_INLINE bool isPO2(T n)
@@ -181,7 +175,7 @@ namespace Ogre {
 
         /** Takes a value with a given src bit mask, and produces another
             value with a desired bit mask.
-
+            @remarks
                 This routine is useful for colour conversion.
         */
         template<typename SrcT, typename DestT>

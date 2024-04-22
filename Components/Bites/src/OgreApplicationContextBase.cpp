@@ -4,7 +4,6 @@
 
 #include "OgreApplicationContextBase.h"
 
-#include "OgreOverlayManager.h"
 #include "OgreRoot.h"
 #include "OgreGpuProgramManager.h"
 #include "OgreConfigFile.h"
@@ -14,17 +13,10 @@
 #include "OgreDataStream.h"
 #include "OgreBitesConfigDialog.h"
 #include "OgreWindowEventUtilities.h"
-#include "OgreSceneNode.h"
-#include "OgreCamera.h"
 
 #include "OgreArchiveManager.h"
 
 #include "OgreConfigPaths.h"
-
-#ifdef HAVE_IMGUI
-#include "OgreImGuiOverlay.h"
-#include "OgreImGuiInputListener.h"
-#endif
 
 namespace OgreBites {
 
@@ -34,13 +26,6 @@ ApplicationContextBase::ApplicationContextBase(const Ogre::String& appName)
 {
     mAppName = appName;
     mFSLayer = new Ogre::FileSystemLayer(mAppName);
-
-    if (char* val = getenv("OGRE_CONFIG_DIR"))
-    {
-        Ogre::String configDir = Ogre::StringUtil::standardisePath(val);
-        mFSLayer->setConfigPaths({ configDir });
-    }
-
     mRoot = NULL;
     mOverlaySystem = NULL;
     mFirstRun = true;
@@ -90,7 +75,7 @@ void ApplicationContextBase::closeApp()
         mRoot = NULL;
     }
 
-#ifdef OGRE_BITES_STATIC_PLUGINS
+#ifdef OGRE_STATIC_LIB
     mStaticPluginLoader.unload();
 #endif
 }
@@ -180,11 +165,11 @@ void ApplicationContextBase::setup()
 
 void ApplicationContextBase::createRoot()
 {
-#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
     mRoot = OGRE_NEW Ogre::Root("");
 #else
     Ogre::String pluginsPath;
-#   ifndef OGRE_BITES_STATIC_PLUGINS
+#   ifndef OGRE_STATIC_LIB
     pluginsPath = mFSLayer->getConfigFilePath("plugins.cfg");
 
     if (!Ogre::FileSystemLayer::fileExists(pluginsPath))
@@ -197,7 +182,7 @@ void ApplicationContextBase::createRoot()
                                 mFSLayer->getWritablePath("ogre.log"));
 #endif
 
-#ifdef OGRE_BITES_STATIC_PLUGINS
+#ifdef OGRE_STATIC_LIB
     mStaticPluginLoader.load();
 #endif
     mOverlaySystem = OGRE_NEW Ogre::OverlaySystem();
@@ -205,14 +190,8 @@ void ApplicationContextBase::createRoot()
 
 bool ApplicationContextBase::oneTimeConfig()
 {
-    if(mRoot->getAvailableRenderers().empty())
-    {
-        Ogre::LogManager::getSingleton().logError("No RenderSystems available");
-        return false;
-    }
-
-#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
-    mRoot->setRenderSystem(mRoot->getAvailableRenderers().front());
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
+    mRoot->setRenderSystem(mRoot->getAvailableRenderers().at(0));
 #else
     if (!mRoot->restoreConfig()) {
         return mRoot->showConfigDialog(OgreBites::getNativeConfigDialog());
@@ -227,7 +206,6 @@ void ApplicationContextBase::createDummyScene()
     Ogre::SceneManager* sm = mRoot->createSceneManager("DefaultSceneManager", "DummyScene");
     sm->addRenderQueueListener(mOverlaySystem);
     Ogre::Camera* cam = sm->createCamera("DummyCamera");
-    sm->getRootSceneNode()->attachObject(cam);
     mWindows[0].render->addViewport(cam);
 #ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
     // Initialize shader generator.
@@ -255,77 +233,6 @@ void ApplicationContextBase::destroyDummyScene()
     dummyScene->removeRenderQueueListener(mOverlaySystem);
     mWindows[0].render->removeAllViewports();
     mRoot->destroySceneManager(dummyScene);
-}
-
-#ifdef HAVE_IMGUI
-struct ImGuiConfigDialog : Ogre::FrameListener
-{
-    Ogre::String nextRenderer;
-    bool saveConfig;
-
-    bool frameStarted(const Ogre::FrameEvent& evt) override
-    {
-        Ogre::ImGuiOverlay::NewFrame();
-
-        auto flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse |
-                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
-        auto center = ImGui::GetMainViewport()->GetCenter();
-        ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::Begin("Rendering Settings", NULL, flags);
-        Ogre::DrawRenderingSettings(nextRenderer);
-        ImGui::Separator();
-        if (ImGui::Button("Accept"))
-        {
-            Ogre::Root::getSingleton().queueEndRendering();
-            saveConfig = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-            Ogre::Root::getSingleton().queueEndRendering();
-        ImGui::End();
-        return true;
-    }
-};
-#endif
-
-void ApplicationContextBase::runRenderingSettingsDialog()
-{
-#ifndef HAVE_IMGUI
-    OGRE_EXCEPT(Ogre::Exception::ERR_NOT_IMPLEMENTED,
-                "OGRE_BUILD_COMPONENT_OVERLAY_IMGUI=ON is required to run the rendering settings dialog");
-#else
-    createRoot();
-    oneTimeConfig();
-    auto rs = getRoot()->getRenderSystem();
-    auto oldVm = rs->getConfigOptions().at("Video Mode").currentValue;
-    rs->setConfigOption("Video Mode", "800 x 600");
-    setup();
-    rs->setConfigOption("Video Mode", oldVm);
-    createDummyScene();
-
-    float vpScale = getDisplayDPI()/96;
-    Ogre::OverlayManager::getSingleton().setPixelRatio(vpScale);
-    auto overlay = initialiseImGui();
-    ImGui::GetIO().FontGlobalScale = std::round(vpScale); // default font does not work with fractional scaling
-    overlay->show();
-
-    addInputListener(getImGuiInputListener());
-
-    ImGuiConfigDialog dialog;
-    getRoot()->addFrameListener(&dialog);
-    getRoot()->startRendering();
-
-    destroyDummyScene();
-    shutdown();
-    mRoot->shutdown();
-    if(dialog.saveConfig)
-    {
-        mRoot->setRenderSystem(mRoot->getRenderSystemByName(dialog.nextRenderer));
-        mRoot->saveConfig();
-    }
-    delete mRoot;
-    mRoot = NULL;
-#endif
 }
 
 void ApplicationContextBase::enableShaderCache() const
@@ -358,8 +265,9 @@ void ApplicationContextBase::removeInputListener(NativeWindowType* win, InputLis
 
 bool ApplicationContextBase::frameRenderingQueued(const Ogre::FrameEvent& evt)
 {
-    for(const auto & li : mInputListeners) {
-        li.second->frameRendered(evt);
+    for(InputListenerList::iterator it = mInputListeners.begin();
+            it != mInputListeners.end(); ++it) {
+        it->second->frameRendered(evt);
     }
 
     return true;
@@ -395,54 +303,14 @@ NativeWindowPair ApplicationContextBase::createWindow(const Ogre::String& name, 
     return ret;
 }
 
-void ApplicationContextBase::destroyWindow(const Ogre::String& name)
-{
-    for (auto it = mWindows.begin(); it != mWindows.end(); ++it)
-    {
-        if (it->render->getName() != name)
-            continue;
-        _destroyWindow(*it);
-        mWindows.erase(it);
-        return;
-    }
-
-    OGRE_EXCEPT(Ogre::Exception::ERR_INVALIDPARAMS, "No window named '"+name+"'");
-}
-
-void ApplicationContextBase::_destroyWindow(const NativeWindowPair& win)
-{
-#if !OGRE_BITES_HAVE_SDL
-    // remove window event listener before destroying it
-    WindowEventUtilities::_removeRenderWindow(win.render);
-#endif
-    mRoot->destroyRenderTarget(win.render);
-}
-
 void ApplicationContextBase::_fireInputEvent(const Event& event, uint32_t windowID) const
 {
-    Event scaled = event;
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE
-    if (event.type == MOUSEMOTION)
+    for(InputListenerList::iterator it = mInputListeners.begin();
+            it != mInputListeners.end(); ++it)
     {
-        // assumes all windows have the same scale
-        float viewScale = getRenderWindow()->getViewPointToPixelScale();
-        scaled.motion.x *= viewScale;
-        scaled.motion.y *= viewScale;
-    }
-    else if(event.type == MOUSEBUTTONDOWN || event.type == MOUSEBUTTONUP)
-    {
-        float viewScale = getRenderWindow()->getViewPointToPixelScale();
-        scaled.button.x *= viewScale;
-        scaled.button.y *= viewScale;
-    }
-#endif
+        if(it->first != windowID) continue;
 
-    for(const auto & li : mInputListeners)
-    {
-        // gamepad events are not window specific
-        if(li.first != windowID && event.type <= TEXTINPUT) continue;
-
-        InputListener& l = *li.second;
+        InputListener& l = *it->second;
 
         switch (event.type)
         {
@@ -453,16 +321,16 @@ void ApplicationContextBase::_fireInputEvent(const Event& event, uint32_t window
             l.keyReleased(event.key);
             break;
         case MOUSEBUTTONDOWN:
-            l.mousePressed(scaled.button);
+            l.mousePressed(event.button);
             break;
         case MOUSEBUTTONUP:
-            l.mouseReleased(scaled.button);
+            l.mouseReleased(event.button);
             break;
         case MOUSEWHEEL:
             l.mouseWheelRolled(event.wheel);
             break;
         case MOUSEMOTION:
-            l.mouseMoved(scaled.motion);
+            l.mouseMoved(event.motion);
             break;
         case FINGERDOWN:
             // for finger down we have to move the pointer first
@@ -474,19 +342,6 @@ void ApplicationContextBase::_fireInputEvent(const Event& event, uint32_t window
             break;
         case FINGERMOTION:
             l.touchMoved(event.tfinger);
-            break;
-        case TEXTINPUT:
-            l.textInput(event.text);
-            break;
-        case JOYAXISMOTION:
-        case CONTROLLERAXISMOTION:
-            l.axisMoved(event.axis);
-            break;
-        case CONTROLLERBUTTONDOWN:
-            l.buttonPressed(event.cbutton);
-            break;
-        case CONTROLLERBUTTONUP:
-            l.buttonReleased(event.cbutton);
             break;
         }
     }
@@ -502,15 +357,13 @@ void ApplicationContextBase::locateResources()
     auto& rgm = Ogre::ResourceGroupManager::getSingleton();
     // load resource paths from config file
     Ogre::ConfigFile cf;
-    Ogre::String resourcesPath = mFSLayer->getConfigFilePath("resources.cfg");
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
     Ogre::Archive* apk = Ogre::ArchiveManager::getSingleton().load("", "APKFileSystem", true);
-    cf.load(apk->open(resourcesPath));
+    cf.load(apk->open(mFSLayer->getConfigFilePath("resources.cfg")));
 #else
-
+    Ogre::String resourcesPath = mFSLayer->getConfigFilePath("resources.cfg");
     if (Ogre::FileSystemLayer::fileExists(resourcesPath) || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN)
     {
-        Ogre::LogManager::getSingleton().logMessage("Parsing '"+resourcesPath+"'");
         cf.load(resourcesPath);
     }
     else
@@ -522,32 +375,17 @@ void ApplicationContextBase::locateResources()
 
     Ogre::String sec, type, arch;
     // go through all specified resource groups
-    for(auto& s : cf.getSettingsBySection()) {
-        sec = s.first;
+    Ogre::ConfigFile::SettingsBySection_::const_iterator seci;
+    for(seci = cf.getSettingsBySection().begin(); seci != cf.getSettingsBySection().end(); ++seci) {
+        sec = seci->first;
+        const Ogre::ConfigFile::SettingsMultiMap& settings = seci->second;
+        Ogre::ConfigFile::SettingsMultiMap::const_iterator i;
+
         // go through all resource paths
-        for (auto& t : s.second)
+        for (i = settings.begin(); i != settings.end(); i++)
         {
-            type = t.first;
-            arch = t.second;
-
-            Ogre::StringUtil::trim(arch);
-            if (arch.empty() || arch[0] == '.')
-            {
-                // resolve relative path with regards to configfile
-                Ogre::String baseDir, filename;
-                Ogre::StringUtil::splitFilename(resourcesPath, filename, baseDir);
-                arch = baseDir + arch;
-            }
-
-            arch = Ogre::FileSystemLayer::resolveBundlePath(arch);
-
-#if OGRE_PLATFORM != OGRE_PLATFORM_EMSCRIPTEN
-            if((type == "Zip" || type == "FileSystem") && !Ogre::FileSystemLayer::fileExists(arch))
-            {
-                Ogre::LogManager::getSingleton().logWarning("resource location '"+arch+"' does not exist - skipping");
-                continue;
-            }
-#endif
+            type = i->first;
+            arch = Ogre::FileSystemLayer::resolveBundlePath(i->second);
 
             rgm.addResourceLocation(arch, type, sec);
         }
@@ -557,42 +395,81 @@ void ApplicationContextBase::locateResources()
     {
         const auto& mediaDir = getDefaultMediaDir();
         // add default locations
-        rgm.addResourceLocation(mediaDir + "/Main", "FileSystem", Ogre::RGN_INTERNAL);
+        rgm.addResourceLocation(mediaDir + "/ShadowVolume", "FileSystem", Ogre::RGN_INTERNAL);
 #ifdef OGRE_BUILD_COMPONENT_TERRAIN
         rgm.addResourceLocation(mediaDir + "/Terrain", "FileSystem", Ogre::RGN_INTERNAL);
 #endif
 #ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
-        rgm.addResourceLocation(mediaDir + "/RTShaderLib", "FileSystem", Ogre::RGN_INTERNAL);
+        rgm.addResourceLocation(mediaDir + "/RTShaderLib/materials", "FileSystem", Ogre::RGN_INTERNAL);
+        rgm.addResourceLocation(mediaDir + "/RTShaderLib/GLSL", "FileSystem", Ogre::RGN_INTERNAL);
+        rgm.addResourceLocation(mediaDir + "/RTShaderLib/HLSL_Cg", "FileSystem", Ogre::RGN_INTERNAL);
 #endif
     }
+
+    sec = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME;
+    const Ogre::ResourceGroupManager::LocationList genLocs = rgm.getResourceLocationList(sec);
+
+    OgreAssert(!genLocs.empty(), ("Resource Group '"+sec+"' must contain at least one entry").c_str());
+
+    arch = genLocs.front().archive->getName();
+
+#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE
+    arch = Ogre::FileSystemLayer::resolveBundlePath("Contents/Resources/Media");
+#elif OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
+    arch = Ogre::FileSystemLayer::resolveBundlePath("Media");
+#else
+    arch = Ogre::StringUtil::replaceAll(arch, "Media/../../Tests/Media", "");
+    arch = Ogre::StringUtil::replaceAll(arch, "media/../../Tests/Media", "");
+#endif
+    type = genLocs.front().archive->getType();
+
+    bool hasCgPlugin = false;
+    const Ogre::Root::PluginInstanceList& plugins = getRoot()->getInstalledPlugins();
+    for(size_t i = 0; i < plugins.size(); i++)
+    {
+        if(plugins[i]->getName() == "Cg Program Manager")
+        {
+            hasCgPlugin = true;
+            break;
+        }
+    }
+
+    bool use_HLSL_Cg_shared = hasCgPlugin || Ogre::GpuProgramManager::getSingleton().isSyntaxSupported("hlsl");
+
+    // Add locations for supported shader languages
+    if(Ogre::GpuProgramManager::getSingleton().isSyntaxSupported("glsles"))
+    {
+        rgm.addResourceLocation(arch + "/materials/programs/GLSL", type, sec);
+        rgm.addResourceLocation(arch + "/materials/programs/GLSLES", type, sec);
+    }
+    else if(Ogre::GpuProgramManager::getSingleton().isSyntaxSupported("glsl"))
+    {
+        rgm.addResourceLocation(arch + "/materials/programs/GLSL", type, sec);
+        rgm.addResourceLocation(arch + "/materials/programs/GLSL120", type, sec);
+
+        if(Ogre::GpuProgramManager::getSingleton().isSyntaxSupported("glsl150"))
+        {
+            rgm.addResourceLocation(arch + "/materials/programs/GLSL150", type, sec);
+        }
+        if(Ogre::GpuProgramManager::getSingleton().isSyntaxSupported("glsl400"))
+        {
+            rgm.addResourceLocation(arch + "/materials/programs/GLSL400", type, sec);
+        }
+    }
+    else if(Ogre::GpuProgramManager::getSingleton().isSyntaxSupported("hlsl"))
+    {
+        rgm.addResourceLocation(arch + "/materials/programs/HLSL", type, sec);
+    }
+
+    if(hasCgPlugin)
+        rgm.addResourceLocation(arch + "/materials/programs/Cg", type, sec);
+    if (use_HLSL_Cg_shared)
+        rgm.addResourceLocation(arch + "/materials/programs/HLSL_Cg", type, sec);
 }
 
 void ApplicationContextBase::loadResources()
 {
     Ogre::ResourceGroupManager::getSingleton().initialiseAllResourceGroups();
-}
-
-Ogre::ImGuiOverlay* ApplicationContextBase::initialiseImGui()
-{
-#ifndef HAVE_IMGUI
-    OGRE_EXCEPT(Ogre::Exception::ERR_NOT_IMPLEMENTED,
-                "OGRE_BUILD_COMPONENT_OVERLAY_IMGUI=ON is required to use ImGui");
-    return NULL;
-#else
-        if(auto overlay = Ogre::OverlayManager::getSingleton().getByName("ImGuiOverlay"))
-            return static_cast<Ogre::ImGuiOverlay*>(overlay);
-
-        auto imguiOverlay = new Ogre::ImGuiOverlay();
-        Ogre::OverlayManager::getSingleton().addOverlay(imguiOverlay); // now owned by overlaymgr
-
-        // handle DPI scaling
-        float vpScale = Ogre::OverlayManager::getSingleton().getPixelRatio();
-        ImGui::GetStyle().ScaleAllSizes(vpScale);
-
-        mImGuiListener.reset(new ImGuiInputListener());
-
-        return imguiOverlay;
-#endif
 }
 
 void ApplicationContextBase::reconfigure(const Ogre::String &renderer, Ogre::NameValuePairList &options)
@@ -601,9 +478,24 @@ void ApplicationContextBase::reconfigure(const Ogre::String &renderer, Ogre::Nam
     Ogre::RenderSystem* rs = mRoot->getRenderSystemByName(renderer);
 
     // set all given render system options
-    for (auto & option : options)
+    for (Ogre::NameValuePairList::iterator it = options.begin(); it != options.end(); it++)
     {
-        rs->setConfigOption(option.first, option.second);
+        rs->setConfigOption(it->first, it->second);
+
+#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
+        // Change the viewport orientation on the fly if requested
+        if(it->first == "Orientation")
+        {
+            Ogre::RenderWindow* win = getRenderWindow();
+
+            if (it->second == "Landscape Left")
+                win->getViewport(0)->setOrientationMode(Ogre::OR_LANDSCAPELEFT, true);
+            else if (it->second == "Landscape Right")
+                win->getViewport(0)->setOrientationMode(Ogre::OR_LANDSCAPERIGHT, true);
+            else if (it->second == "Portrait")
+                win->getViewport(0)->setOrientationMode(Ogre::OR_PORTRAIT, true);
+        }
+#endif
     }
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
@@ -638,9 +530,12 @@ void ApplicationContextBase::shutdown()
 
     for(auto it = mWindows.rbegin(); it != mWindows.rend(); ++it)
     {
-        _destroyWindow(*it);
+#if !OGRE_BITES_HAVE_SDL
+        // remove window event listener before destroying it
+        WindowEventUtilities::_removeRenderWindow(it->render);
+#endif
+        mRoot->destroyRenderTarget(it->render);
     }
-    mWindows.clear();
 
     if (mOverlaySystem)
     {

@@ -42,7 +42,8 @@ namespace Ogre {
     }
     PixelBox PixelBox::getSubVolume(const Box &def, bool resetOrigin /* = true */) const
     {
-        OgreAssert(contains(def), "");
+        if(!contains(def))
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Bounds out of range", "PixelBox::getSubVolume");
 
         if(PixelUtil::isCompressed(format) && (def.left != left || def.top != top || def.right != right || def.bottom != bottom))
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Cannot return subvolume of compressed PixelBuffer with less than slice granularity", "PixelBox::getSubVolume");
@@ -92,7 +93,7 @@ namespace Ogre {
         return _pixelFormats[ord];
     }
     //-----------------------------------------------------------------------
-    uint8 PixelUtil::getNumElemBytes( PixelFormat format )
+    size_t PixelUtil::getNumElemBytes( PixelFormat format )
     {
         return getDescriptionFor(format).elemBytes;
     }
@@ -139,13 +140,16 @@ namespace Ogre {
                 case PF_PVRTC2_4BPP:
                     return (std::max((int)width, 8) * std::max((int)height, 8) * 4 + 7) / 8;
 
-                // see https://registry.khronos.org/OpenGL-Refpages/es3/html/glCompressedTexImage2D.xhtml
+                // Size calculations from the ETC spec
+                // https://www.khronos.org/registry/OpenGL/extensions/OES/OES_compressed_ETC1_RGB8_texture.txt
                 case PF_ETC1_RGB8:
                 case PF_ETC2_RGB8:
+                case PF_ETC2_RGBA8:
                 case PF_ETC2_RGB8A1:
+                    return ((width + 3) / 4) * ((height + 3) / 4) * 8;
+
                 case PF_ATC_RGB:
                     return ((width + 3) / 4) * ((height + 3) / 4) * 8;
-                case PF_ETC2_RGBA8:
                 case PF_ATC_RGBA_EXPLICIT_ALPHA:
                 case PF_ATC_RGBA_INTERPOLATED_ALPHA:
                     return ((width + 3) / 4) * ((height + 3) / 4) * 16;
@@ -189,7 +193,7 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
-    uint8 PixelUtil::getNumElemBits( PixelFormat format )
+    size_t PixelUtil::getNumElemBits( PixelFormat format )
     {
         return getDescriptionFor(format).elemBytes * 8;
     }
@@ -277,7 +281,7 @@ namespace Ogre {
         return des.componentType;
     }
     //-----------------------------------------------------------------------
-    uint8 PixelUtil::getComponentCount(PixelFormat fmt)
+    size_t PixelUtil::getComponentCount(PixelFormat fmt)
     {
         const PixelFormatDescription &des = getDescriptionFor(fmt);
         return des.componentCount;
@@ -421,6 +425,11 @@ namespace Ogre {
     /*************************************************************************
     * Pixel packing/unpacking utilities
     */
+    void PixelUtil::packColour(const ColourValue &colour, const PixelFormat pf,  void* dest)
+    {
+        packColour(colour.r, colour.g, colour.b, colour.a, pf, dest);
+    }
+    //-----------------------------------------------------------------------
     void PixelUtil::packColour(const uint8 r, const uint8 g, const uint8 b, const uint8 a, const PixelFormat pf,  void* dest)
     {
         const PixelFormatDescription &des = getDescriptionFor(pf);
@@ -506,9 +515,16 @@ namespace Ogre {
                 ((uint8*)dest)[0] = (uint8)Bitwise::floatToFixed(r, 8);
                 ((uint8*)dest)[1] = (uint8)Bitwise::floatToFixed(a, 8);
                 break;
-            case PF_A8:
-                ((uint8*)dest)[0] = (uint8)Bitwise::floatToFixed(r, 8);
+            case PF_A2B10G10R10:
+            {
+                const uint16 ir = static_cast<uint16>( Math::saturate( r ) * 1023.0f + 0.5f );
+                const uint16 ig = static_cast<uint16>( Math::saturate( g ) * 1023.0f + 0.5f );
+                const uint16 ib = static_cast<uint16>( Math::saturate( b ) * 1023.0f + 0.5f );
+                const uint16 ia = static_cast<uint16>( Math::saturate( a ) * 3.0f + 0.5f );
+
+                ((uint32*)dest)[0] = (ia << 30u) | (ir << 20u) | (ig << 10u) | (ib);
                 break;
+            }
             default:
                 // Not yet supported
                 OGRE_EXCEPT(
@@ -518,6 +534,11 @@ namespace Ogre {
                 break;
             }
         }
+    }
+    //-----------------------------------------------------------------------
+    void PixelUtil::unpackColour(ColourValue *colour, PixelFormat pf,  const void* src)
+    {
+        unpackColour(&colour->r, &colour->g, &colour->b, &colour->a, pf, src);
     }
     //-----------------------------------------------------------------------
     void PixelUtil::unpackColour(uint8 *r, uint8 *g, uint8 *b, uint8 *a, PixelFormat pf,  const void* src)
@@ -656,36 +677,56 @@ namespace Ogre {
     }
     //-----------------------------------------------------------------------
     /* Convert pixels from one format to another */
+    void PixelUtil::bulkPixelConversion(void *srcp, PixelFormat srcFormat,
+        void *destp, PixelFormat dstFormat, unsigned int count)
+    {
+        PixelBox src(count, 1, 1, srcFormat, srcp),
+                 dst(count, 1, 1, dstFormat, destp);
+
+        bulkPixelConversion(src, dst);
+    }
+    //-----------------------------------------------------------------------
     void PixelUtil::bulkPixelConversion(const PixelBox &src, const PixelBox &dst)
     {
-        OgreAssert(src.getSize() == dst.getSize(), "");
+        assert(src.getWidth() == dst.getWidth() &&
+               src.getHeight() == dst.getHeight() &&
+               src.getDepth() == dst.getDepth());
 
         // Check for compressed formats, we don't support decompression, compression or recoding
         if(PixelUtil::isCompressed(src.format) || PixelUtil::isCompressed(dst.format))
         {
-            OgreAssert(src.format == dst.format && src.isConsecutive() && dst.isConsecutive(),
-                       "This method can not be used to compress or decompress images");
-            // we can copy with slice granularity, useful for Tex2DArray handling
-            size_t bytesPerSlice = getMemorySize(src.getWidth(), src.getHeight(), 1, src.format);
-            memcpy(dst.data + bytesPerSlice * dst.front, src.data + bytesPerSlice * src.front,
-                   bytesPerSlice * src.getDepth());
-            return;
+            if(src.format == dst.format && src.isConsecutive() && dst.isConsecutive())
+            {
+                // we can copy with slice granularity, useful for Tex2DArray handling
+                size_t bytesPerSlice = getMemorySize(src.getWidth(), src.getHeight(), 1, src.format);
+                memcpy(dst.data + bytesPerSlice * dst.front,
+                    src.data + bytesPerSlice * src.front,
+                    bytesPerSlice * src.getDepth());
+                return;
+            }
+            else
+            {
+                OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+                    "This method can not be used to compress or decompress images",
+                    "PixelUtil::bulkPixelConversion");
+            }
         }
 
         // The easy case
         if(src.format == dst.format) {
-            uint8 *srcptr = src.getTopLeftFrontPixelPtr();
-            uint8 *dstptr = dst.getTopLeftFrontPixelPtr();
-
             // Everything consecutive?
             if(src.isConsecutive() && dst.isConsecutive())
             {
-                memcpy(dstptr, srcptr, src.getConsecutiveSize());
+                memcpy(dst.getTopLeftFrontPixelPtr(), src.getTopLeftFrontPixelPtr(), src.getConsecutiveSize());
                 return;
             }
 
             const size_t srcPixelSize = PixelUtil::getNumElemBytes(src.format);
             const size_t dstPixelSize = PixelUtil::getNumElemBytes(dst.format);
+            uint8 *srcptr = src.data
+                + (src.left + src.top * src.rowPitch + src.front * src.slicePitch) * srcPixelSize;
+            uint8 *dstptr = dst.data
+                + (dst.left + dst.top * dst.rowPitch + dst.front * dst.slicePitch) * dstPixelSize;
 
             // Calculate pitches+skips in bytes
             const size_t srcRowPitchBytes = src.rowPitch*srcPixelSize;
@@ -746,9 +787,11 @@ namespace Ogre {
 
         const size_t srcPixelSize = PixelUtil::getNumElemBytes(src.format);
         const size_t dstPixelSize = PixelUtil::getNumElemBytes(dst.format);
-        uint8* srcptr = src.getTopLeftFrontPixelPtr();
-        uint8* dstptr = dst.getTopLeftFrontPixelPtr();
-
+        uint8 *srcptr = src.data
+            + (src.left + src.top * src.rowPitch + src.front * src.slicePitch) * srcPixelSize;
+        uint8 *dstptr = dst.data
+            + (dst.left + dst.top * dst.rowPitch + dst.front * dst.slicePitch) * dstPixelSize;
+        
         // Old way, not taking into account box dimensions
         //uint8 *srcptr = static_cast<uint8*>(src.data), *dstptr = static_cast<uint8*>(dst.data);
 
@@ -782,16 +825,22 @@ namespace Ogre {
     void PixelUtil::bulkPixelVerticalFlip(const PixelBox &box)
     {
         // Check for compressed formats, we don't support decompression, compression or recoding
-        OgreAssert(!PixelUtil::isCompressed(box.format), "This method can not be used for compressed formats");
+        if(PixelUtil::isCompressed(box.format))
+        {
+            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
+                        "This method can not be used for compressed formats",
+                        "PixelUtil::bulkPixelVerticalFlip");
+        }
         
         const size_t pixelSize = PixelUtil::getNumElemBytes(box.format);
-        const size_t copySize = box.getWidth() * pixelSize;
+        const size_t copySize = (box.right - box.left) * pixelSize;
 
         // Calculate pitches in bytes
         const size_t rowPitchBytes = box.rowPitch * pixelSize;
         const size_t slicePitchBytes = box.slicePitch * pixelSize;
 
-        uint8 *basesrcptr = box.getTopLeftFrontPixelPtr();
+        uint8 *basesrcptr = box.data
+            + (box.left + box.top * box.rowPitch + box.front * box.slicePitch) * pixelSize;
         uint8 *basedstptr = basesrcptr + (box.bottom - box.top - 1) * rowPitchBytes;
         uint8* tmpptr = (uint8*)OGRE_MALLOC_SIMD(copySize, MEMCATEGORY_GENERAL);
         

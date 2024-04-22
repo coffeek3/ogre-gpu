@@ -43,8 +43,7 @@ THE SOFTWARE.
 #include "OgreTechnique.h"
 #include "OgrePass.h"
 #include "OgreMaterialManager.h"
-#include "OgreCodec.h"
-#include "OgreRoot.h"
+#include "OgreSceneLoaderManager.h"
 
 #include <fstream>
 
@@ -66,7 +65,11 @@ namespace Ogre {
         return BspSceneManagerFactory::FACTORY_TYPE_NAME;
     }
     //-----------------------------------------------------------------------
-    BspSceneManager::~BspSceneManager() {}
+    BspSceneManager::~BspSceneManager()
+    {
+        freeMemory();
+        mLevel.reset();
+    }
     //-----------------------------------------------------------------------
     size_t BspSceneManager::estimateWorldGeometry(const String& filename)
     {
@@ -83,15 +86,17 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void BspSceneManager::setWorldGeometry(const String& filename)
     {
-        auto stream = Root::openFileStream(
-            filename, ResourceGroupManager::getSingleton().getWorldResourceGroupName());
-        setWorldGeometry(stream);
+        SceneLoaderManager::getSingleton().load(
+            filename, ResourceGroupManager::getSingleton().getWorldResourceGroupName(),
+            getRootSceneNode());
     }
     //-----------------------------------------------------------------------
     void BspSceneManager::setWorldGeometry(DataStreamPtr& stream, 
         const String& typeName)
     {
-        Codec::getCodec("bsp")->decode(stream, getRootSceneNode());
+        SceneLoaderManager::getSingleton().load(
+            stream, ResourceGroupManager::getSingleton().getWorldResourceGroupName(),
+            getRootSceneNode());
     }
 
     void BspSceneManager::setLevel(const BspLevelPtr& level)
@@ -114,6 +119,24 @@ namespace Ogre {
         {
             setSkyDome(false, BLANKSTRING);
         }
+
+        // Init static render operation
+        mRenderOp.vertexData = mLevel->mVertexData;
+        // index data is per-frame
+        mRenderOp.indexData = OGRE_NEW IndexData();
+        mRenderOp.indexData->indexStart = 0;
+        mRenderOp.indexData->indexCount = 0;
+        // Create enough index space to render whole level
+        mRenderOp.indexData->indexBuffer = HardwareBufferManager::getSingleton()
+            .createIndexBuffer(
+                HardwareIndexBuffer::IT_32BIT, // always 32-bit
+                mLevel->mNumIndexes, 
+                HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY_DISCARDABLE, false);
+
+        mRenderOp.operationType = RenderOperation::OT_TRIANGLE_LIST;
+        mRenderOp.useIndexes = true;
+
+
     }
     //-----------------------------------------------------------------------
     void BspSceneManager::_findVisibleObjects(Camera* cam, 
@@ -147,25 +170,53 @@ namespace Ogre {
     void BspSceneManager::renderStaticGeometry(void)
     {
         // Check we should be rendering
-        if (!isRenderQueueToBeProcessed(getWorldGeometryRenderQueue()))
+        if (!isRenderQueueToBeProcessed(mWorldGeometryRenderQueue))
             return;
+
+        // Cache vertex/face data first
+        std::vector<StaticFaceGroup*>::const_iterator faceGrpi;
+        static RenderOperation patchOp;
+        
+        mAutoParamDataSource->setCurrentRenderable(0);
+        // no world transform required
+        mAutoParamDataSource->setWorldMatrices(&Affine3::IDENTITY, 1);
 
         // For each material in turn, cache rendering data & render
         MaterialFaceGroupMap::const_iterator mati;
+
         for (mati = mMatFaceGroupMap.begin(); mati != mMatFaceGroupMap.end(); ++mati)
         {
             // Get Material
             Material* thisMaterial = mati->first;
             thisMaterial->touch();
+            // Empty existing cache
+            mRenderOp.indexData->indexCount = 0;
+            // lock index buffer ready to receive data
+            unsigned int* pIdx = static_cast<unsigned int*>(
+                mRenderOp.indexData->indexBuffer->lock(HardwareBuffer::HBL_DISCARD));
+
+            for (faceGrpi = mati->second.begin(); faceGrpi != mati->second.end(); ++faceGrpi)
+            {
+                // Cache each
+                unsigned int numelems = cacheGeometry(pIdx, *faceGrpi);
+                mRenderOp.indexData->indexCount += numelems;
+                pIdx += numelems;
+            }
+            // Unlock the buffer
+            mRenderOp.indexData->indexBuffer->unlock();
 
             // Skip if no faces to process (we're not doing flare types yet)
-            if (!mLevel->cacheGeometry(mati->second))
+            if (mRenderOp.indexData->indexCount == 0)
                 continue;
 
             const Technique::Passes& passes = thisMaterial->getBestTechnique ()->getPasses();
             for (size_t p = 0; p < passes.size(); p++)
             {
-                _injectRenderWithPass(passes[p], mLevel.get());
+                Pass* pass = passes[p];
+                _setPass(pass);
+
+                updateGpuProgramParameters(pass);
+                mDestRenderSystem->_render(mRenderOp);
             } 
 
 
@@ -324,6 +375,64 @@ namespace Ogre {
 
     }
     //-----------------------------------------------------------------------
+    unsigned int BspSceneManager::cacheGeometry(unsigned int* pIndexes, 
+        const StaticFaceGroup* faceGroup)
+    {
+        // Skip sky always
+        if (faceGroup->isSky)
+            return 0;
+
+        size_t idxStart, numIdx, vertexStart;
+
+        if (faceGroup->fType == FGT_FACE_LIST)
+        {
+            idxStart = faceGroup->elementStart;
+            numIdx = faceGroup->numElements;
+            vertexStart = faceGroup->vertexStart;
+        }
+        else if (faceGroup->fType == FGT_PATCH)
+        {
+
+            idxStart = faceGroup->patchSurf->getIndexOffset();
+            numIdx = faceGroup->patchSurf->getCurrentIndexCount();
+            vertexStart = faceGroup->patchSurf->getVertexOffset();
+        }
+        else
+        {
+            // Unsupported face type
+            return 0;
+        }
+
+
+        // Copy index data
+        unsigned int* pSrc = static_cast<unsigned int*>(
+            mLevel->mIndexes->lock(
+                idxStart * sizeof(unsigned int),
+                numIdx * sizeof(unsigned int), 
+                HardwareBuffer::HBL_READ_ONLY));
+        // Offset the indexes here
+        // we have to do this now rather than up-front because the 
+        // indexes are sometimes reused to address different vertex chunks
+        for (size_t elem = 0; elem < numIdx; ++elem)
+        {
+            *pIndexes++ = *pSrc++ + static_cast<unsigned int>(vertexStart);
+        }
+        mLevel->mIndexes->unlock();
+
+        // return number of elements
+        return static_cast<unsigned int>(numIdx);
+
+
+    }
+
+    //-----------------------------------------------------------------------
+    void BspSceneManager::freeMemory(void)
+    {
+        // no need to delete index buffer, will be handled by shared pointer
+        OGRE_DELETE mRenderOp.indexData;
+        mRenderOp.indexData = 0;
+    }
+    //-----------------------------------------------------------------------
     void BspSceneManager::showNodeBoxes(bool show)
     {
         mShowNodeAABs = show;
@@ -455,6 +564,7 @@ namespace Ogre {
     void BspSceneManager::clearScene(void)
     {
         SceneManager::clearScene();
+        freeMemory();
         // Clear level
         mLevel.reset();
     }
@@ -494,11 +604,11 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
     BspIntersectionSceneQuery::BspIntersectionSceneQuery(SceneManager* creator) 
-        : DefaultIntersectionSceneQuery(creator), mWorldFragmentType(WFT_NONE)
+        : DefaultIntersectionSceneQuery(creator)
     {
-        mSupportedWorldFragments.insert(WFT_NONE);
         // Add bounds fragment type
-        mSupportedWorldFragments.insert(WFT_PLANE_BOUNDED_REGION);
+        mSupportedWorldFragments.insert(SceneQuery::WFT_PLANE_BOUNDED_REGION);
+        
     }
     void BspIntersectionSceneQuery::execute(IntersectionSceneQueryListener* listener)
     {
@@ -582,7 +692,7 @@ namespace Ogre {
                         if (brushIntersect)
                         {
                             // report this brush as it's WorldFragment
-                            assert((*bi)->fragment.fragmentType == WFT_PLANE_BOUNDED_REGION);
+                            assert((*bi)->fragment.fragmentType == SceneQuery::WFT_PLANE_BOUNDED_REGION);
                             if (!listener->queryResult(const_cast<MovableObject*>(aObj), 
                                     const_cast<WorldFragment*>(&((*bi)->fragment))))
                                 return; 
@@ -603,12 +713,11 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     //-----------------------------------------------------------------------
     BspRaySceneQuery::BspRaySceneQuery(SceneManager* creator)
-        :DefaultRaySceneQuery(creator), mWorldFragmentType(WFT_NONE)
+        :DefaultRaySceneQuery(creator)
     {
         // Add supported fragment types
-        mSupportedWorldFragments.insert(WFT_NONE);
-        mSupportedWorldFragments.insert(WFT_SINGLE_INTERSECTION);
-        mSupportedWorldFragments.insert(WFT_PLANE_BOUNDED_REGION);
+        mSupportedWorldFragments.insert(SceneQuery::WFT_SINGLE_INTERSECTION);
+        mSupportedWorldFragments.insert(SceneQuery::WFT_PLANE_BOUNDED_REGION);
     }
     //-----------------------------------------------------------------------
     void BspRaySceneQuery::execute(RaySceneQueryListener* listener)
@@ -743,22 +852,22 @@ namespace Ogre {
                 if(result.first && result.second <= maxDistance)
                 {
                     intersectedBrush = true;
-                    if(mWorldFragmentType == WFT_SINGLE_INTERSECTION)
+                    if(mWorldFragmentType == SceneQuery::WFT_SINGLE_INTERSECTION)
                     {
                         // We're interested in a single intersection
                         // Have to create these 
                         SceneQuery::WorldFragment* wf = OGRE_ALLOC_T(SceneQuery::WorldFragment, 1, MEMCATEGORY_SCENE_CONTROL);
-                        wf->fragmentType = WFT_SINGLE_INTERSECTION;
+                        wf->fragmentType = SceneQuery::WFT_SINGLE_INTERSECTION;
                         wf->singleIntersection = tracingRay.getPoint(result.second);
                         // save this so we can clean up later
                         mSingleIntersections.push_back(wf);
                         if (!listener->queryResult(wf, result.second + traceDistance))
                             return false;
                     }
-                    else if (mWorldFragmentType ==  WFT_PLANE_BOUNDED_REGION)
+                    else if (mWorldFragmentType ==  SceneQuery::WFT_PLANE_BOUNDED_REGION)
                     {
                         // We want the whole bounded volume
-                        assert((*bi)->fragment.fragmentType == WFT_PLANE_BOUNDED_REGION);
+                        assert((*bi)->fragment.fragmentType == SceneQuery::WFT_PLANE_BOUNDED_REGION);
                         if (!listener->queryResult(const_cast<WorldFragment*>(&(brush->fragment)), 
                             result.second + traceDistance))
                             return false; 
@@ -779,10 +888,21 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     const String BspSceneManagerFactory::FACTORY_TYPE_NAME = "BspSceneManager";
     //-----------------------------------------------------------------------
+    void BspSceneManagerFactory::initMetaData(void) const
+    {
+        mMetaData.typeName = FACTORY_TYPE_NAME;
+        mMetaData.worldGeometrySupported = true;
+    }
+    //-----------------------------------------------------------------------
     SceneManager* BspSceneManagerFactory::createInstance(
         const String& instanceName)
     {
         return OGRE_NEW BspSceneManager(instanceName);
+    }
+    //-----------------------------------------------------------------------
+    void BspSceneManagerFactory::destroyInstance(SceneManager* instance)
+    {
+        OGRE_DELETE instance;
     }
 
 }

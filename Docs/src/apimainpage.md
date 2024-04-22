@@ -1,15 +1,10 @@
 # API Reference Start Page {#mainpage}
 
 # What is this?
-
 This is the complete API reference for <a href="https://www.ogre3d.org"><b>OGRE</b></a> (<b>O</b>bject-Oriented <b>G</b>raphics <b>R</b>endering <b>E</b>ngine). Contained within are the 
 specifications for each namespace/module/class and the methods from those which you can refer to when writing code which uses OGRE. 
 
-The API reference for a specific OGRE version can be found under:
-- https://ogrecave.github.io/ogre/api/13
-- https://ogrecave.github.io/ogre/api/1.12
-
-i.e. replace the last part with the version number, for example 14, 1.11, etc.
+The API references for some of the previous OGRE versions can be found under the following link: <a href="https://www.ogre3d.org/docs/api/X.Y">www.ogre3d.org/docs/api/X.Y</a> (replace X.Y with the version number, for example 1.7, 1.8, etc.).
 
 # It's so BIG!
 
@@ -25,7 +20,6 @@ more "discussive" documentation such as:
 general introduction to the OGRE principles and core components, and a 
 reference to various important parts of the OGRE system, especially the
 script syntax for materials, particle systems, and overlays.
-
 * [The OGRE Tutorials](@ref tutorials): This is a gold mine for new and experienced users alike.
 
 We make an effort to document our classes fully so we hope you can find what
@@ -35,6 +29,7 @@ like the <a href="https://wiki.ogre3d.org">wiki</a> and the <a href="https://for
 
 # License
   
-The OGRE rendering engine itself is licensed under the <a href="https://opensource.org/licenses/MIT/">MIT License</a>. More details can be found <a href="https://github.com/OGRECave/ogre/blob/master/LICENSE">here</a>.<br>
+The OGRE rendering engine itself is licensed under the <a href="https://opensource.org/licenses/MIT/">MIT License</a>. More details can be found <a href="https://www.ogre3d.org/licensing/">here</a>.<br>
 This documentation work is licensed under a <a rel="license" href="https://creativecommons.org/licenses/by-sa/3.0/">Creative Commons Attribution-ShareAlike 3.0 Unported License</a>.<br>
-![](cc_licensebutton.png)
+*Copyright &copy; 2015 Torus Knot Software Ltd*<br>
+<img alt="Creative Commons License" src="https://licensebuttons.net/l/by-sa/3.0/88x31.png" />

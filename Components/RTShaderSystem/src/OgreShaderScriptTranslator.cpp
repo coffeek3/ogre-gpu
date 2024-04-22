@@ -57,7 +57,19 @@ SubRenderState* SGScriptTranslator::getGeneratedSubRenderState(const String& typ
 {
     //check if we are in the middle of parsing
     if (mGeneratedRenderState)
-        return mGeneratedRenderState->getSubRenderState(typeName);
+    {
+        /** Get the list of the template sub render states composing this render state. */
+        const SubRenderStateList& rsList =
+            mGeneratedRenderState->getTemplateSubRenderStateList();
+        
+        SubRenderStateList::const_iterator it = rsList.begin();
+        SubRenderStateList::const_iterator itEnd = rsList.end();
+        for(; it != itEnd; ++it)
+        {
+            if ((*it)->getType() == typeName)
+                return *it;
+        }
+    }
     return NULL;
 }
     
@@ -78,11 +90,12 @@ void SGScriptTranslator::translateTextureUnit(ScriptCompiler* compiler, const Ab
 
     // Make sure the scheme name is valid - use default if none exists.
     if (dstTechniqueSchemeName.empty()) 
-        dstTechniqueSchemeName = MSN_SHADERGEN;
+        dstTechniqueSchemeName = ShaderGenerator::DEFAULT_SCHEME_NAME;  
 
 
     //check if technique already created
-    techniqueCreated = shaderGenerator->hasShaderBasedTechnique(*material,
+    techniqueCreated = shaderGenerator->hasShaderBasedTechnique(material->getName(), 
+        material->getGroup(),
         technique->getSchemeName(), 
         dstTechniqueSchemeName);
     
@@ -100,15 +113,15 @@ void SGScriptTranslator::translateTextureUnit(ScriptCompiler* compiler, const Ab
     if (techniqueCreated)
     {
         //Attempt to get the render state which might have been created by the pass parsing
-        mGeneratedRenderState =
-            shaderGenerator->getRenderState(dstTechniqueSchemeName, *material, pass->getIndex());
-
+        mGeneratedRenderState = shaderGenerator->getRenderState(dstTechniqueSchemeName, 
+                    material->getName(), material->getGroup(), pass->getIndex());
+    
         // Go over all the render state properties.
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
                 SubRenderState* subRenderState = ShaderGenerator::getSingleton().createSubRenderState(compiler, prop, texState, this);
                 
                 if (subRenderState)
@@ -116,14 +129,10 @@ void SGScriptTranslator::translateTextureUnit(ScriptCompiler* compiler, const Ab
                     addSubRenderState(subRenderState, dstTechniqueSchemeName, material->getName(), 
                         material->getGroup(), pass->getIndex());
                 }
-                else
-                {
-                    compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line, prop->name);
-                }
             }
             else
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
 
@@ -145,7 +154,7 @@ void SGScriptTranslator::translatePass(ScriptCompiler* compiler, const AbstractN
 
     // Make sure the scheme name is valid - use default if none exists.
     if (dstTechniqueSchemeName.empty()) 
-        dstTechniqueSchemeName = MSN_SHADERGEN;
+        dstTechniqueSchemeName = ShaderGenerator::DEFAULT_SCHEME_NAME;  
 
 
     // Create the shader based technique.
@@ -158,35 +167,35 @@ void SGScriptTranslator::translatePass(ScriptCompiler* compiler, const AbstractN
     if (techniqueCreated)
     {
         // Go over all the render state properties.
-        for(auto & i : obj->children)
+        for(AbstractNodeList::iterator i = obj->children.begin(); i != obj->children.end(); ++i)
         {
-            if(i->type == ANT_PROPERTY)
+            if((*i)->type == ANT_PROPERTY)
             {
-                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>(i.get());
+                PropertyAbstractNode *prop = static_cast<PropertyAbstractNode*>((*i).get());
 
                 // Handle light count property.
                 if (prop->name == "light_count")
                 {
-                    if (prop->values.size() == 3 || prop->values.size() == 1)
+                    if (prop->values.size() != 3)
                     {
-                        std::vector<int> lightCount;
-                        getVector(prop->values.begin(), prop->values.end(), lightCount, prop->values.size());
-                        int total = 0;
-                        for(auto & j : lightCount)
-                            total += j;
-                        shaderGenerator->createScheme(dstTechniqueSchemeName);
-                        auto renderState =
-                            shaderGenerator->getRenderState(dstTechniqueSchemeName, *material, pass->getIndex());
-
-                        renderState->setLightCount(total);
-                        renderState->setLightCountAutoUpdate(false);
-
-                        if(prop->values.size() == 3)
-                            compiler->addError(ScriptCompiler::CE_DEPRECATEDSYMBOL, prop->file, prop->line, "light_count only takes 1 parameter now");
+                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
                     }
                     else
                     {
-                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                        std::vector<int> lightCount;
+                        if (getVector(prop->values.begin(), prop->values.end(), lightCount, 3))
+                        {
+                            shaderGenerator->createScheme(dstTechniqueSchemeName);
+                            RenderState* renderState = shaderGenerator->getRenderState(dstTechniqueSchemeName, 
+                                material->getName(), material->getGroup(), pass->getIndex());
+
+                            renderState->setLightCount(Vector3i(lightCount.data()));
+                            renderState->setLightCountAutoUpdate(false);
+                        }
+                        else
+                        {
+                            compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line);
+                        }
                     }                   
                 }
 
@@ -198,15 +207,11 @@ void SGScriptTranslator::translatePass(ScriptCompiler* compiler, const AbstractN
                     {
                         addSubRenderState(subRenderState, dstTechniqueSchemeName, material->getName(), material->getGroup(), pass->getIndex());
                     }
-                    else
-                    {
-                        compiler->addError(ScriptCompiler::CE_INVALIDPARAMETERS, prop->file, prop->line, prop->name);
-                    }
                 }               
             }
             else
             {
-                processNode(compiler, i);
+                processNode(compiler, *i);
             }
         }
 

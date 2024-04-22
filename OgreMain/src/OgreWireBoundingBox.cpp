@@ -26,7 +26,6 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 #include "OgreStableHeaders.h"
-#include "OgreWireBoundingBox.h"
 
 namespace Ogre {
     #define POSITION_BINDING 0
@@ -52,7 +51,7 @@ namespace Ogre {
         mRenderOp.vertexData->vertexStart = 0; 
         mRenderOp.operationType = RenderOperation::OT_LINE_LIST; 
         mRenderOp.useIndexes = false; 
-        mRenderOp.useGlobalInstancing = false;
+        mRenderOp.useGlobalInstancingVertexBufferIsAvailable = false;
 
         VertexDeclaration* decl = mRenderOp.vertexData->vertexDeclaration;
         VertexBufferBinding* bind = mRenderOp.vertexData->vertexBufferBinding;

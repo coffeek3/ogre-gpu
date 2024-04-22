@@ -35,45 +35,55 @@ namespace Ogre {
 
     /** Texture surface.
      */
-    class _OgreGL3PlusExport GL3PlusTextureBuffer: public GLHardwarePixelBufferCommon
+    class _OgreGL3PlusExport GL3PlusTextureBuffer: public GL3PlusHardwarePixelBuffer
     {
-        GL3PlusRenderSystem* mRenderSystem;
     public:
         /** Texture constructor */
         GL3PlusTextureBuffer(GL3PlusTexture* parent, GLint face, GLint level, uint32 width,
                              uint32 height, uint32 depth);
         ~GL3PlusTextureBuffer();
 
-        void bindToFramebuffer(uint32 attachment, uint32 zoffset) override;
+        virtual void bindToFramebuffer(uint32 attachment, uint32 zoffset);
+
+        RenderTexture* getRenderTarget(size_t);
 
         /// Upload a box of pixels to this buffer on the card.
-        void upload(const PixelBox &data, const Box &dest) override;
+        virtual void upload(const PixelBox &data, const Box &dest);
 
         /// Download a box of pixels from the card.
-        void download(const PixelBox &data) override;
+        virtual void download(const PixelBox &data);
 
         /// Hardware implementation of blitFromMemory.
-        void blitFromMemory(const PixelBox &src_orig, const Box &dstBox) override;
+        virtual void blitFromMemory(const PixelBox &src_orig, const Box &dstBox);
+
+        /// Notify TextureBuffer of destruction of render target.
+        void _clearSliceRTT(size_t zoffset)
+        {
+            mSliceTRT[zoffset] = 0;
+        }
 
         /// Copy from framebuffer.
         void copyFromFramebuffer(uint32 zoffset);
 
         /// @copydoc HardwarePixelBuffer::blit
         void blit(const HardwarePixelBufferSharedPtr &src,
-                  const Box &srcBox, const Box &dstBox) override;
-
-        void blitToMemory(const Box &srcBox, const PixelBox &dst) override;
-    protected:
+                  const Box &srcBox, const Box &dstBox);
         // Blitting implementation
-        void blitFromTexture(GL3PlusTextureBuffer* src, const Box& srcBox, const Box& dstBox);
-        void _blitFromMemory(const PixelBox& src, const Box& dst);
+        void blitFromTexture(GL3PlusTextureBuffer *src,
+                             const Box &srcBox, const Box &dstBox);
+
+    protected:
         // In case this is a texture level.
         GLenum mTarget;
         // Same as mTarget in case of GL_TEXTURE_xD, but cubemap face
         // for cubemaps.
         GLenum mFaceTarget;
         GLuint mTextureID;
+        GLint mFace;
         GLint mLevel;
+
+        typedef std::vector<RenderTexture*> SliceTRT;
+        SliceTRT mSliceTRT;
 
         void _bindToFramebuffer(GLenum attachment, uint32 zoffset, GLenum which);
     };

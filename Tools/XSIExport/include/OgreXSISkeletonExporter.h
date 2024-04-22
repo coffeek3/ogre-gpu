@@ -29,7 +29,8 @@ THE SOFTWARE.
 #define __XSISKELETONEXPORTER_H__
 
 #include "OgrePrerequisites.h"
-#include "OgreVector.h"
+#include "OgreVector2.h"
+#include "OgreVector3.h"
 #include "OgreAxisAlignedBox.h"
 #include "OgreXSIHelper.h"
 #include <xsi_x3dobject.h>

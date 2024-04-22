@@ -34,13 +34,12 @@
 #include "macUtils.h"
 #endif
 
-#define MINIZ_HEADER_FILE_ONLY
-#include <miniz.h>
+#include <zlib.h>
 
 namespace Ogre
 {
     // memory implementations
-    static void* OgreZalloc(void* opaque, size_t items, size_t size)
+    static void* OgreZalloc(void* opaque, unsigned int items, unsigned int size)
     {
         return OGRE_MALLOC(items * size, MEMCATEGORY_GENERAL);
     }
@@ -177,7 +176,9 @@ namespace Ogre
 #endif
             }
 
-            mTmpWriteStream = _openFileStream(mTempFileName, std::ios::binary | std::ios::out);
+            std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
+            f->open(mTempFileName.c_str(), std::ios::binary | std::ios::out);
+            mTmpWriteStream = DataStreamPtr(OGRE_NEW FileStreamDataStream(f));
             
         }
 
@@ -233,19 +234,21 @@ namespace Ogre
                         mZStream->next_in = mTmp;
                     }
                     
-                    if (mZStream->avail_in || mZStream->avail_out)
+                    if (mZStream->avail_in)
                     {
                         int availpre = mZStream->avail_out;
-                        mStatus = inflate(mZStream, Z_SYNC_FLUSH);
+                        int status = inflate(mZStream, Z_SYNC_FLUSH);
                         size_t readUncompressed = availpre - mZStream->avail_out;
                         newReadUncompressed += readUncompressed;
-                        if (mStatus != Z_OK)
+                        if (status != Z_OK)
                         {
                             // End of data, or error
-                            if (mStatus != Z_STREAM_END)
+                            if (status != Z_STREAM_END)
                             {
                                 mCompressedStream->seek(restorePoint);
-                                OGRE_EXCEPT(Exception::ERR_INVALID_STATE, "Error in compressed stream");
+                                OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
+                                            "Error in compressed stream",
+                                            "DeflateStrea::read");
                             }
                             else 
                             {
@@ -280,10 +283,6 @@ namespace Ogre
     //---------------------------------------------------------------------
     void DeflateStream::compressFinal()
     {
-        // Prevent reenterancy
-        if( !mTmpWriteStream )
-            return;
-        
         // Close temp stream
         mTmpWriteStream->close();
         mTmpWriteStream.reset();
@@ -440,7 +439,7 @@ namespace Ogre
             if (mStreamType == Invalid)
                 return mCompressedStream->eof();
             else
-                return mCompressedStream->eof() && mStatus == Z_STREAM_END;
+                return mCompressedStream->eof() && mZStream->avail_in == 0;
         }
     }
     //---------------------------------------------------------------------

@@ -49,6 +49,16 @@ namespace Ogre {
         mNativeDisplay = glsupport->getNativeDisplay();
     }
 
+    void Win32EGLWindow::getLeftAndTopFromNativeWindow( int & left, int & top, uint width, uint height )
+    {
+
+    }
+
+    void Win32EGLWindow::initNativeCreatedWindow(const NameValuePairList *miscParams)
+    {
+
+    }
+
     void Win32EGLWindow::createNativeWindow( int &left, int &top, uint &width, uint &height, String &title )
     {
         // destroy current window, if any
@@ -260,19 +270,14 @@ namespace Ogre {
 
     }
 
+    void Win32EGLWindow::reposition( int left, int top )
+    {
+
+    }
+
     void Win32EGLWindow::resize( unsigned int width, unsigned int height )
     {
-		// Case window resized.
-		if (width != mWidth || height != mHeight)
-		{
-			mWidth  = rc.right - rc.left;
-			mHeight = rc.bottom - rc.top;
 
-			// Notify viewports of resize
-			ViewportList::iterator it = mViewportList.begin();
-			while( it != mViewportList.end() )
-				(*it++).second->_updateDimensions();
-		}
     }
 
     void Win32EGLWindow::windowMovedOrResized()
@@ -310,7 +315,22 @@ namespace Ogre {
 		unsigned int width = rc.right - rc.left;
 		unsigned int height = rc.bottom - rc.top;
 
-        resize(width, height);
+		// Case window resized.
+		if (width != mWidth || height != mHeight)
+		{
+			mWidth  = rc.right - rc.left;
+			mHeight = rc.bottom - rc.top;
+
+			// Notify viewports of resize
+			ViewportList::iterator it = mViewportList.begin();
+			while( it != mViewportList.end() )
+				(*it++).second->_updateDimensions();			
+		}
+    }
+
+    void Win32EGLWindow::switchFullScreen( bool fullscreen )
+    {
+
     }
 
     void Win32EGLWindow::create(const String& name, uint width, uint height,
@@ -324,6 +344,8 @@ namespace Ogre {
         ::EGLContext eglContext = 0;
         int left = 0;
         int top  = 0;
+
+        getLeftAndTopFromNativeWindow(left, top, width, height);
 
         mIsFullScreen = fullScreen;
 
@@ -343,6 +365,7 @@ namespace Ogre {
                                 "EGLWindow::create");
                 }
 
+                mEglSurface = eglGetCurrentSurface(EGL_DRAW);
                 mEglDisplay = eglGetCurrentDisplay();
             }
 
@@ -388,6 +411,13 @@ namespace Ogre {
             }
         }
 
+        initNativeCreatedWindow(miscParams);
+
+        if (mEglSurface)
+        {
+            mEglConfig = mGLSupport->getGLConfigFromDrawable (mEglSurface, &width, &height);
+        }
+
         if (!mEglConfig && eglContext)
         {
             mEglConfig = mGLSupport->getGLConfigFromContext(eglContext);
@@ -400,6 +430,10 @@ namespace Ogre {
                             "EGLWindow::create");
             }
         }
+
+        mIsExternal = (mEglSurface != 0);
+
+
 
         if (!mEglConfig)
         {
@@ -434,18 +468,31 @@ namespace Ogre {
             mGLSupport->switchMode (width, height, frequency);
         }
 
-        createNativeWindow(left, top, width, height, title);
+        if (!mIsExternal)
+        {
+            createNativeWindow(left, top, width, height, title);
+        }
 
-        mContext = createEGLContext(eglContext);
+        mContext = createEGLContext();
         mContext->setCurrent();
+        ::EGLSurface oldDrawableDraw = eglGetCurrentSurface(EGL_DRAW);
+        ::EGLSurface oldDrawableRead = eglGetCurrentSurface(EGL_READ);
+        ::EGLContext oldContext  = eglGetCurrentContext();
+
+        int glConfigID;
+
+        mGLSupport->getGLConfigAttrib(mEglConfig, EGL_CONFIG_ID, &glConfigID);
+        LogManager::getSingleton().logMessage("EGLWindow::create used FBConfigID = " + StringConverter::toString(glConfigID));
 
         mName = name;
         mWidth = width;
         mHeight = height;
         mLeft = left;
         mTop = top;
+        mActive = true;
+        mVisible = true;
 
-        finaliseWindow();
+        mClosed = false;
     }
 
 }

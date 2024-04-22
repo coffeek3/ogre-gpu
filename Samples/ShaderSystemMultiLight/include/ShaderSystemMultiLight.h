@@ -67,13 +67,13 @@ public:
         
     }
 
-    void _shutdown() override
+    virtual void _shutdown()
     {
         delete SegmentedDynamicLightManager::getSingletonPtr();
 
         RTShader::RenderState* pMainRenderState = 
-            RTShader::ShaderGenerator::getSingleton().createOrRetrieveRenderState(MSN_SHADERGEN).first;
-        pMainRenderState->resetToBuiltinSubRenderStates();
+            RTShader::ShaderGenerator::getSingleton().createOrRetrieveRenderState(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME).first;
+        pMainRenderState->reset();
         
         if (mSRSSegLightFactory)
         {
@@ -91,7 +91,7 @@ public:
         SdkSample::_shutdown();
     }
 
-    bool frameRenderingQueued(const FrameEvent& evt) override
+    bool frameRenderingQueued(const FrameEvent& evt)
     {
         // Move the lights along their paths
         for(size_t i = 0 ; i < mLights.size() ; ++i)
@@ -99,13 +99,13 @@ public:
             mLights[i].animState->addTime(evt.timeSinceLastFrame);
             if (mTwirlLights)
             {
-                mLights[i].dirnode->setDirection(
+                mLights[i].light->setDirection(
                     Quaternion(Degree(ControllerManager::getSingleton().getElapsedTime() * 150 + 360 * i / (float)mLights.size()), Vector3::UNIT_Y) *
-                    Vector3(0,-1,-1).normalisedCopy(), Node::TS_WORLD);
+                    Vector3(0,-1,-1).normalisedCopy());
             }
             else
             {
-                mLights[i].dirnode->setDirection(Vector3::NEGATIVE_UNIT_Y, Node::TS_WORLD);
+                mLights[i].light->setDirection(Vector3::NEGATIVE_UNIT_Y);
             }
         }
         
@@ -115,7 +115,7 @@ public:
 
 protected:
 
-    void setupContent() override
+    void setupContent()
     {
         mTrayMgr->createThickSlider(TL_BOTTOM, NUM_OF_LIGHTS_SLIDER, "Num of lights", 240, 80, 0, 64, 65)->setValue(cInitialLightCount, false);
         mTrayMgr->createCheckBox(TL_BOTTOM, TWIRL_LIGHTS_CHECKBOX, "Twirl Lights", 240)->setChecked(false, false);
@@ -146,7 +146,7 @@ protected:
         setupLights();
     }
         
-    void cleanupContent() override
+    void cleanupContent()
     {
         MeshManager::getSingleton().remove("floor", ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     }
@@ -160,8 +160,8 @@ protected:
         RTShader::ShaderGenerator* mGen = RTShader::ShaderGenerator::getSingletonPtr();
 
         RTShader::RenderState* pMainRenderState = 
-            mGen->createOrRetrieveRenderState(MSN_SHADERGEN).first;
-        pMainRenderState->resetToBuiltinSubRenderStates();
+            mGen->createOrRetrieveRenderState(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME).first;
+        pMainRenderState->reset();
 
         // If we are using segmented lighting, no auto light update required. (prevent constant invalidation)
         pMainRenderState->setLightCountAutoUpdate(false);
@@ -171,10 +171,10 @@ protected:
         pMainRenderState->addTemplateSubRenderState(
             mGen->createSubRenderState<RTShaderSRSSegmentedLights>());
 
-        mGen->invalidateScheme(Ogre::MSN_SHADERGEN);
+        mGen->invalidateScheme(Ogre::RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
 
         // Make this viewport work with shader generator scheme.
-        mViewport->setMaterialScheme(MSN_SHADERGEN);
+        mViewport->setMaterialScheme(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
     }
 
 
@@ -184,13 +184,10 @@ protected:
         // set the single directional light
         Light* light = mSceneMgr->createLight();
         light->setType(Light::LT_DIRECTIONAL);
+        light->setDirection(Vector3(-1,-1,0).normalisedCopy());
         light->setDiffuseColour(ColourValue(0.1, 0.1, 0.1));
         light->setCastShadows(false);
         
-        auto ln = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-        ln->setDirection(Vector3(-1,-1,0).normalisedCopy());
-        ln->attachObject(light);
-
         for(unsigned int i = 0 ; i < cInitialLightCount ; ++i)
         {
             addSpotLight();
@@ -245,11 +242,10 @@ protected:
         state.light = mSceneMgr->createLight();
         state.light->setCastShadows(false);
         state.light->setType(mLights.size() % 10 ? Light::LT_SPOTLIGHT : Light::LT_POINT);
+        state.light->setDirection(Vector3::NEGATIVE_UNIT_Y);
         state.light->setAttenuation(200,0,0,0);
         state.light->setDiffuseColour(lightColor);
-        state.dirnode = state.node->createChildSceneNode();
-        state.dirnode->setDirection(Vector3::NEGATIVE_UNIT_Y, Node::TS_WORLD);
-        state.dirnode->attachObject(state.light);
+        state.node->attachObject(state.light);
 
         // Attach a flare with the same colour to the light node
         state.bbs = mSceneMgr->createBillboardSet(1);
@@ -272,12 +268,12 @@ protected:
         bool needInvalidate = SegmentedDynamicLightManager::getSingleton().setDebugMode(state);
         if (needInvalidate)
         {
-            RTShader::ShaderGenerator::getSingleton().invalidateScheme(MSN_SHADERGEN);
+            RTShader::ShaderGenerator::getSingleton().invalidateScheme(RTShader::ShaderGenerator::DEFAULT_SCHEME_NAME);
         }
     }
 
     //--------------------------------------------------------------------------
-    void sliderMoved(Slider* slider) override
+    void sliderMoved(Slider* slider)
     {
         if (slider->getName() == NUM_OF_LIGHTS_SLIDER)
         {
@@ -314,7 +310,7 @@ protected:
     }
 
     
-    void checkBoxToggled(CheckBox* box) override
+    void checkBoxToggled(CheckBox* box)
     {
         const String& cbName = box->getName();
 
@@ -332,7 +328,6 @@ private:
     struct LightState
     {
         SceneNode* node;
-        SceneNode* dirnode;
         Animation* anim;
         NodeAnimationTrack* track;
         AnimationState* animState;

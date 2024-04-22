@@ -12,7 +12,7 @@
 # Add platform specific settings
 
 if(EGL_FOUND)
-  cmake_dependent_option(OGRE_GLSUPPORT_USE_EGL "use EGL for GL Context Creation instead of GLX/ WGL" TRUE "NOT WIN32" FALSE)
+  option(OGRE_GLSUPPORT_USE_EGL "use EGL for GL Context Creation instead of GLX/ WGL" FALSE)
 endif()
 
 if(ANDROID)
@@ -44,7 +44,9 @@ elseif (WIN32)
     set(NATIVE_INCLUDES
         ${CMAKE_CURRENT_SOURCE_DIR}/include/win32)
         
-    set(PLATFORM_LIBS ${OPENGL_gl_LIBRARY})
+    if(MINGW)
+        set(PLATFORM_LIBS opengl32)
+    endif()
   endif()
 elseif(APPLE_IOS)
   # only works with GLES2 - no shared components here.
@@ -61,11 +63,11 @@ elseif (APPLE)
   set(NATIVE_INCLUDES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/OSX 
     ${PROJECT_SOURCE_DIR}/OgreMain/include/OSX)
-  set(PLATFORM_LIBS "-framework AppKit" ${OPENGL_gl_LIBRARY})
+  set(PLATFORM_LIBS ${Cocoa_LIBRARY_FWK})
 elseif (UNIX)
   if(OGRE_GLSUPPORT_USE_EGL)
     file(GLOB PLATFORM_HEADERS "include/EGL/X11/*.h" "include/EGL/*.h")
-    file(GLOB PLATFORM_SOURCES "src/EGL/X11/*.cpp" "src/EGL/*.cpp" "src/X11/*.cpp")
+    file(GLOB PLATFORM_SOURCES "src/EGL/X11/*.cpp" "src/EGL/*.cpp")
     
     set(NATIVE_INCLUDES
         ${CMAKE_CURRENT_SOURCE_DIR}/include/EGL
@@ -73,19 +75,13 @@ elseif (UNIX)
     set(PLATFORM_LIBS ${X11_LIBRARIES} ${X11_Xrandr_LIB} ${EGL_LIBRARIES})
   else()
     file(GLOB PLATFORM_HEADERS "include/GLX/*.h")
-    file(GLOB PLATFORM_SOURCES "src/GLX/*.cpp" "src/X11/*.cpp")
+    file(GLOB PLATFORM_SOURCES "src/GLX/*.cpp")
 
     set(NATIVE_INCLUDES
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/GLX
-        ${OPENGL_INCLUDE_DIR})
-
-    if(NOT OPENGL_glx_LIBRARY)
-      set(OPENGL_glx_LIBRARY ${OPENGL_gl_LIBRARY})
-    endif()
-
-    set(PLATFORM_LIBS ${X11_LIBRARIES} ${X11_Xrandr_LIB} ${OPENGL_glx_LIBRARY})
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/GLX)
+    
+    set(PLATFORM_LIBS ${X11_LIBRARIES} ${X11_Xrandr_LIB} ${OPENGL_gl_LIBRARY})
   endif()
-  list(APPEND NATIVE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/src/X11/")
 endif ()
 
 file(GLOB GLSUPPORT_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
@@ -104,11 +100,9 @@ add_library(OgreGLSupport STATIC
     src/OgreGLTextureCommon.cpp
     src/OgreGLDepthBufferCommon.cpp
     src/OgreGLRenderTexture.cpp
-    src/OgreGLRenderToVertexBufferCommon.cpp
     src/OgreGLHardwarePixelBufferCommon.cpp
     src/OgreGLUniformCache.cpp
     src/OgreGLVertexArrayObject.cpp
-    src/OgreGLWindow.cpp
 )
 target_link_libraries(OgreGLSupport PUBLIC OgreMain PRIVATE ${PLATFORM_LIBS})
 target_include_directories(OgreGLSupport PUBLIC 
@@ -121,6 +115,8 @@ generate_export_header(OgreGLSupport
     EXPORT_MACRO_NAME _OgreGLExport
     EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/OgreGLSupportPrerequisites.h)
 
-if(OGRE_STATIC)
-  ogre_config_lib(OgreGLSupport TRUE)
+if (APPLE)
+    set_target_properties(OgreGLSupport PROPERTIES LINK_FLAGS "-framework Cocoa -framework OpenGL")
 endif()
+
+ogre_config_component(OgreGLSupport)

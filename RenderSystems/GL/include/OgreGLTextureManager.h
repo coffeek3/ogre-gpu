@@ -42,11 +42,11 @@ namespace Ogre {
         virtual ~GLTextureManager();
 
         /// @copydoc TextureManager::getNativeFormat
-        PixelFormat getNativeFormat(TextureType ttype, PixelFormat format, int usage) override;
+        PixelFormat getNativeFormat(TextureType ttype, PixelFormat format, int usage);
 
         /// @copydoc TextureManager::isHardwareFilteringSupported
         bool isHardwareFilteringSupported(TextureType ttype, PixelFormat format, int usage,
-            bool preciseFormatOnly = false) override;
+            bool preciseFormatOnly = false);
 
     protected:
         friend class GLRenderSystem;
@@ -54,7 +54,7 @@ namespace Ogre {
         /// @copydoc ResourceManager::createImpl
         Resource* createImpl(const String& name, ResourceHandle handle, 
             const String& group, bool isManual, ManualResourceLoader* loader, 
-            const NameValuePairList* createParams) override;
+            const NameValuePairList* createParams);
 
         GLRenderSystem* mRenderSystem;
     };

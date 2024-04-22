@@ -31,10 +31,11 @@ THE SOFTWARE.
 
 #include "OgreOverlayPrerequisites.h"
 #include "OgreOverlayElement.h"
+#include "OgreIteratorWrappers.h"
 
 
 namespace Ogre {
-    template <typename T> class MapIterator;
+
 
     /** \addtogroup Optional
     *  @{
@@ -43,11 +44,11 @@ namespace Ogre {
     *  @{
     */
     /** A 2D element which contains other OverlayElement instances.
-
+    @remarks
         This is a specialisation of OverlayElement for 2D elements that contain other
         elements. These are also the smallest elements that can be attached directly
         to an Overlay.
-
+    @remarks
         OverlayContainers should be managed using OverlayManager. This class is responsible for
         instantiating / deleting elements, and also for accepting new types of element
         from plugins etc.
@@ -59,7 +60,7 @@ namespace Ogre {
         typedef MapIterator<ChildMap> ChildIterator;
         typedef std::map<String, OverlayContainer*> ChildContainerMap;
         typedef MapIterator<ChildContainerMap> ChildContainerIterator;
-    private:
+    protected:
         /// Map of all children
         ChildMap mChildren;
         /// Map of container children (subset of mChildren)
@@ -84,47 +85,44 @@ namespace Ogre {
         virtual OverlayElement* getChild(const String& name);
 
         /** @copydoc OverlayElement::initialise */
-        void initialise(void) override;
+        void initialise(void);
 
         void _addChild(OverlayElement* elem);
         void _removeChild(OverlayElement* elem) { _removeChild(elem->getName()); }
         void _removeChild(const String& name);
 
-        /** Gets all the children of this object. */
-        const ChildMap& getChildren() const { return mChildren; }
-
-        /// @deprecated use getChildren(
-        OGRE_DEPRECATED virtual ChildIterator getChildIterator(void);
+        /** Gets an object for iterating over all the children of this object. */
+        virtual ChildIterator getChildIterator(void);
 
         /** Gets an iterator for just the container children of this object.
-
+        @remarks
             Good for cascading updates without having to use RTTI
         */
         virtual ChildContainerIterator getChildContainerIterator(void);
 
         /** Tell the object and its children to recalculate */
-        void _positionsOutOfDate(void) override;
+        virtual void _positionsOutOfDate(void);
 
         /** Overridden from OverlayElement. */
-        void _update(void) override;
+        virtual void _update(void);
 
         /** Overridden from OverlayElement. */
-        ushort _notifyZOrder(ushort newZOrder) override;
+        virtual ushort _notifyZOrder(ushort newZOrder);
 
         /** Overridden from OverlayElement. */
-        void _notifyViewport() override;
+        virtual void _notifyViewport();
 
         /** Overridden from OverlayElement. */
-        void _notifyWorldTransforms(const Matrix4& xform) override;
+        virtual void _notifyWorldTransforms(const Matrix4& xform);
 
         /** Overridden from OverlayElement. */
-        void _notifyParent(OverlayContainer* parent, Overlay* overlay) override;
+        virtual void _notifyParent(OverlayContainer* parent, Overlay* overlay);
 
         /** Overridden from OverlayElement. */
-        void _updateRenderQueue(RenderQueue* queue) override;
+        virtual void _updateRenderQueue(RenderQueue* queue);
 
         /** Overridden from OverlayElement. */
-        inline bool isContainer() const override
+        inline bool isContainer() const
         { return true; }
 
         /** Should this container pass events to their children */
@@ -136,10 +134,10 @@ namespace Ogre {
         { mChildrenProcessEvents = val; }
 
         /** This returns a OverlayElement at position x,y. */
-        OverlayElement* findElementAt(Real x, Real y) override;      // relative to parent
+        virtual OverlayElement* findElementAt(Real x, Real y);      // relative to parent
 
-        void copyFromTemplate(OverlayElement* templateOverlay) override;
-        OverlayElement* clone(const String& instanceName) override;
+        void copyFromTemplate(OverlayElement* templateOverlay);
+        virtual OverlayElement* clone(const String& instanceName);
 
     };
 

@@ -36,6 +36,8 @@ namespace Ogre
     //---------------------------------------------------------------------
     void FileSystemLayer::getConfigPaths()
     {
+        // use application path as first config search path
+        mConfigPaths.push_back("");
     }
     //---------------------------------------------------------------------
     void FileSystemLayer::prepareUserHome(const Ogre::String& subdir)

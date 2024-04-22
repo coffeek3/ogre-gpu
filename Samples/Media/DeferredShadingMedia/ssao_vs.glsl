@@ -1,12 +1,8 @@
-#ifdef GL_ES
-#version 300 es
-#else
 #version 150
-#endif
 
 uniform mat4 worldViewProj;
+uniform vec3 farCorner;
 in vec4 vertex;
-in vec3 normal;
 out vec2 oUv0;
 out vec3 ray;
 
@@ -19,6 +15,6 @@ void main()
     // Convert to image space
     uv = (vec2(uv.x, -uv.y) + 1.0) * 0.5;
     oUv0 = uv;
-    // ray towards frustum far corners
-    ray = normal;
+    // Calculate the correct ray (modify XY parameters based on screen-space quad XY)
+    ray = farCorner * vec3(sign(vertex.xy), 1);
 }

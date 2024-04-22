@@ -30,7 +30,7 @@ THE SOFTWARE.
 
 #include "OgreParticleFXPrerequisites.h"
 #include "OgreParticleAffector.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 
 
 namespace Ogre {
@@ -40,8 +40,9 @@ namespace Ogre {
     /** \addtogroup ParticleFX
     *  @{
     */
-    /** This affector applies a force vector to all particles to modify their trajectory. Can be used for gravity, wind, or any other linear force.
-
+    /** This class defines a ParticleAffector which applies a linear force to particles in a system.
+    @remarks
+        This affector (see ParticleAffector) applies a linear force, such as gravity, to a particle system.
         This force can be applied in 2 ways: by taking the average of the particle's current momentum and the 
         force vector, or by adding the force vector to the current particle's momentum. 
     @par
@@ -52,23 +53,23 @@ namespace Ogre {
         it is not self-stabilising and can lead to perpetually increasing particle velocities. 
         You choose the approach by calling the setForceApplication method.
     */
-    class LinearForceAffector : public ParticleAffector
+    class _OgreParticleFXExport LinearForceAffector : public ParticleAffector
     {
     public:
         /** Command object for force vector (see ParamCommand).*/
         class CmdForceVector : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
 
         /** Command object for force application (see ParamCommand).*/
         class CmdForceApp : public ParamCommand
         {
         public:
-            String doGet(const void* target) const override;
-            void doSet(void* target, const String& val) override;
+            String doGet(const void* target) const;
+            void doSet(void* target, const String& val);
         };
         /// Choice of how to apply the force vector to particles
         enum ForceApplication
@@ -81,7 +82,8 @@ namespace Ogre {
         /// Default constructor
         LinearForceAffector(ParticleSystem* psys);
 
-        void _affectParticles(ParticleSystem* pSystem, Real timeElapsed) override;
+        /** See ParticleAffector. */
+        void _affectParticles(ParticleSystem* pSystem, Real timeElapsed);
 
 
         /** Sets the force vector to apply to the particles in a system. */
@@ -91,7 +93,7 @@ namespace Ogre {
         Vector3 getForceVector(void) const;
 
         /** Sets how the force vector is applied to a particle. 
-
+        @remarks
           The default is FA_ADD.
         @param fa A member of the ForceApplication enum.
         */

@@ -114,9 +114,9 @@ namespace Ogre {
     }
     ProfileInstance::~ProfileInstance(void)
     {                                        
-        for(auto & it : children)
+        for(ProfileChildren::iterator it = children.begin(); it != children.end(); ++it)
         {
-            ProfileInstance* instance = it.second;
+            ProfileInstance* instance = it->second;
             OGRE_DELETE instance;
         }
         children.clear();
@@ -153,15 +153,15 @@ namespace Ogre {
     {
         if (!mInitialized && enabled) 
         {
-            for(auto & l : mListeners)
-                l->initializeSession();
+            for( TProfileSessionListener::iterator i = mListeners.begin(); i != mListeners.end(); ++i )
+                (*i)->initializeSession();
 
             mInitialized = true;
         }
         else if (mInitialized)
         {
-            for(auto & l : mListeners)
-                l->finializeSession();
+            for( TProfileSessionListener::iterator i = mListeners.begin(); i != mListeners.end(); ++i )
+                (*i)->finializeSession();
 
             mInitialized = false;
             mEnabled = false;
@@ -178,8 +178,8 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Profiler::changeEnableState() 
     {
-        for(auto & l : mListeners)
-            l->changeEnableState(mNewEnableState);
+        for( TProfileSessionListener::iterator i = mListeners.begin(); i != mListeners.end(); ++i )
+            (*i)->changeEnableState(mNewEnableState);
 
         mEnabled = mNewEnableState;
     }
@@ -372,6 +372,21 @@ namespace Ogre {
 #endif
     }
     //-----------------------------------------------------------------------
+    void Profiler::beginGPUEvent(const String& event)
+    {
+        Root::getSingleton().getRenderSystem()->beginProfileEvent(event);
+    }
+    //-----------------------------------------------------------------------
+    void Profiler::endGPUEvent(const String& event)
+    {
+        Root::getSingleton().getRenderSystem()->endProfileEvent();
+    }
+    //-----------------------------------------------------------------------
+    void Profiler::markGPUEvent(const String& event)
+    {
+        Root::getSingleton().getRenderSystem()->markProfileEvent(event);
+    }
+    //-----------------------------------------------------------------------
     void Profiler::processFrameStats(ProfileInstance* instance, Real& maxFrameTime)
     {
         // calculate what percentage of frame time this profile took
@@ -410,12 +425,13 @@ namespace Ogre {
             instance->history.maxTimeMillisecs = frameTimeMillisecs;
         }
 
-        if (instance->frame.frameTime > maxFrameTime)
+        if(instance->frame.frameTime > maxFrameTime)
             maxFrameTime = (Real)instance->frame.frameTime;
 
-        for (auto& i : instance->children)
+        ProfileChildren::iterator it = instance->children.begin(), endit = instance->children.end();
+        for(;it != endit; ++it)
         {
-            ProfileInstance* child = i.second;
+            ProfileInstance* child = it->second;
 
             // we set the number of times each profile was called per frame to 0
             // because not all profiles are called every frame
@@ -432,9 +448,10 @@ namespace Ogre {
     {
         Real maxFrameTime = 0;
 
-        for (auto& i : mRoot.children)
+        ProfileChildren::iterator it = mRoot.children.begin(), endit = mRoot.children.end();
+        for(;it != endit; ++it)
         {
-            ProfileInstance* child = i.second;
+            ProfileInstance* child = it->second;
 
             // we set the number of times each profile was called per frame to 0
             // because not all profiles are called every frame
@@ -469,8 +486,8 @@ namespace Ogre {
             // ensure the root won't be culled
             mRoot.frame.calls = 1;
 
-            for(auto& l : mListeners)
-                l->displayResults(mRoot, mMaxTotalFrameTime);
+            for( TProfileSessionListener::iterator i = mListeners.begin(); i != mListeners.end(); ++i )
+                (*i)->displayResults(mRoot, mMaxTotalFrameTime);
         }
         ++mCurrentFrame;
     }
@@ -484,9 +501,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     bool ProfileInstance::watchForMax(const String& profileName) 
     {
-        for(auto& i : children)
+        ProfileChildren::iterator it = children.begin(), endit = children.end();
+        for(;it != endit; ++it)
         {
-            ProfileInstance* child = i.second;
+            ProfileInstance* child = it->second;
             if( (child->name == profileName && child->watchForMax()) || child->watchForMax(profileName))
                 return true;
         }
@@ -501,9 +519,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     bool ProfileInstance::watchForMin(const String& profileName) 
     {
-        for(auto& i : children)
+        ProfileChildren::iterator it = children.begin(), endit = children.end();
+        for(;it != endit; ++it)
         {
-            ProfileInstance* child = i.second;
+            ProfileInstance* child = it->second;
             if( (child->name == profileName && child->watchForMin()) || child->watchForMin(profileName))
                 return true;
         }
@@ -518,9 +537,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     bool ProfileInstance::watchForLimit(const String& profileName, Real limit, bool greaterThan) 
     {
-        for(auto& i : children)
+        ProfileChildren::iterator it = children.begin(), endit = children.end();
+        for(;it != endit; ++it)
         {
-            ProfileInstance* child = i.second;
+            ProfileInstance* child = it->second;
             if( (child->name == profileName && child->watchForLimit(limit, greaterThan)) || child->watchForLimit(profileName, limit, greaterThan))
                 return true;
         }
@@ -531,9 +551,9 @@ namespace Ogre {
     {
         LogManager::getSingleton().logMessage("----------------------Profiler Results----------------------");
 
-        for(auto& it : mRoot.children)
+        for(ProfileChildren::iterator it = mRoot.children.begin(); it != mRoot.children.end(); ++it)
         {
-            it.second->logResults();
+            it->second->logResults();
         }
 
         LogManager::getSingleton().logMessage("------------------------------------------------------------");
@@ -541,13 +561,21 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void ProfileInstance::logResults() 
     {
-        LogManager::getSingleton().logMessage(StringUtil::format(
-            "%*s%s\t| Min %.2f | Max %.2f | Avg %.2f", hierarchicalLvl * 4, "", name.c_str(), history.minTimePercent,
-            history.maxTimePercent, history.totalTimePercent / history.totalCalls));
-
-        for(auto& it : children)
+        // create an indent that represents the hierarchical order of the profile
+        String indent = "";
+        for (uint i = 0; i < hierarchicalLvl; ++i) 
         {
-            it.second->logResults();
+            indent = indent + "\t";
+        }
+
+        LogManager::getSingleton().logMessage(indent + "Name " + name + 
+                        " | Min " + StringConverter::toString(history.minTimePercent) + 
+                        " | Max " + StringConverter::toString(history.maxTimePercent) + 
+                        " | Avg "+ StringConverter::toString(history.totalTimePercent / history.totalCalls));   
+
+        for(ProfileChildren::iterator it = children.begin(); it != children.end(); ++it)
+        {
+            it->second->logResults();
         }
     }
     //-----------------------------------------------------------------------
@@ -565,9 +593,9 @@ namespace Ogre {
 
         history.minTimePercent = 1;
         history.minTimeMillisecs = 100000;
-        for(auto& it : children)
+        for(ProfileChildren::iterator it = children.begin(); it != children.end(); ++it)
         {
-            it.second->reset();
+            it->second->reset();
         }
     }
     //-----------------------------------------------------------------------

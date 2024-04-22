@@ -59,10 +59,11 @@ namespace Ogre {
         ViewportList vlist = mViewportList;
         
         // Delete viewports
-        for (auto & i : vlist)
+        for (ViewportList::iterator i = vlist.begin();
+            i != vlist.end(); ++i)
         {
-            fireViewportRemoved(i.second);
-            OGRE_DELETE i.second;
+            fireViewportRemoved(i->second);
+            OGRE_DELETE (*i).second;
         }
 
         //DepthBuffer keeps track of us, avoid a dangling pointer
@@ -84,10 +85,11 @@ namespace Ogre {
     }
 
 
-    void RenderTarget::getMetrics(unsigned int& width, unsigned int& height)
+    void RenderTarget::getMetrics(unsigned int& width, unsigned int& height, unsigned int& colourDepth)
     {
         width = mWidth;
         height = mHeight;
+        colourDepth = mColourDepth;
     }
 
     unsigned int RenderTarget::getWidth(void) const
@@ -97,6 +99,10 @@ namespace Ogre {
     unsigned int RenderTarget::getHeight(void) const
     {
         return mHeight;
+    }
+    unsigned int RenderTarget::getColourDepth(void) const
+    {
+        return mColourDepth;
     }
     //-----------------------------------------------------------------------
     void RenderTarget::setDepthBufferPool( uint16 poolId )
@@ -166,13 +172,15 @@ namespace Ogre {
     {
         // Go through viewports in Z-order
         // Tell each to refresh
-        for (const auto& v : mViewportList)
+        ViewportList::iterator it = mViewportList.begin();
+        while (it != mViewportList.end())
         {
-            Viewport* viewport = v.second;
+            Viewport* viewport = (*it).second;
             if(viewport->isAutoUpdated())
             {
                 _updateViewport(viewport,updateStatistics);
             }
+            ++it;
         }
     }
 
@@ -257,10 +265,10 @@ namespace Ogre {
         // make a copy of the list to avoid crashes, the viewport destructor change the list
         ViewportList vlist = mViewportList;
 
-        for (auto& vl : vlist)
+        for (ViewportList::iterator it = vlist.begin(); it != vlist.end(); ++it)
         {
-            fireViewportRemoved(vl.second);
-            OGRE_DELETE vl.second;
+            fireViewportRemoved(it->second);
+            OGRE_DELETE (*it).second;
         }
 
         mViewportList.clear();
@@ -354,9 +362,12 @@ namespace Ogre {
         RenderTargetEvent evt;
         evt.source = this;
 
-        for(auto& l : mListeners)
+        RenderTargetListenerList::iterator i, iend;
+        i = mListeners.begin();
+        iend = mListeners.end();
+        for(; i != iend; ++i)
         {
-            l->preRenderTargetUpdate(evt);
+            (*i)->preRenderTargetUpdate(evt);
         }
 
 
@@ -367,9 +378,12 @@ namespace Ogre {
         RenderTargetEvent evt;
         evt.source = this;
 
-        for(auto& l : mListeners)
+        RenderTargetListenerList::iterator i, iend;
+        i = mListeners.begin();
+        iend = mListeners.end();
+        for(; i != iend; ++i)
         {
-            l->postRenderTargetUpdate(evt);
+            (*i)->postRenderTargetUpdate(evt);
         }
     }
     //-----------------------------------------------------------------------
@@ -421,9 +435,12 @@ namespace Ogre {
         RenderTargetViewportEvent evt;
         evt.source = vp;
 
-        for(auto& l : mListeners)
+        RenderTargetListenerList::iterator i, iend;
+        i = mListeners.begin();
+        iend = mListeners.end();
+        for(; i != iend; ++i)
         {
-            l->preViewportUpdate(evt);
+            (*i)->preViewportUpdate(evt);
         }
     }
     //-----------------------------------------------------------------------
@@ -432,9 +449,12 @@ namespace Ogre {
         RenderTargetViewportEvent evt;
         evt.source = vp;
 
-        for(auto& l : mListeners)
+        RenderTargetListenerList::iterator i, iend;
+        i = mListeners.begin();
+        iend = mListeners.end();
+        for(; i != iend; ++i)
         {
-            l->postViewportUpdate(evt);
+            (*i)->postViewportUpdate(evt);
         }
     }
     //-----------------------------------------------------------------------
@@ -443,9 +463,12 @@ namespace Ogre {
         RenderTargetViewportEvent evt;
         evt.source = vp;
 
-        for(auto& l : mListeners)
+        RenderTargetListenerList::iterator i, iend;
+        i = mListeners.begin();
+        iend = mListeners.end();
+        for(; i != iend; ++i)
         {
-            l->viewportAdded(evt);
+            (*i)->viewportAdded(evt);
         }
     }
     //-----------------------------------------------------------------------
@@ -458,17 +481,20 @@ namespace Ogre {
         // some will want to remove themselves as listeners when they get this
         RenderTargetListenerList tempList = mListeners;
 
-        for(auto& l : tempList)
+        RenderTargetListenerList::iterator i, iend;
+        i = tempList.begin();
+        iend = tempList.end();
+        for(; i != iend; ++i)
         {
-            l->viewportRemoved(evt);
+            (*i)->viewportRemoved(evt);
         }
     }
     //-----------------------------------------------------------------------
     String RenderTarget::writeContentsToTimestampedFile(const String& filenamePrefix, const String& filenameSuffix)
     {
-        auto t = std::time(nullptr);
-        auto pTime = std::localtime(&t);
-
+        struct tm *pTime;
+        time_t ctTime; time(&ctTime);
+        pTime = localtime( &ctTime );
         // use ISO 8601 order
         StringStream oss;
         oss << filenamePrefix
@@ -483,21 +509,25 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void RenderTarget::writeContentsToFile(const String& filename)
     {
-        Image img(suggestPixelFormat(), mWidth, mHeight);
+        PixelFormat pf = suggestPixelFormat();
 
-        PixelBox pb = img.getPixelBox();
+        uchar *data = OGRE_ALLOC_T(uchar, mWidth * mHeight * PixelUtil::getNumElemBytes(pf), MEMCATEGORY_RENDERSYS);
+        PixelBox pb(mWidth, mHeight, 1, pf, data);
+
         copyContentsToMemory(pb, pb);
 
-        img.save(filename);
+        Image().loadDynamicImage(data, mWidth, mHeight, 1, pf, false, 1, 0).save(filename);
+
+        OGRE_FREE(data, MEMCATEGORY_RENDERSYS);
     }
     //-----------------------------------------------------------------------
     void RenderTarget::_notifyCameraRemoved(const Camera* cam)
     {
         ViewportList::iterator i, iend;
         iend = mViewportList.end();
-        for (auto& l : mViewportList)
+        for (i = mViewportList.begin(); i != iend; ++i)
         {
-            Viewport* v = l.second;
+            Viewport* v = i->second;
             if (v->getCamera() == cam)
             {
                 // disable camera link
@@ -527,6 +557,11 @@ namespace Ogre {
         return mStereoEnabled;
     }
     //-----------------------------------------------------------------------
+    RenderTarget::Impl *RenderTarget::_getImpl()
+    {
+        return 0;
+    }
+    //-----------------------------------------------------------------------
     void RenderTarget::update(bool swap)
     {
         OgreProfileBeginGPUEvent(getName());
@@ -541,4 +576,6 @@ namespace Ogre {
         }
         OgreProfileEndGPUEvent(getName());
     }
-}
+    
+
+}        

@@ -42,9 +42,9 @@ namespace Ogre {
         GLCopyingRenderTexture(GLCopyingRTTManager *manager, const String &name, const GLSurfaceDesc &target, 
             bool writeGamma, uint fsaa);
         
-        void getCustomAttribute(const String& name, void* pData) override;
+        virtual void getCustomAttribute(const String& name, void* pData);
 
-        GLContext* getContext() const override { return NULL; }
+        GLContext* getContext() const { return NULL; }
     };
     
     /** Simple, copying manager/factory for RenderTextures. This is only used as the last fallback if
@@ -53,7 +53,7 @@ namespace Ogre {
     class _OgreGLExport GLCopyingRTTManager: public GLRTTManager
     {
     public:
-        RenderTexture *createRenderTexture(const String &name, const GLSurfaceDesc &target, bool writeGamma, uint fsaa) override {
+        RenderTexture *createRenderTexture(const String &name, const GLSurfaceDesc &target, bool writeGamma, uint fsaa) {
             return new GLCopyingRenderTexture(this, name, target, writeGamma, fsaa);
         }
 
@@ -61,11 +61,11 @@ namespace Ogre {
             return true;
         }
         
-        void bind(RenderTarget *target) override {
+        void bind(RenderTarget *target) {
             // Nothing to do here
         }
 
-        void unbind(RenderTarget *target) override;
+        void unbind(RenderTarget *target);
     };
 }
 

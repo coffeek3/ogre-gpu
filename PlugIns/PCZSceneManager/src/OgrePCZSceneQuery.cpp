@@ -62,12 +62,17 @@ namespace Ogre
         MovableSet set;
 
         // Iterate over all movable types
-        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
+        Root::MovableObjectFactoryIterator factIt = 
+            Root::getSingleton().getMovableObjectFactoryIterator();
+        while(factIt.hasMoreElements())
         {
-            for (const auto& it : mParentSceneMgr->getMovableObjects(factIt.first))
+            SceneManager::MovableObjectIterator it = 
+                mParentSceneMgr->getMovableObjectIterator(
+                factIt.getNext()->getType());
+            while( it.hasMoreElements() )
             {
 
-                MovableObject * e = it.second;
+                MovableObject * e = it.getNext();
                 PCZone * zone = ((PCZSceneNode*)(e->getParentSceneNode()))->getHomeZone();
                 PCZSceneNodeList list;
                 //find the nodes that intersect the AAB
@@ -88,7 +93,7 @@ namespace Ogre
                         {
                             listener -> queryResult( e, m );
                             // deal with attached objects, since they are not directly attached to nodes
-                            if (m->getMovableType() == MOT_ENTITY)
+                            if (m->getMovableType() == "Entity")
                             {
                                 Entity* e2 = static_cast<Entity*>(m);
                                 for (auto c : e2->getAttachedObjects())
@@ -106,6 +111,7 @@ namespace Ogre
                     }
                     ++nit;
                 }
+
             }
         }
     }
@@ -140,7 +146,7 @@ namespace Ogre
                 {
                     listener -> queryResult( m );
                     // deal with attached objects, since they are not directly attached to nodes
-                    if (m->getMovableType() == MOT_ENTITY)
+                    if (m->getMovableType() == "Entity")
                     {
                         Entity* e = static_cast<Entity*>(m);
                         for (auto c : e->getAttachedObjects())
@@ -192,7 +198,7 @@ namespace Ogre
                     {
                         listener -> queryResult( m, result.second );
                         // deal with attached objects, since they are not directly attached to nodes
-                        if (m->getMovableType() == MOT_ENTITY)
+                        if (m->getMovableType() == "Entity")
                         {
                             Entity* e = static_cast<Entity*>(m);
                             for (auto c : e->getAttachedObjects())
@@ -248,7 +254,7 @@ namespace Ogre
                 {
                     listener -> queryResult( m );
                     // deal with attached objects, since they are not directly attached to nodes
-                    if (m->getMovableType() == MOT_ENTITY)
+                    if (m->getMovableType() == "Entity")
                     {
                         Entity* e = static_cast<Entity*>(m);
                         for (auto c : e->getAttachedObjects())
@@ -309,7 +315,7 @@ namespace Ogre
                     {
                         listener -> queryResult( m );
                         // deal with attached objects, since they are not directly attached to nodes
-                        if (m->getMovableType() == MOT_ENTITY)
+                        if (m->getMovableType() == "Entity")
                         {
                             Entity* e = static_cast<Entity*>(m);
                             for (auto c : e->getAttachedObjects())

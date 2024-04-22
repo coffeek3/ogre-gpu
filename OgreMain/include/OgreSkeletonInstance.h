@@ -42,7 +42,7 @@ namespace Ogre {
     *  @{
     */
     /** A SkeletonInstance is a single instance of a Skeleton used by a world object.
-
+    @remarks
         The difference between a Skeleton and a SkeletonInstance is that the
         Skeleton is the 'master' version much like Mesh is a 'master' version of
         Entity. Many SkeletonInstance objects can be based on a single Skeleton, 
@@ -60,31 +60,31 @@ namespace Ogre {
         ~SkeletonInstance();
 
         /** Gets the number of animations on this skeleton. */
-        unsigned short getNumAnimations(void) const override;
+        unsigned short getNumAnimations(void) const;
 
         /** Gets a single animation by index. */
-        Animation* getAnimation(unsigned short index) const override;
+        Animation* getAnimation(unsigned short index) const;
         /// Internal accessor for animations (returns null if animation does not exist)
         Animation* _getAnimationImpl(const String& name, 
-            const LinkedSkeletonAnimationSource** linker = 0) const override;
+            const LinkedSkeletonAnimationSource** linker = 0) const;
 
         /** Creates a new Animation object for animating this skeleton. 
-
+        @remarks
             This method updates the reference skeleton, not just this instance!
         @param name The name of this animation
         @param length The length of the animation in seconds
         */
-        Animation* createAnimation(const String& name, Real length) override;
+        Animation* createAnimation(const String& name, Real length);
 
         /** Returns the named Animation object. */
         Animation* getAnimation(const String& name, 
-            const LinkedSkeletonAnimationSource** linker = 0) const override;
+            const LinkedSkeletonAnimationSource** linker = 0) const;
 
         /** Removes an Animation from this skeleton. 
-
+        @remarks
             This method updates the reference skeleton, not just this instance!
         */
-        void removeAnimation(const String& name) override;
+        void removeAnimation(const String& name);
 
 
         /** Creates a TagPoint ready to be attached to a bone */
@@ -97,19 +97,18 @@ namespace Ogre {
 
         /// @copydoc Skeleton::addLinkedSkeletonAnimationSource
         void addLinkedSkeletonAnimationSource(const String& skelName, 
-            Real scale = 1.0f) override;
+            Real scale = 1.0f);
         /// @copydoc Skeleton::removeAllLinkedSkeletonAnimationSources
-        void removeAllLinkedSkeletonAnimationSources(void) override;
-        const LinkedSkeletonAnimSourceList&
-                    getLinkedSkeletonAnimationSources() const override;
-        OGRE_DEPRECATED LinkedSkeletonAnimSourceIterator
-            getLinkedSkeletonAnimationSourceIterator(void) const override;
+        void removeAllLinkedSkeletonAnimationSources(void);
+        /// @copydoc Skeleton::getLinkedSkeletonAnimationSourceIterator
+        LinkedSkeletonAnimSourceIterator 
+            getLinkedSkeletonAnimationSourceIterator(void) const;
 
         /// @copydoc Skeleton::_initAnimationState
-        void _initAnimationState(AnimationStateSet* animSet) override;
+        void _initAnimationState(AnimationStateSet* animSet);
 
         /// @copydoc Skeleton::_refreshAnimationState
-        void _refreshAnimationState(AnimationStateSet* animSet) override;
+        void _refreshAnimationState(AnimationStateSet* animSet);
 
         /// @copydoc Resource::getName
         const String& getName(void) const;
@@ -118,14 +117,14 @@ namespace Ogre {
         /// @copydoc Resource::getGroup
         const String& getGroup(void) const;
 
-    private:
+    protected:
         /// Pointer back to master Skeleton
         SkeletonPtr mSkeleton;
 
         typedef std::list<TagPoint*> TagPointList;
 
         /** Active tag point list.
-
+        @remarks
             This is a linked list of pointers to active tag points
         @par
             This allows very fast insertions and deletions from anywhere in the list to activate / deactivate
@@ -135,7 +134,7 @@ namespace Ogre {
         TagPointList mActiveTagPoints;
 
         /** Free tag point list.
-
+        @remarks
             This contains a list of the tag points free for use as new instances
             as required by the set. When a TagPoint instance is deactivated, there will be a reference on this
             list. As they get used this list reduces, as they get released back to to the set they get added
@@ -147,8 +146,8 @@ namespace Ogre {
         unsigned short mNextTagPointAutoHandle;
 
         void cloneBoneAndChildren(Bone* source, Bone* parent);
-        void prepareImpl(void) override;
-        void unprepareImpl(void) override;
+        void loadImpl(void) override;
+        void unloadImpl(void) override;
 
     };
     /** @} */

@@ -30,11 +30,9 @@ THE SOFTWARE.
 
 // Precompiler options
 #include "OgrePrerequisites.h"
+#include "OgreSceneManagerEnumerator.h"
 
 #include <exception>
-#include <deque>
-#include "OgreSingleton.h"
-#include "OgreSceneManager.h"
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre
@@ -48,15 +46,11 @@ namespace Ogre
 
     class AndroidLogListener;
     class ShadowTextureManager;
-    class SceneManagerEnumerator;
 
     typedef std::vector<RenderSystem*> RenderSystemList;
-
-    /// Scene manager instances, indexed by instance name
-    typedef std::map<String, SceneManager*> SceneManagerInstanceMap;
-
+    
     /** The root class of the Ogre system.
-
+        @remarks
             The Ogre::Root class represents a starting point for the client
             application. From here, the application can gain access to the
             fundamentals of the system, namely the rendering systems
@@ -73,11 +67,7 @@ namespace Ogre
         // To allow update of active renderer if
         // RenderSystem::initialise is used directly
         friend class RenderSystem;
-    public:
-        typedef std::map<String, MovableObjectFactory*> MovableObjectFactoryMap;
-        typedef std::vector<DynLib*> PluginLibList;
-        typedef std::vector<Plugin*> PluginInstanceList;
-    private:
+    protected:
         RenderSystemList mRenderers;
         RenderSystem* mActiveRenderer;
         String mVersion;
@@ -98,7 +88,7 @@ namespace Ogre
         std::unique_ptr<ResourceGroupManager> mResourceGroupManager;
         std::unique_ptr<ResourceBackgroundQueue> mResourceBackgroundQueue;
         std::unique_ptr<MaterialManager> mMaterialManager;
-        std::unique_ptr<GpuProgramManager> mGpuProgramManager;
+        std::unique_ptr<HighLevelGpuProgramManager> mHighLevelGpuProgramManager;
         std::unique_ptr<ControllerManager> mControllerManager;
         std::unique_ptr<MeshManager> mMeshManager;
         std::unique_ptr<SkeletonManager> mSkeletonManager;
@@ -108,6 +98,7 @@ namespace Ogre
         std::unique_ptr<ArchiveFactory> mZipArchiveFactory;
         std::unique_ptr<ArchiveManager> mArchiveManager;
 
+        typedef std::map<String, MovableObjectFactory*> MovableObjectFactoryMap;
         MovableObjectFactoryMap mMovableObjectFactoryMap;
         std::unique_ptr<MovableObjectFactory> mRibbonTrailFactory;
         std::unique_ptr<MovableObjectFactory> mBillboardChainFactory;
@@ -115,8 +106,6 @@ namespace Ogre
         std::unique_ptr<MovableObjectFactory> mBillboardSetFactory;
         std::unique_ptr<MovableObjectFactory> mLightFactory;
         std::unique_ptr<MovableObjectFactory> mEntityFactory;
-        std::unique_ptr<MovableObjectFactory> mStaticGeometryFactory;
-        std::unique_ptr<MovableObjectFactory> mRectangle2DFactory;
 
         std::unique_ptr<ParticleSystemManager> mParticleManager;
         std::unique_ptr<LodStrategyManager> mLodStrategyManager;
@@ -127,9 +116,12 @@ namespace Ogre
         std::unique_ptr<RenderSystemCapabilitiesManager> mRenderSystemCapabilitiesManager;
 
         std::unique_ptr<SceneManagerEnumerator> mSceneManagerEnum;
-        SceneManager* mCurrentSceneManager;
+        typedef std::deque<SceneManager*> SceneManagerStack;
+        SceneManagerStack mSceneManagerStack;
 
         std::unique_ptr<ShadowTextureManager> mShadowTextureManager;
+
+        std::unique_ptr<SceneLoaderManager> mSceneLoaderManager;
 
         RenderWindow* mAutoWindow;
 
@@ -138,13 +130,19 @@ namespace Ogre
         bool mRemoveQueueStructuresOnClear;
         Real mDefaultMinPixelSize;
 
-    private:
+    public:
+        typedef std::vector<DynLib*> PluginLibList;
+        typedef std::vector<Plugin*> PluginInstanceList;
+    protected:
         /// List of plugin DLLs loaded
         PluginLibList mPluginLibs;
         /// List of Plugin instances registered
         PluginInstanceList mPlugins;
 
         uint32 mNextMovableObjectTypeFlag;
+
+        typedef std::map<String, RenderQueueInvocationSequence*> RenderQueueInvocationSequenceMap;
+        RenderQueueInvocationSequenceMap mRQSequenceMap;
 
         /// Are we initialised yet?
         bool mIsInitialised;
@@ -185,10 +183,10 @@ namespace Ogre
 
         /** Indicates the type of event to be considered by calculateEventTime(). */
         enum FrameEventTimeType {
-            FETT_ANY = 0,
-            FETT_STARTED = 1,
-            FETT_QUEUED = 2,
-            FETT_ENDED = 3,
+            FETT_ANY = 0, 
+            FETT_STARTED = 1, 
+            FETT_QUEUED = 2, 
+            FETT_ENDED = 3, 
             FETT_COUNT = 4
         };
 
@@ -212,23 +210,23 @@ namespace Ogre
             May be left blank to ignore.
         @param configFileName The file that contains the configuration to be loaded.
             Defaults to "ogre.cfg", may be left blank to load nothing.
-        @param logFileName The logfile to create, defaults to Ogre.log, may be
+        @param logFileName The logfile to create, defaults to Ogre.log, may be 
             left blank if you've already set up LogManager & Log yourself
         */
         Root(const String& pluginFileName = "plugins.cfg",
-            const String& configFileName = "ogre.cfg",
+            const String& configFileName = "ogre.cfg", 
             const String& logFileName = "Ogre.log");
         ~Root();
 
         /** Saves the details of the current configuration
-
+            @remarks
                 Stores details of the current configuration so it may be
                 restored later on.
         */
         void saveConfig(void);
 
         /** Checks for saved video/sound/etc settings
-
+            @remarks
                 This method checks to see if there is a valid saved configuration
                 from a previous run. If there is, the state of the system will
                 be restored to that configuration.
@@ -242,7 +240,7 @@ namespace Ogre
         bool restoreConfig(void);
 
         /** Displays a dialog asking the user to choose system settings.
-
+            @remarks
                 This method displays the default dialog allowing the user to
                 choose the rendering system, video mode etc. If there is are
                 any settings saved already, they will be restored automatically
@@ -263,7 +261,7 @@ namespace Ogre
         bool showConfigDialog(ConfigDialog* dialog);
 
         /** Adds a new rendering subsystem to the list of available renderers.
-
+            @remarks
                 Intended for use by advanced users and plugin writers only!
                 Calling this method with a pointer to a valid RenderSystem
                 (subclass) adds a rendering API implementation to the list of
@@ -276,7 +274,7 @@ namespace Ogre
         void addRenderSystem(RenderSystem* newRend);
 
         /** Retrieve a list of the available render systems.
-
+            @remarks
                 Retrieves a pointer to the list of available renderers as a
                 list of RenderSystem subclasses. Can be used to build a
                 custom settings dialog.
@@ -292,11 +290,11 @@ namespace Ogre
         RenderSystem* getRenderSystemByName(const String& name);
 
         /** Sets the rendering subsystem to be used.
-
+            @remarks
                 This method indicates to OGRE which rendering system is to be
                 used (e.g. Direct3D, OpenGL etc). This is called
                 automatically by the default config dialog, and when settings
-                are restored from a previous configuration. If used manually
+                are restored from a previous configuraion. If used manually
                 it could be used to set the renderer from a custom settings
                 dialog. Once this has been done, the renderer can be
                 initialised using Root::initialise.
@@ -315,7 +313,7 @@ namespace Ogre
         RenderSystem* getRenderSystem(void);
 
         /** Initialises the renderer.
-
+            @remarks
                 This method can only be called after a renderer has been
                 selected with Root::setRenderSystem, and it will initialise
                 the selected rendering system ready for use.
@@ -325,88 +323,83 @@ namespace Ogre
                 Root::createRenderWindow). The window will be
                 created based on the options currently set on the render
                 system.
-            @param windowTitle
             @return
                 A pointer to the automatically created window, if
                 requested, otherwise <b>NULL</b>.
         */
-        RenderWindow* initialise(bool autoCreateWindow, const String& windowTitle = "OGRE Render Window");
+        RenderWindow* initialise(bool autoCreateWindow, const String& windowTitle = "OGRE Render Window",
+                                    const String& customCapabilitiesConfig = BLANKSTRING);
 
         /** Returns whether the system is initialised or not. */
         bool isInitialised(void) const { return mIsInitialised; }
 
         /** Requests active RenderSystem to use custom RenderSystemCapabilities
-
+        @remarks
             This is useful for testing how the RenderSystem would behave on a machine with
             less advanced GPUs. This method MUST be called before creating the first RenderWindow
         */
         void useCustomRenderSystemCapabilities(RenderSystemCapabilities* capabilities);
 
-        /** Get whether the entire render queue structure should be emptied on clearing,
+        /** Get whether the entire render queue structure should be emptied on clearing, 
             or whether just the objects themselves should be cleared.
         */
         bool getRemoveRenderQueueStructuresOnClear() const { return mRemoveQueueStructuresOnClear; }
 
-        /** Set whether the entire render queue structure should be emptied on clearing,
+        /** Set whether the entire render queue structure should be emptied on clearing, 
         or whether just the objects themselves should be cleared.
         */
         void setRemoveRenderQueueStructuresOnClear(bool r) { mRemoveQueueStructuresOnClear = r; }
 
         /** Register a new SceneManagerFactory, a factory object for creating instances
-            of specific SceneManagers.
-
+            of specific SceneManagers. 
+        @remarks
             Plugins should call this to register as new SceneManager providers.
         */
         void addSceneManagerFactory(SceneManagerFactory* fact);
 
-        /** Remove a SceneManagerFactory.
-        */
+        /// @copydoc SceneManagerEnumerator::addFactory
         void removeSceneManagerFactory(SceneManagerFactory* fact);
 
-        /// get all types of SceneManager available for construction
-        const StringVector& getSceneManagerTypes() const;
+        /// @copydoc SceneManagerEnumerator::getMetaData(const String& )const
+        const SceneManagerMetaData* getSceneManagerMetaData(const String& typeName) const;
+
+        /// @copydoc SceneManagerEnumerator::getMetaData()
+        const SceneManagerEnumerator::MetaDataList& getSceneManagerMetaData() const;
+
+        /// @copydoc SceneManagerEnumerator::getMetaDataIterator
+        OGRE_DEPRECATED SceneManagerEnumerator::MetaDataIterator getSceneManagerMetaDataIterator(void) const;
 
         /// create a default scene manager
-        SceneManager* createSceneManager() { return createSceneManager(SMT_DEFAULT); }
-
-        /** Create a SceneManager instance of a given type.
-
-            You can use this method to create a SceneManager instance of a
-            given specific type. You may know this type already, or you may
-            have discovered it by looking at the results from getMetaDataIterator.
-        @note
-            This method throws an exception if the named type is not found.
-        @param typeName String identifying a unique SceneManager type
-        @param instanceName Optional name to given the new instance that is
-            created. If you leave this blank, an auto name will be assigned.
-        */
-        SceneManager* createSceneManager(const String& typeName, const String& instanceName = BLANKSTRING);
-
-        /// @deprecated do not use
-        OGRE_DEPRECATED SceneManager* createSceneManager(uint16 typeMask, const String& instanceName = BLANKSTRING)
+        SceneManager* createSceneManager()
         {
-            return createSceneManager(SMT_DEFAULT, instanceName);
+            return createSceneManager(DefaultSceneManagerFactory::FACTORY_TYPE_NAME);
         }
 
-        /** Destroy an instance of a SceneManager. */
+        /// @copydoc SceneManagerEnumerator::createSceneManager(const String&, const String&)
+        SceneManager* createSceneManager(const String& typeName, 
+            const String& instanceName = BLANKSTRING);
+
+        /// @copydoc SceneManagerEnumerator::createSceneManager(SceneTypeMask, const String&)
+        OGRE_DEPRECATED SceneManager* createSceneManager(SceneTypeMask typeMask,
+            const String& instanceName = BLANKSTRING)
+        { return createSceneManager(DefaultSceneManagerFactory::FACTORY_TYPE_NAME, instanceName); }
+
+        /// @copydoc SceneManagerEnumerator::destroySceneManager
         void destroySceneManager(SceneManager* sm);
 
-        /** Get an existing SceneManager instance that has already been created,
-            identified by the instance name.
-        @param instanceName The name of the instance to retrieve.
-        */
+        /// @copydoc SceneManagerEnumerator::getSceneManager
         SceneManager* getSceneManager(const String& instanceName) const;
 
-        /** Identify if a SceneManager instance already exists.
-        @param instanceName The name of the instance to retrieve.
-        */
+        /// @copydoc SceneManagerEnumerator::hasSceneManager
         bool hasSceneManager(const String& instanceName) const;
+        /// @copydoc SceneManagerEnumerator::getSceneManagerIterator
+        OGRE_DEPRECATED SceneManagerEnumerator::SceneManagerIterator getSceneManagerIterator(void);
 
-        /// Get all the existing SceneManager instances.
-        const SceneManagerInstanceMap& getSceneManagers(void) const;
+        /// @copydoc SceneManagerEnumerator::getSceneManagers
+        const SceneManagerEnumerator::Instances& getSceneManagers(void) const;
 
         /** Retrieves a reference to the current TextureManager.
-
+            @remarks
                 This performs the same function as
                 TextureManager::getSingleton, but is provided for convenience
                 particularly to scripting engines.
@@ -423,19 +416,19 @@ namespace Ogre
         TextureManager* getTextureManager(void);
 
         /** Retrieves a reference to the current MeshManager.
-
+            @remarks
                 This performs the same function as MeshManager::getSingleton
                 and is provided for convenience to scripting engines.
         */
         MeshManager* getMeshManager(void);
 
         /** Registers a FrameListener which will be called back every frame.
-
+            @remarks
                 A FrameListener is a class which implements methods which
                 will be called every frame.
             @par
                 See the FrameListener class for more details on the specifics
-                It is imperative that the instance passed to this method is
+                It is imperitive that the instance passed to this method is
                 not destroyed before either the rendering loop ends, or the
                 class is removed from the listening list using
                 removeFrameListener.
@@ -454,7 +447,7 @@ namespace Ogre
         void removeFrameListener(FrameListener* oldListener);
 
         /** Queues the end of rendering.
-
+            @remarks
                 This method will do nothing unless startRendering() has
                 been called, in which case before the next frame is rendered
                 the rendering loop will bail out.
@@ -464,7 +457,7 @@ namespace Ogre
         void queueEndRendering(bool state = true);
 
         /** Check for planned end of rendering.
-
+            @remarks
                 This method return true if queueEndRendering() was called before.
             @see
                 Root, Root::queueEndRendering, Root::startRendering
@@ -472,7 +465,7 @@ namespace Ogre
         bool endRenderingQueued(void);
 
         /** Starts / restarts the automatic rendering cycle.
-
+            @remarks
                 This method begins the automatic rendering of the scene. It
                 will <b>NOT</b> return until the rendering cycle is halted.
             @par
@@ -510,7 +503,7 @@ namespace Ogre
         bool renderOneFrame(void);
 
         /** Updates all the render targets with custom frame time information
-
+        @remarks
         Updates all the render targets automatically and then returns,
         raising frame events before and after - all per-frame times are based on
         the time value you pass in.
@@ -518,7 +511,7 @@ namespace Ogre
         bool renderOneFrame(Real timeSinceLastFrame);
 
         /** Shuts down the system manually.
-
+            @remarks
                 This is normally done by Ogre automatically so don't think
                 you have to call this yourself. However this is here for
                 convenience, especially for dealing with unexpected errors or
@@ -527,23 +520,23 @@ namespace Ogre
         void shutdown(void);
 
         /** Helper method to assist you in creating writeable file streams.
-
-            This is a high-level utility method which you can use to find a place to
+        @remarks
+            This is a high-level utility method which you can use to find a place to 
             save a file more easily. If the filename you specify is either an
             absolute or relative filename (ie it includes path separators), then
             the file will be created in the normal filesystem using that specification.
             If it doesn't, then the method will look for a writeable resource location
             via ResourceGroupManager::createResource using the other params provided.
-        @param filename The name of the file to create. If it includes path separators,
+        @param filename The name of the file to create. If it includes path separators, 
             the filesystem will be accessed direct. If no path separators are
             present the resource system is used, falling back on the raw filesystem after.
-        @param groupName The name of the group in which to create the file, if the
+        @param groupName The name of the group in which to create the file, if the 
             resource system is used
         @param overwrite If true, an existing file will be overwritten, if false
             an error will occur if the file already exists
-        @param locationPattern If the resource group contains multiple locations,
-            then usually the file will be created in the first writable location. If you
-            want to be more specific, you can include a location pattern here and
+        @param locationPattern If the resource group contains multiple locations, 
+            then usually the file will be created in the first writable location. If you 
+            want to be more specific, you can include a location pattern here and 
             only locations which match that pattern (as determined by StringUtil::match)
             will be considered candidates for creation.
         */
@@ -552,22 +545,29 @@ namespace Ogre
                 bool overwrite = false, const String& locationPattern = BLANKSTRING);
 
         /** Helper method to assist you in accessing readable file streams.
-
-            This is a high-level utility method which you can use to find a place to
+        @remarks
+            This is a high-level utility method which you can use to find a place to 
             open a file more easily. It checks the resource system first, and if
             that fails falls back on accessing the file system directly.
-        @param filename The name of the file to open.
-        @param groupName The name of the group in which to create the file, if the
+        @param filename The name of the file to open. 
+        @param groupName The name of the group in which to create the file, if the 
             resource system is used
-        */
+        */      
         static DataStreamPtr openFileStream(const String& filename,
                 const String& groupName = ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
 
-        /// @deprecated use ColourValue::getAsBYTE()
-        OGRE_DEPRECATED static void convertColourValue(const ColourValue& colour, uint32* pDest) { *pDest = colour.getAsBYTE(); }
+        /** Generates a packed data version of the passed in ColourValue suitable for
+            use with the current RenderSystem.
+        @remarks
+            Since different render systems have different colour data formats (eg
+            RGBA for GL, ARGB for D3D) this method allows you to use 1 method for all.
+        @param colour The colour to convert
+        @param pDest Pointer to location to put the result.
+        */
+        void convertColourValue(const ColourValue& colour, uint32* pDest);
 
         /** Retrieves a pointer to the window that was created automatically
-
+            @remarks
                 When Root is initialised an optional window is created. This
                 method retrieves a pointer to that window.
             @note
@@ -578,7 +578,7 @@ namespace Ogre
 
         /** @copydoc RenderSystem::_createRenderWindow
         */
-        RenderWindow* createRenderWindow(const String &name, unsigned int width, unsigned int height,
+        RenderWindow* createRenderWindow(const String &name, unsigned int width, unsigned int height, 
             bool fullScreen, const NameValuePairList *miscParams = 0) ;
 
         /// @overload
@@ -588,6 +588,11 @@ namespace Ogre
                                       desc.useFullScreen, &desc.miscParams);
         }
 
+        /** @copydoc RenderSystem::_createRenderWindows
+        */
+        bool createRenderWindows(const RenderWindowDescriptionList& renderWindowDescriptions,
+            RenderWindowList& createdWindows);
+    
         /** Detaches a RenderTarget from the active render system
         and returns a pointer to it.
         @note
@@ -615,11 +620,11 @@ namespace Ogre
         RenderTarget * getRenderTarget(const String &name);
 
         /** Manually load a Plugin contained in a DLL / DSO.
-
-            Plugins embedded in DLLs can be loaded at startup using the plugin
+         @remarks
+            Plugins embedded in DLLs can be loaded at startup using the plugin 
             configuration file specified when you create Root.
             This method allows you to load plugin DLLs directly in code.
-            The DLL in question is expected to implement a dllStartPlugin
+            The DLL in question is expected to implement a dllStartPlugin 
             method which instantiates a Plugin subclass and calls Root::installPlugin.
             It should also implement dllStopPlugin (see Root::unloadPlugin)
         @param pluginName Name of the plugin library to load
@@ -627,10 +632,10 @@ namespace Ogre
         void loadPlugin(const String& pluginName);
 
         /** Manually unloads a Plugin contained in a DLL / DSO.
-
-            Plugin DLLs are unloaded at shutdown automatically. This method
-            allows you to unload plugins in code, but make sure their
-            dependencies are decoupled first. This method will call the
+         @remarks
+            Plugin DLLs are unloaded at shutdown automatically. This method 
+            allows you to unload plugins in code, but make sure their 
+            dependencies are decoupled first. This method will call the 
             dllStopPlugin method defined in the DLL, which in turn should call
             Root::uninstallPlugin.
         @param pluginName Name of the plugin library to unload
@@ -638,21 +643,21 @@ namespace Ogre
         void unloadPlugin(const String& pluginName);
 
         /** Install a new plugin.
-
+        @remarks
             This installs a new extension to OGRE. The plugin itself may be loaded
-            from a DLL / DSO, or it might be statically linked into your own
+            from a DLL / DSO, or it might be statically linked into your own 
             application. Either way, something has to call this method to get
             it registered and functioning. You should only call this method directly
-            if your plugin is not in a DLL that could otherwise be loaded with
+            if your plugin is not in a DLL that could otherwise be loaded with 
             loadPlugin, since the DLL function dllStartPlugin should call this
-            method when the DLL is loaded.
+            method when the DLL is loaded. 
         */
         void installPlugin(Plugin* plugin);
 
         /** Uninstall an existing plugin.
-
-            This uninstalls an extension to OGRE. Plugins are automatically
-            uninstalled at shutdown but this lets you remove them early.
+        @remarks
+            This uninstalls an extension to OGRE. Plugins are automatically 
+            uninstalled at shutdown but this lets you remove them early. 
             If the plugin was loaded from a DLL / DSO you should call unloadPlugin
             which should result in this method getting called anyway (if the DLL
             is well behaved).
@@ -665,12 +670,12 @@ namespace Ogre
         /** Gets a pointer to the central timer used for all OGRE timings */
         Timer* getTimer(void);
 
-        /** Method for raising frame started events.
-
+        /** Method for raising frame started events. 
+        @remarks
             This method is only for internal use when you use OGRE's inbuilt rendering
             loop (Root::startRendering). However, if you run your own rendering loop then
             you should call this method to ensure that FrameListener objects are notified
-            of frame events; processes like texture animation and particle systems rely on
+            of frame events; processes like texture animation and particle systems rely on 
             this.
         @par
             Calling this method also increments the frame number, which is
@@ -679,14 +684,14 @@ namespace Ogre
             This method takes an event object as a parameter, so you can specify the times
             yourself. If you are happy for OGRE to automatically calculate the frame time
             for you, then call the other version of this method with no parameters.
-        @param evt Event object which includes all the timing information which you have
+        @param evt Event object which includes all the timing information which you have 
             calculated for yourself
         @return False if one or more frame listeners elected that the rendering loop should
             be terminated, true otherwise.
         */
         bool _fireFrameStarted(FrameEvent& evt);
-        /** Method for raising frame rendering queued events.
-
+        /** Method for raising frame rendering queued events. 
+        @remarks
             This method is only for internal use when you use OGRE's inbuilt rendering
             loop (Root::startRendering). However, if you run your own rendering loop then
             you should call this method too, to ensure that all state is updated
@@ -696,93 +701,98 @@ namespace Ogre
         */
         bool _fireFrameRenderingQueued(FrameEvent& evt);
 
-        /** Method for raising frame ended events.
-
+        /** Method for raising frame ended events. 
+        @remarks
             This method is only for internal use when you use OGRE's inbuilt rendering
             loop (Root::startRendering). However, if you run your own rendering loop then
             you should call this method to ensure that FrameListener objects are notified
-            of frame events; processes like texture animation and particle systems rely on
+            of frame events; processes like texture animation and particle systems rely on 
             this.
         @note
             This method takes an event object as a parameter, so you can specify the times
             yourself. If you are happy for OGRE to automatically calculate the frame time
             for you, then call the other version of this method with no parameters.
-        @param evt Event object which includes all the timing information which you have
+        @param evt Event object which includes all the timing information which you have 
             calculated for yourself
         @return False if one or more frame listeners elected that the rendering loop should
             be terminated, true otherwise.
         */
         bool _fireFrameEnded(FrameEvent& evt);
-        /** Method for raising frame started events.
-
+        /** Method for raising frame started events. 
+        @remarks
             This method is only for internal use when you use OGRE's inbuilt rendering
             loop (Root::startRendering). However, if you run your own rendering loop then
             you should call this method to ensure that FrameListener objects are notified
-            of frame events; processes like texture animation and particle systems rely on
+            of frame events; processes like texture animation and particle systems rely on 
             this.
         @par
             Calling this method also increments the frame number, which is
             important for keeping some elements of the engine up to date.
         @note
             This method calculates the frame timing information for you based on the elapsed
-            time. If you want to specify elapsed times yourself you should call the other
+            time. If you want to specify elapsed times yourself you should call the other 
             version of this method which takes event details as a parameter.
         @return False if one or more frame listeners elected that the rendering loop should
             be terminated, true otherwise.
         */
         bool _fireFrameStarted();
-        /** Method for raising frame rendering queued events.
-
+        /** Method for raising frame rendering queued events. 
+        @remarks
             This method is only for internal use when you use OGRE's inbuilt rendering
             loop (Root::startRendering). However, if you run your own rendering loop then
             you you may want to call this method too, although nothing in OGRE relies on this
             particular event. Really if you're running your own rendering loop at
             this level of detail then you can get the same effect as doing your
-            updates in a frameRenderingQueued callback by just calling
-            RenderWindow::update with the 'swapBuffers' option set to false.
+            updates in a frameRenderingQueued callback by just calling 
+            RenderWindow::update with the 'swapBuffers' option set to false. 
         */
         bool _fireFrameRenderingQueued();
-        /** Method for raising frame ended events.
-
+        /** Method for raising frame ended events. 
+        @remarks
             This method is only for internal use when you use OGRE's inbuilt rendering
             loop (Root::startRendering). However, if you run your own rendering loop then
             you should call this method to ensure that FrameListener objects are notified
-            of frame events; processes like texture animation and particle systems rely on
+            of frame events; processes like texture animation and particle systems rely on 
             this.
         @note
             This method calculates the frame timing information for you based on the elapsed
-            time. If you want to specify elapsed times yourself you should call the other
+            time. If you want to specify elapsed times yourself you should call the other 
             version of this method which takes event details as a parameter.
         @return False if one or more frame listeners elected that the rendering loop should
             be terminated, true otherwise.
         */
         bool _fireFrameEnded();
 
-        /** Gets the number of the next frame to be rendered.
-
+        /** Gets the number of the next frame to be rendered. 
+        @remarks
             Note that this is 'next frame' rather than 'current frame' because
             it indicates the frame number that current changes made to the scene
             will take effect. It is incremented after all rendering commands for
-            the current frame have been queued, thus reflecting that if you
-            start performing changes then, you will actually see them in the
+            the current frame have been queued, thus reflecting that if you 
+            start performing changes then, you will actually see them in the 
             next frame. */
         unsigned long getNextFrameNumber(void) const { return mNextFrame; }
 
         /** Returns the scene manager currently being used to render a frame.
-
+        @remarks
             This is only intended for internal use; it is only valid during the
             rendering of a frame.
         */
-        SceneManager* _getCurrentSceneManager(void) const { return mCurrentSceneManager; }
-        /** Sets the scene manager currently being used to render.
-
+        SceneManager* _getCurrentSceneManager(void) const;
+        /** Pushes the scene manager currently being used to render.
+        @remarks
             This is only intended for internal use.
         */
-        void _setCurrentSceneManager(SceneManager* sm) { mCurrentSceneManager = sm; }
+        void _pushCurrentSceneManager(SceneManager* sm);
+        /** Pops the scene manager currently being used to render.
+        @remarks
+        This is only intended for internal use.
+        */
+        void _popCurrentSceneManager(SceneManager* sm);
 
-        /** Internal method used for updating all RenderTarget objects (windows,
+        /** Internal method used for updating all RenderTarget objects (windows, 
             renderable textures etc) which are set to auto-update.
-
+        @remarks
             You don't need to use this method if you're using Ogre's own internal
             rendering loop (Root::startRendering). If you're running your own loop
             you may wish to call it to update all the render targets which are
@@ -792,10 +802,10 @@ namespace Ogre
         */
         bool _updateAllRenderTargets(void);
 
-        /** Internal method used for updating all RenderTarget objects (windows,
+        /** Internal method used for updating all RenderTarget objects (windows, 
             renderable textures etc) which are set to auto-update, with a custom time
             passed to the frameRenderingQueued events.
-
+        @remarks
             You don't need to use this method if you're using Ogre's own internal
             rendering loop (Root::startRendering). If you're running your own loop
             you may wish to call it to update all the render targets which are
@@ -805,15 +815,42 @@ namespace Ogre
         */
         bool _updateAllRenderTargets(FrameEvent& evt);
 
+        /** Create a new RenderQueueInvocationSequence, useful for linking to
+            Viewport instances to perform custom rendering.
+        @param name The name to give the new sequence
+        */
+        RenderQueueInvocationSequence* createRenderQueueInvocationSequence(
+            const String& name);
+
+        /** Get a RenderQueueInvocationSequence. 
+        @param name The name to identify the sequence
+        */
+        RenderQueueInvocationSequence* getRenderQueueInvocationSequence(
+            const String& name);
+
+        /** Destroy a RenderQueueInvocationSequence. 
+        @remarks
+            You must ensure that no Viewports are using this sequence.
+        @param name The name to identify the sequence
+        */
+        void destroyRenderQueueInvocationSequence(
+            const String& name);
+
+        /** Destroy all RenderQueueInvocationSequences. 
+        @remarks
+            You must ensure that no Viewports are using custom sequences.
+        */
+        void destroyAllRenderQueueInvocationSequences(void);
+
         /// @copydoc Singleton::getSingleton()
         static Root& getSingleton(void);
         /// @copydoc Singleton::getSingleton()
         static Root* getSingletonPtr(void);
 
-        /** Clears the history of all event times.
-
+        /** Clears the history of all event times. 
+        @remarks
             OGRE stores a history of the last few event times in order to smooth
-            out any inaccuracies and temporary fluctuations. However, if you
+            out any inaccuracies and temporary fluctuations. However, if you 
             pause or don't render for a little while this can cause a lurch, so
             if you're resuming rendering after a break, call this method to reset
             the stored times
@@ -821,9 +858,9 @@ namespace Ogre
         void clearEventTimes(void);
 
         /** Sets the period over which OGRE smooths out fluctuations in frame times.
-
+        @remarks
             OGRE by default gives you the raw frame time, but can optionally
-            smooths it out over several frames, in order to reduce the
+            smooths it out over several frames, in order to reduce the 
             noticeable effect of occasional hiccups in framerate.
             These smoothed values are passed back as parameters to FrameListener
             calls.
@@ -838,22 +875,22 @@ namespace Ogre
 
         /** Register a new MovableObjectFactory which will create new MovableObject
             instances of a particular type, as identified by the getType() method.
-
-            Plugin creators can create subclasses of MovableObjectFactory which
-            construct custom subclasses of MovableObject for insertion in the
+        @remarks
+            Plugin creators can create subclasses of MovableObjectFactory which 
+            construct custom subclasses of MovableObject for insertion in the 
             scene. This is the primary way that plugins can make custom objects
             available.
         @param fact Pointer to the factory instance
-        @param overrideExisting Set this to true to override any existing
+        @param overrideExisting Set this to true to override any existing 
             factories which are registered for the same type. You should only
-            change this if you are very sure you know what you're doing.
+            change this if you are very sure you know what you're doing. 
         */
-        void addMovableObjectFactory(MovableObjectFactory* fact,
+        void addMovableObjectFactory(MovableObjectFactory* fact, 
             bool overrideExisting = false);
         /** Removes a previously registered MovableObjectFactory.
-
+        @remarks
             All instances of objects created by this factory will be destroyed
-            before removing the factory (by calling back the factories
+            before removing the factory (by calling back the factories 
             'destroyInstance' method). The plugin writer is responsible for actually
             destroying the factory.
         */
@@ -863,7 +900,7 @@ namespace Ogre
         /// Get a MovableObjectFactory for the given type
         MovableObjectFactory* getMovableObjectFactory(const String& typeName);
         /** Allocate the next MovableObject type flag.
-
+        @remarks
             This is done automatically if MovableObjectFactory::requestTypeFlags
             returns true; don't call this manually unless you're sure you need to.
         */
@@ -873,32 +910,31 @@ namespace Ogre
         /** Return an iterator over all the MovableObjectFactory instances currently
             registered.
         */
-        const MovableObjectFactoryMap& getMovableObjectFactories() const
-        {
-            return mMovableObjectFactoryMap;
-        }
+        MovableObjectFactoryIterator getMovableObjectFactoryIterator(void) const;
 
-        /// @deprecated use getMovableObjectFactories
-        OGRE_DEPRECATED MovableObjectFactoryIterator getMovableObjectFactoryIterator(void) const;
+        /**
+        * Gets the number of display monitors.
+        */
+        unsigned int getDisplayMonitorCount() const;
 
         /** Get the WorkQueue for processing background tasks.
             You are free to add new requests and handlers to this queue to
-            process your custom background tasks using the shared thread pool.
-            However, you must remember to assign yourself a new channel through
+            process your custom background tasks using the shared thread pool. 
+            However, you must remember to assign yourself a new channel through 
             which to process your tasks.
         */
         WorkQueue* getWorkQueue() const { return mWorkQueue.get(); }
 
-        /** Replace the current work queue with an alternative.
+        /** Replace the current work queue with an alternative. 
             You can use this method to replace the internal implementation of
-            WorkQueue with  your own, e.g. to externalise the processing of
+            WorkQueue with  your own, e.g. to externalise the processing of 
             background events. Doing so will delete the existing queue and
-            replace it with this one.
+            replace it with this one. 
         @param queue The new WorkQueue instance. Root will delete this work queue
             at shutdown, so do not destroy it yourself.
         */
         void setWorkQueue(WorkQueue* queue);
-
+            
         /** Sets whether blend indices information needs to be passed to the GPU.
             When entities use software animation they remove blend information such as
             indices and weights from the vertex buffers sent to the graphic card. This function
@@ -922,7 +958,7 @@ namespace Ogre
         see setBlendWeightsGpuRedundant() for more information
         */
         bool isBlendWeightsGpuRedundant() const { return mIsBlendWeightsGpuRedundant; }
-
+    
         /** Set the default minimum pixel size for object to be rendered by
         @note
             To use this feature see Camera::setUseMinPixelSize()

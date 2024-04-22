@@ -61,10 +61,12 @@ public:
     const GpuProgramPtr& getGpuProgram(GpuProgramType type) const;
 
     // Protected methods.
-private:
+protected:
     void setCpuProgram(std::unique_ptr<Program>&& program);
     void setGpuProgram(const GpuProgramPtr& program);
 
+    // Attributes.
+protected:
     // Vertex shader CPU program.
     std::unique_ptr<Program> mVSCpuProgram;
     // Fragment shader CPU program.
@@ -74,6 +76,7 @@ private:
     // Fragment shader CPU program.
     GpuProgramPtr mPSGpuProgram;
 
+private:
     friend class ProgramManager;
     friend class TargetRenderState;
 

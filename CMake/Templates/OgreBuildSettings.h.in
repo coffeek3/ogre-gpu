@@ -20,8 +20,6 @@
 */
 #define OGRE_RESOURCEMANAGER_STRICT @OGRE_RESOURCEMANAGER_STRICT@
 
-#cmakedefine OGRE_NODELESS_POSITIONING
-
 #cmakedefine OGRE_CONFIG_LITTLE_ENDIAN
 #cmakedefine OGRE_CONFIG_BIG_ENDIAN
 
@@ -72,6 +70,8 @@ OGRE_THREAD_PROVIDER = 1
     Boost libraries provide threading functionality.
 OGRE_THREAD_PROVIDER = 2
     Poco libraries provide threading functionality.
+OGRE_THREAD_PROVIDER = 3
+    TBB library provides threading functionality.
 OGRE_THREAD_PROVIDER = 4
     Standard library provides threading functionality. (requires compiler support)
 */
@@ -95,6 +95,8 @@ WARNING: Disabling this will make the samples unusable.
 */
 #cmakedefine01 OGRE_NO_ZIP_ARCHIVE
 
+#cmakedefine01 OGRE_NO_VIEWPORT_ORIENTATIONMODE
+
 #cmakedefine01 OGRE_NO_TBB_SCHEDULER
 
 /** If set to 1, profiling code will be included in the application. When you
@@ -102,7 +104,5 @@ WARNING: Disabling this will make the samples unusable.
 #cmakedefine01 OGRE_PROFILING
 
 #cmakedefine01 OGRE_NO_QUAD_BUFFER_STEREO
-
-#cmakedefine01 OGRE_NO_LOCALE_STRCONVERT
 
 #endif

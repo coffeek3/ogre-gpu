@@ -4,16 +4,23 @@
 
 This tutorial will expand on the use of Lights in a scene and using them to cast shadows.
 
-The full source for this tutorial can be found in samples directory **Samples/Tutorials/BasicTutorial2.cpp**.
+The full source for this tutorial (BasicTutorial2.cpp) can be found in samples directory **Samples/Tutorials**.
 
 @note Refer to @ref setup for instructions how set up an Ogre project and compile it successfully.
 
 # The Ogre Camera Class {#bt2TheOgreCameraClass}
-A Camera is the object we use to view our scene. A Ogre::Camera is a special object that must be attached to a
-Ogre::SceneNode. You can then use that for movement and rotation. For example, you might want to use a SceneNode that follows a path in the sky to create an impressive aerial cutscene
+A Camera is the object we use to view our scene. A Ogre::Camera is a special object that works similar to a
+Ogre::SceneNode. It has methods like setPosition and yaw. You can also attach it to a SceneNode. For instance,
+you might want to temporarily attach your Camera to a SceneNode that follows a path through the sky to create an
+aerial cutscene. Just like a SceneNode the Camera's position will be relative to its parent SceneNode. The Camera
+is not a SceneNode (it actually inherits from the Frustum class), but for movement and rotation, you can treat it
+like a SceneNode.
+
+@note Starting from version 1.10 functionality related to rotate and translate camera are deprecated. 
+You should attach camera to Ogre::SceneNode and do all transformation with this node.
 
 # Creating a Camera {#bt2CreatingaCamera}
-We will now cover camera creation part which we just applied in previous tutorial. We remember that now we need to have SceneNode for camera. The first step will be doing is creating that SceneNode and asking the SceneManager to create a new Camera. Add the following to create SceneNode and Camera:
+We will now cover camera creation part which we just applied in previous tutorial. We remeber that now we need to have SceneNode for camera. The first step will be doing is creating that SceneNode and asking the SceneManager to create a new Camera. Add the following to create SceneNode and Camera:
 
 @snippet Samples/Tutorials/BasicTutorial2.cpp cameracreate
 You can retrieve the Camera by name using the SceneManager's getCamera method.
@@ -22,9 +29,9 @@ Next, we will position the Camera and use a method called lookAt to set its dire
 @snippet Samples/Tutorials/BasicTutorial2.cpp cameraposition
 The Ogre::SceneNode::lookAt method is very useful. It does exactly what it says. It rotates the SceneNode so that its line of sight focuses on the vector you give it. It makes the Camera "look at" the point.
 
-[//]: <> (TODO: add explanation about second argument of lookAt method)
+[//]: <> (TODO: add explanation about second arguemnt of lookAt method)
 
-The last thing we'll do (apart from attaching camera to a SceneNode) is set the near clipping distance to 5 units. This is the distance at which the Camera will no longer render any mesh. If you get very close to a mesh, this will sometimes cut the mesh and allow you to see inside of it. The alternative is filling the entire screen with a tiny, highly magnified piece of the mesh's texture. It's up to you what you want in your scene. For demonstration, we'll set it here.
+The last thing we'll do (apart of attachning camera to a SceneNode) is set the near clipping distance to 5 units. This is the distance at which the Camera will no longer render any mesh. If you get very close to a mesh, this will sometimes cut the mesh and allow you to see inside of it. The alternative is filling the entire screen with a tiny, highly magnified piece of the mesh's texture. It's up to you what you want in your scene. For demonstration, we'll set it here.
 
 @snippet Samples/Tutorials/BasicTutorial2.cpp cameralaststep
 
@@ -33,7 +40,7 @@ When dealing with multiple Cameras in a scene, the concept of a Viewport becomes
 
 There are three constructs that are crucial to understanding how Ogre renders a scene: the Camera, the SceneManager, and the RenderWindow. We have not yet covered the RenderWindow. It basically represents the whole window we are rendering to. The SceneManager will create Cameras to view the scene, and then we tell the RenderWindow where to display each Camera's view. The way we tell the RenderWindow which area of the screen to use is by giving it a Ogre::Viewport. For many circumstances, we will simply create one Camera and create a Viewport which represents the whole screen.
 
-## Creating a Viewport {#bt2CreatingaViewport}
+# Creating a Viewport {#bt2CreatingaViewport}
 Let's create a Viewport for our scene. To do this, we will use the addViewport method of the RenderWindow.
 @snippet Samples/Tutorials/BasicTutorial2.cpp addviewport
 getRenderWindow() is a method defined for us in OgreBites::ApplicationContext which returns Ogre::RenderWindow.
@@ -87,20 +94,23 @@ And finally we need to give our ground a material. For now, it will be easiest t
 Make sure you add the texture for the material and the Examples.material script to your resource loading path. In our case, the texture is called 'rockwall.tga'. You can find the name yourself by reading the entry in the material script.
 
 # Using Shadows in Ogre {#bt2UsingShadowsinOgre}
-Enabling shadows in Ogre is easy. The SceneManager class has a Ogre::SceneManager::setShadowTechnique method we can use. Then whenever we create an Entity, we call Ogre::Entity::setCastShadows to choose which ones will cast shadows. setShadowTechnique method takes several of different techniques. Refer to Ogre::ShadowTechnique for more details.
+Enabling shadows in Ogre is easy. The SceneManager class has a Ogre::SceneManager::setShadowTechnique method we can use. Then whenever we create an Entity, we call setCastShadows to choose which Entities will cast shadows. setShadowTechinique method takes several of different techniques. Refer to Ogre::ShadowTechnique for more details.
 
 Let's turn off the ambient light so we can see the full effect of our lights. Add the following changes:
 
 @snippet Samples/Tutorials/BasicTutorial2.cpp lightingsset
 
-Now the SceneManager will use shadows. Let's add some lights to see this in action.
+Now the SceneManager will use modulative stencil shadows. Let's add some lights to see this in action.
 
 # Lights {#bt2Lights}
-%Ogre provides different types of lights as listed in Ogre::Light::LightTypes.
+Ogre provides three types of lighting.
+* Ogre::Light::LT\_POINT - This Light speads out equally in all directions from a point.
+* Ogre::Light::LT\_SPOTLIGHT - This Light works like a flashlight. It produces a solid cylinder of light that is brighter at the center and fades off.
+* Ogre::Light::LT\_DIRECTIONAL - This Light simulates a huge source that is very far away - like daylight. Light hits the entire scene at the same angle everywhere.
 
-The Ogre::Light class has a wide range of properties. Two of the most important are the [diffuse](https://learn.microsoft.com/en-us/windows/win32/direct3d9/diffuse-lighting#example) and [specular](https://learn.microsoft.com/en-us/windows/win32/direct3d9/specular-lighting#example) color. Each material script defines how much specular and diffuse lighting a material reflects. These properties will be covered in some of the later tutorials.
+The Ogre::Light class has a wide range of properties. Two of the most important are the [diffuse](http://www.ogre3d.org/tikiwiki/tiki-index.php?page=-Diffuse+%28Light%29) and [specular](http://www.ogre3d.org/tikiwiki/tiki-index.php?page=-Specular+%28Light%29) color. Each material script defines how much specular and diffuse lighting a material reflects. These properties will be covered in some of the later tutorials.
 
-## Creating a Light {#CreatingaLight}
+# Creating a Light {#CreatingaLight}
 Let's add a Light to our scene. We do this by calling the Ogre::SceneManager::createLight method. Add the following code right after we finish creating the groundEntity:
 @snippet Samples/Tutorials/BasicTutorial2.cpp spotlight
 
@@ -124,7 +134,7 @@ Compile and run the application. You should see the shadowy blue figure of a nin
 
 ![](bt2_ninja1.jpg)
 
-## Creating More Lights {#CreatingMoreLights}
+# Creating More Lights {#CreatingMoreLights}
 Next we'll add a directional light to our scene. This type of light essentially simulates daylight or moonlight. The light is cast at the same angle across the entire scene equally. As before, we'll start by creating the Light and setting its type.
 
 @snippet Samples/Tutorials/BasicTutorial2.cpp directlight

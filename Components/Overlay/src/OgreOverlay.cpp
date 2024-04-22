@@ -29,7 +29,7 @@ THE SOFTWARE.
 #include "OgreOverlay.h"
 #include "OgreOverlayContainer.h"
 #include "OgreOverlayManager.h"
-#include "OgreVector.h"
+#include "OgreVector3.h"
 #include "OgreSceneNode.h"
 #include "OgreRenderQueue.h"
 #include "OgreCamera.h"
@@ -39,11 +39,11 @@ namespace Ogre {
     //---------------------------------------------------------------------
     Overlay::Overlay(const String& name) :
         mName(name),
-        mRotate(0.0f),
+        mRotate(0.0f), 
         mScrollX(0.0f), mScrollY(0.0f),
         mScaleX(1.0f), mScaleY(1.0f),
         mLastViewportWidth(0), mLastViewportHeight(0),
-        mTransformOutOfDate(true), mTransformUpdated(true),
+        mTransformOutOfDate(true), mTransformUpdated(true), 
         mZOrder(100), mVisible(false), mInitialised(false)
 
     {
@@ -56,10 +56,11 @@ namespace Ogre {
         // remove children
 
         OGRE_DELETE mRootNode;
-
-        for (auto *e : m2DElements)
+        
+        for (OverlayContainerList::iterator i = m2DElements.begin(); 
+             i != m2DElements.end(); ++i)
         {
-            e->_notifyParent(0, 0);
+            (*i)->_notifyParent(0, 0);
         }
     }
     //---------------------------------------------------------------------
@@ -70,18 +71,21 @@ namespace Ogre {
     //---------------------------------------------------------------------
     void Overlay::assignZOrders()
     {
-        ushort zorder = mZOrder * ushort(100);
+        ushort zorder = static_cast<ushort>(mZOrder * 100.0f);
 
         // Notify attached 2D elements
-        for (auto *e : m2DElements)
+        OverlayContainerList::iterator i, iend;
+        iend = m2DElements.end();
+        for (i = m2DElements.begin(); i != iend; ++i)
         {
-            zorder = e->_notifyZOrder(zorder);
+            zorder = (*i)->_notifyZOrder(zorder);
         }
     }
     //---------------------------------------------------------------------
     void Overlay::setZOrder(ushort zorder)
     {
-        OgreAssert(zorder <= 655, "zorder is multiplied by 100 to pad out for containers");
+        // Limit to 650 since this is multiplied by 100 to pad out for containers
+        assert (zorder <= 650 && "Overlay Z-order cannot be greater than 650!");
 
         mZOrder = zorder;
 
@@ -90,7 +94,7 @@ namespace Ogre {
     //---------------------------------------------------------------------
     ushort Overlay::getZOrder(void) const
     {
-        return mZOrder;
+        return (ushort)mZOrder;
     }
     //---------------------------------------------------------------------
     bool Overlay::isVisible(void) const
@@ -112,16 +116,13 @@ namespace Ogre {
         mVisible = false;
     }
     //---------------------------------------------------------------------
-    void Overlay::setVisible(bool visible)
-    {
-        mVisible = visible;
-    }
-    //---------------------------------------------------------------------
     void Overlay::initialise(void)
     {
-        for (auto *e : m2DElements)
+        OverlayContainerList::iterator i, iend;
+        iend = m2DElements.end();
+        for (i = m2DElements.begin(); i != iend; ++i)
         {
-            e->initialise();
+            (*i)->initialise();
         }
         mInitialised = true;
     }
@@ -183,10 +184,16 @@ namespace Ogre {
       //---------------------------------------------------------------------
     OverlayContainer* Overlay::getChild(const String& name)
     {
-        for (auto *e : m2DElements)
+
+        OverlayContainerList::iterator i, iend;
+        iend = m2DElements.end();
+        for (i = m2DElements.begin(); i != iend; ++i)
         {
-            if (e->getName() == name)
-                return e;
+            if ((*i)->getName() == name)
+            {
+                return *i;
+
+            }
         }
         return NULL;
     }
@@ -257,9 +264,10 @@ namespace Ogre {
 
             if(tmpViewportDimensionsChanged)
             {
-                for (auto *e : m2DElements)
+                iend = m2DElements.end();
+                for (i = m2DElements.begin(); i != iend; ++i)
                 {
-                    e->_notifyViewport();
+                    (*i)->_notifyViewport();
                 }
             }
 
@@ -269,9 +277,10 @@ namespace Ogre {
                 Matrix4 xform;
                 _getWorldTransforms(&xform);
 
-                for (auto *e : m2DElements)
+                iend = m2DElements.end();
+                for (i = m2DElements.begin(); i != iend; ++i)
                 {
-                    e->_notifyWorldTransforms(xform);
+                    (*i)->_notifyWorldTransforms(xform);
                 }
 
                 mTransformUpdated = false;
@@ -291,10 +300,12 @@ namespace Ogre {
             queue->setDefaultQueueGroup(oldgrp);
             queue->setDefaultRenderablePriority(oldPriority);
             // Add 2D elements
-            for (auto *e : m2DElements)
+            iend = m2DElements.end();
+            for (i = m2DElements.begin(); i != iend; ++i)
             {
-                e->_update();
-                e->_updateRenderQueue(queue);
+                (*i)->_update();
+
+                (*i)->_updateRenderQueue(queue);
             }
         }
     }
@@ -307,6 +318,10 @@ namespace Ogre {
         //    3. Translate
 
         Radian orientationRotation = Radian(0);
+
+#if OGRE_NO_VIEWPORT_ORIENTATIONMODE == 0
+        orientationRotation = Radian(OverlayManager::getSingleton().getViewportOrientationMode() * Math::HALF_PI);
+#endif
 
         Matrix3 rot3x3, scale3x3;
         rot3x3.FromEulerAnglesXYZ(Radian(0), Radian(0), mRotate + orientationRotation);
@@ -326,12 +341,14 @@ namespace Ogre {
     {
         OverlayElement* ret = NULL;
         int currZ = -1;
-        for (auto *e : m2DElements)
+        OverlayContainerList::iterator i, iend;
+        iend = m2DElements.end();
+        for (i = m2DElements.begin(); i != iend; ++i)
         {
-            int z = e->getZOrder();
+            int z = (*i)->getZOrder();
             if (z > currZ)
             {
-                OverlayElement* elementFound = e->findElementAt(x,y);
+                OverlayElement* elementFound = (*i)->findElementAt(x,y);
                 if(elementFound)
                 {
                     currZ = elementFound->getZOrder();
@@ -341,5 +358,6 @@ namespace Ogre {
         }
         return ret;
     }
+
 }
 

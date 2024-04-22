@@ -34,24 +34,27 @@
 // Export macro to export the sample's main dll functions.
 #if defined( OGRE_STATIC_LIB )
 #  define _OgreSampleExport
+#  define _OgreSampleClassExport
 #else
 #  if (OGRE_PLATFORM == OGRE_PLATFORM_WIN32 || OGRE_PLATFORM == OGRE_PLATFORM_WINRT) && !defined(__MINGW32__)
 #    define _OgreSampleExport __declspec(dllexport)
+#    define _OgreSampleClassExport
 #  elif defined ( OGRE_GCC_VISIBILITY )
 #   define _OgreSampleExport  __attribute__ ((visibility("default")))
+#   define _OgreSampleClassExport  __attribute__ ((visibility("default")))
 #  else
 #   define _OgreSampleExport
+#   define _OgreSampleClassExport
 #  endif
 #endif
 
-#define _OgreSampleClassExport
 
 namespace OgreBites
 {
     /*=============================================================================
     | Utility class used to hold a set of samples in an OGRE plugin.
     =============================================================================*/
-    class _OgreSampleExport SamplePlugin : public Ogre::Plugin
+    class _OgreSampleClassExport SamplePlugin : public Ogre::Plugin
     {
     public:
 
@@ -60,15 +63,15 @@ namespace OgreBites
         {
         }
 
-        const Ogre::String& getName() const override
+        const Ogre::String& getName() const
         {
             return mName;
         }
         
-        void install() override {}
-        void uninstall() override {}
-        void initialise() override {}
-        void shutdown() override {}
+        void install() {}
+        void uninstall() {}
+        void initialise() {}
+        void shutdown() {}
 
         /*-----------------------------------------------------------------------------
         | Adds a sample to the queue.

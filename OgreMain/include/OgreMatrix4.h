@@ -46,7 +46,7 @@ namespace Ogre
     class Affine3;
     Matrix4 operator*(const Matrix4 &m, const Matrix4 &m2);
     /** Class encapsulating a standard 4x4 homogeneous matrix.
-
+        @remarks
             OGRE uses column vectors when applying matrix multiplications,
             This means a vector is represented as a single column, 4-row
             matrix. This has the effect that the transformations implemented
@@ -95,7 +95,7 @@ namespace Ogre
         }
 
         template<typename U>
-        explicit TransformBase(const TransformBase<rows, U>& o) : TransformBase(o[0]) {}
+        explicit TransformBase(const TransformBase<rows, U>& o) : TransformBase(o.m[0]) {}
 
         T* operator[](size_t iRow)
         {
@@ -113,9 +113,9 @@ namespace Ogre
         void setTrans( const Vector<3, T>& v )
         {
             assert(rows > 2);
-            m[0][3] = v[0];
-            m[1][3] = v[1];
-            m[2][3] = v[2];
+            m[0][3] = v.x;
+            m[1][3] = v.y;
+            m[2][3] = v.z;
         }
         /// Extracts the translation transformation part of the matrix.
         Vector<3, T> getTrans() const
@@ -127,9 +127,9 @@ namespace Ogre
         void setScale( const Vector<3, T>& v )
         {
             assert(rows > 2);
-            m[0][0] = v[0];
-            m[1][1] = v[1];
-            m[2][2] = v[2];
+            m[0][0] = v.x;
+            m[1][1] = v.y;
+            m[2][2] = v.z;
         }
 
         /** Function for writing to a stream.
@@ -156,10 +156,6 @@ namespace Ogre
 
     struct _OgreExport TransformBaseReal : public TransformBase<4, Real>
     {
-        /// Do <b>NOT</b> initialize for efficiency.
-        TransformBaseReal() {}
-        template<typename U>
-        explicit TransformBaseReal(const U* ptr) : TransformBase(ptr) {}
         /** Builds a translation matrix
         */
         void makeTrans( const Vector3& v )
@@ -201,7 +197,7 @@ namespace Ogre
         Matrix4 transpose() const;
 
         /** Building a Affine3 from orientation / scale / position.
-
+        @remarks
             Transform is performed in the order scale, rotate, translation, i.e. translation is independent
             of orientation axes, scale does not affect size of translation, rotation and scaling are always
             centered on the origin.
@@ -209,7 +205,7 @@ namespace Ogre
         void makeTransform(const Vector3& position, const Vector3& scale, const Quaternion& orientation);
 
         /** Building an inverse Affine3 from orientation / scale / position.
-
+        @remarks
             As makeTransform except it build the inverse given the same data as makeTransform, so
             performing -translation, -rotate, 1/scale in that order.
         */
@@ -234,9 +230,7 @@ namespace Ogre
             m[2][0] = m20; m[2][1] = m21; m[2][2] = m22; m[2][3] = m23;
             m[3][0] = m30; m[3][1] = m31; m[3][2] = m32; m[3][3] = m33;
         }
-
-        template<typename U>
-        explicit Matrix4(const U* ptr) : TransformBaseReal(ptr) {}
+        
         explicit Matrix4 (const Real* arr)
         {
             memcpy(m,arr,16*sizeof(Real));
@@ -325,15 +319,6 @@ namespace Ogre
         Affine3(const Vector3& position, const Quaternion& orientation, const Vector3& scale = Vector3::UNIT_SCALE)
         {
             makeTransform(position, scale, orientation);
-        }
-
-        template<typename U>
-        explicit Affine3(const U* ptr)
-        {
-            for (int i = 0; i < 3; i++)
-                for (int j = 0; j < 4; j++)
-                    m[i][j] = Real(ptr[i*4 + j]);
-            m[3][0] = 0, m[3][1] = 0, m[3][2] = 0, m[3][3] = 1;
         }
 
         explicit Affine3(const Real* arr)
@@ -539,7 +524,7 @@ namespace Ogre
     }
 
     /** Vector transformation using '*'.
-
+        @remarks
             Transforms the given 3-D vector by the matrix, projecting the
             result back into <i>w</i> = 1.
         @note

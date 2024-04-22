@@ -38,8 +38,18 @@
 
 namespace Ogre {
 
-    GLSLMonolithicProgram::GLSLMonolithicProgram(const GLShaderList& shaders)
-        : GLSLProgram(shaders)
+    GLSLMonolithicProgram::GLSLMonolithicProgram(GLSLShader* vertexProgram,
+                                                 GLSLShader* hullProgram,
+                                                 GLSLShader* domainProgram,
+                                                 GLSLShader* geometryProgram,
+                                                 GLSLShader* fragmentProgram,
+                                                 GLSLShader* computeProgram)
+        : GLSLProgram(vertexProgram,
+                      hullProgram,
+                      domainProgram,
+                      geometryProgram,
+                      fragmentProgram,
+                      computeProgram)
     {
     }
 
@@ -55,20 +65,19 @@ namespace Ogre {
         {
             uint32 hash = getCombinedHash();
 
-            if(mGLProgramHandle == 0)
-            {
-                OGRE_CHECK_GL_ERROR(mGLProgramHandle = glCreateProgram());
-            }
+            OGRE_CHECK_GL_ERROR(mGLProgramHandle = glCreateProgram());
 
-            mLinked = getMicrocodeFromCache(hash, mGLProgramHandle);
-            if (!mLinked)
+            if ( GpuProgramManager::getSingleton().canGetCompiledShaderBuffer() &&
+                 GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(hash) )
             {
-                // Something must have changed since the program binaries
-                // were cached away. Fallback to source shader loading path,
-                // and then retrieve and cache new program binaries once again.
+                getMicrocodeFromCache(hash);
+            }
+            else
+            {
                 compileAndLink();
             }
 
+            extractLayoutQualifiers();
             buildGLUniformReferences();
         }
 
@@ -81,7 +90,15 @@ namespace Ogre {
 
     void GLSLMonolithicProgram::compileAndLink()
     {
-        for (auto shader : mShaders)
+        // attach Vertex Program
+        if (mVertexShader)
+        {
+            getVertexShader()->attachToProgramObject(mGLProgramHandle);
+            setSkeletalAnimationIncluded(mVertexShader->isSkeletalAnimationIncluded());
+        }
+
+        // attach remaining Programs
+        for (auto shader : {mFragmentShader, mGeometryShader, mHullShader, mDomainShader, mComputeShader})
         {
         	if(!shader) continue;
 
@@ -104,7 +121,24 @@ namespace Ogre {
 
         if(mLinked)
         {
-            writeMicrocodeToCache(getCombinedHash(), mGLProgramHandle);
+            if ( GpuProgramManager::getSingleton().getSaveMicrocodesToCache() )
+            {
+                // add to the microcode to the cache
+
+                // get buffer size
+                GLint binaryLength = 0;
+                OGRE_CHECK_GL_ERROR(glGetProgramiv(mGLProgramHandle, GL_PROGRAM_BINARY_LENGTH, &binaryLength));
+
+                // create microcode
+                GpuProgramManager::Microcode newMicrocode =
+                    GpuProgramManager::getSingleton().createMicrocode(binaryLength + sizeof(GLenum));
+
+                // get binary
+                OGRE_CHECK_GL_ERROR(glGetProgramBinary(mGLProgramHandle, binaryLength, NULL, (GLenum *)newMicrocode->getPtr(), newMicrocode->getPtr() + sizeof(GLenum)));
+
+                // add to the microcode to the cache
+                GpuProgramManager::getSingleton().addMicrocodeToCache(getCombinedHash(), newMicrocode);
+            }
         }
     }
 
@@ -117,19 +151,21 @@ namespace Ogre {
         }
 
         // order must match GpuProgramType
+        GLSLShader* shaders[6] = {getVertexShader(), mFragmentShader, mGeometryShader, mDomainShader, mHullShader, mComputeShader};
         const GpuConstantDefinitionMap* params[6] = { NULL };
 
         for (int i = 0; i < 6; i++)
         {
-            if (!mShaders[i])
+            if (!shaders[i])
                 continue;
 
-            params[i] = &(mShaders[i]->getConstantDefinitions().map);
+            params[i] = &(shaders[i]->getConstantDefinitions().map);
         }
 
         // Do we know how many shared params there are yet? Or if there are any blocks defined?
-        GLSLProgramManager::getSingleton().extractUniformsFromProgram(mGLProgramHandle, params,
-                                                                      mGLUniformReferences);
+        GLSLProgramManager::getSingleton().extractUniformsFromProgram(
+            mGLProgramHandle, params, mGLUniformReferences, mGLAtomicCounterReferences,
+            mGLUniformBufferReferences, mSharedParamsBufferMap, mGLCounterBufferReferences);
 
         mUniformRefsBuilt = true;
     }
@@ -143,7 +179,16 @@ namespace Ogre {
         GLUniformReferenceIterator endUniform = mGLUniformReferences.end();
 
         // determine if we need to transpose matrices when binding
-        bool transpose = !mShaders[fromProgType] || mShaders[fromProgType]->getColumnMajorMatrices();
+        bool transpose = GL_TRUE;
+        if ((fromProgType == GPT_FRAGMENT_PROGRAM && mVertexShader && (!getVertexShader()->getColumnMajorMatrices())) ||
+            (fromProgType == GPT_VERTEX_PROGRAM && mFragmentShader && (!mFragmentShader->getColumnMajorMatrices())) ||
+            (fromProgType == GPT_GEOMETRY_PROGRAM && mGeometryShader && (!mGeometryShader->getColumnMajorMatrices())) ||
+            (fromProgType == GPT_HULL_PROGRAM && mHullShader && (!mHullShader->getColumnMajorMatrices())) ||
+            (fromProgType == GPT_DOMAIN_PROGRAM && mDomainShader && (!mDomainShader->getColumnMajorMatrices())) ||
+            (fromProgType == GPT_COMPUTE_PROGRAM && mComputeShader && (!mComputeShader->getColumnMajorMatrices())))
+        {
+            transpose = GL_FALSE;
+        }
 
         for (;currentUniform != endUniform; ++currentUniform)
         {
@@ -198,15 +243,15 @@ namespace Ogre {
                         break;
                     case GCT_MATRIX_DOUBLE_2X3:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix2x3dv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getDoublePointer(def->physicalIndex)));
+                                                                 transpose, params->getDoublePointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_DOUBLE_2X4:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix2x4dv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getDoublePointer(def->physicalIndex)));
+                                                                 transpose, params->getDoublePointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_DOUBLE_3X2:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix3x2dv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getDoublePointer(def->physicalIndex)));
+                                                                 transpose, params->getDoublePointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_DOUBLE_3X3:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix3dv(currentUniform->mLocation, glArraySize,
@@ -214,15 +259,15 @@ namespace Ogre {
                         break;
                     case GCT_MATRIX_DOUBLE_3X4:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix3x4dv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getDoublePointer(def->physicalIndex)));
+                                                                 transpose, params->getDoublePointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_DOUBLE_4X2:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix4x2dv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getDoublePointer(def->physicalIndex)));
+                                                                 transpose, params->getDoublePointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_DOUBLE_4X3:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix4x3dv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getDoublePointer(def->physicalIndex)));
+                                                                 transpose, params->getDoublePointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_DOUBLE_4X4:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix4dv(currentUniform->mLocation, glArraySize,
@@ -234,15 +279,15 @@ namespace Ogre {
                         break;
                     case GCT_MATRIX_2X3:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix2x3fv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getFloatPointer(def->physicalIndex)));
+                                                                 transpose, params->getFloatPointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_2X4:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix2x4fv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getFloatPointer(def->physicalIndex)));
+                                                                 transpose, params->getFloatPointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_3X2:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix3x2fv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getFloatPointer(def->physicalIndex)));
+                                                                 transpose, params->getFloatPointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_3X3:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix3fv(currentUniform->mLocation, glArraySize,
@@ -250,30 +295,19 @@ namespace Ogre {
                         break;
                     case GCT_MATRIX_3X4:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix3x4fv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getFloatPointer(def->physicalIndex)));
+                                                                 transpose, params->getFloatPointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_4X2:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix4x2fv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getFloatPointer(def->physicalIndex)));
+                                                                 transpose, params->getFloatPointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_4X3:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix4x3fv(currentUniform->mLocation, glArraySize,
-                                                                 GL_FALSE, params->getFloatPointer(def->physicalIndex)));
+                                                                 transpose, params->getFloatPointer(def->physicalIndex)));
                         break;
                     case GCT_MATRIX_4X4:
                         OGRE_CHECK_GL_ERROR(glUniformMatrix4fv(currentUniform->mLocation, glArraySize,
                                                                transpose, params->getFloatPointer(def->physicalIndex)));
-                        break;
-                    case GCT_SAMPLER1D:
-                    case GCT_SAMPLER1DSHADOW:
-                    case GCT_SAMPLER2D:
-                    case GCT_SAMPLER2DSHADOW:
-                    case GCT_SAMPLER2DARRAY:
-                    case GCT_SAMPLER3D:
-                    case GCT_SAMPLERCUBE:
-                        // Samplers handled like 1-element ints, but use register storage
-                        OGRE_CHECK_GL_ERROR(glUniform1iv(currentUniform->mLocation, glArraySize,
-                                    (GLint*)params->getRegPointer(def->physicalIndex)));
                         break;
                     case GCT_INT1:
                         OGRE_CHECK_GL_ERROR(glUniform1iv(currentUniform->mLocation, glArraySize,
@@ -311,6 +345,19 @@ namespace Ogre {
                         OGRE_CHECK_GL_ERROR(glUniform4uiv(currentUniform->mLocation, glArraySize,
                                                           (GLuint*)params->getUnsignedIntPointer(def->physicalIndex)));
                         break;
+
+                    case GCT_SAMPLER1D:
+                    case GCT_SAMPLER1DSHADOW:
+                    case GCT_SAMPLER2D:
+                    case GCT_SAMPLER2DSHADOW:
+                    case GCT_SAMPLER2DARRAY:
+                    case GCT_SAMPLER3D:
+                    case GCT_SAMPLERCUBE:
+                    case GCT_SAMPLERRECT:
+                        // Samplers handled like 1-element ints
+                        OGRE_CHECK_GL_ERROR(glUniform1iv(currentUniform->mLocation, 1,
+                                                         (GLint*)params->getIntPointer(def->physicalIndex)));
+                        break;
                     default:
                         break;
 
@@ -320,6 +367,58 @@ namespace Ogre {
             } // fromProgType == currentUniform->mSourceProgType
 
         } // End for
+    }
+
+
+    void GLSLMonolithicProgram::updateUniformBlocks(GpuProgramParametersSharedPtr params,
+                                                    uint16 mask, GpuProgramType fromProgType)
+    {
+        // Iterate through the list of uniform buffers and update them as needed
+        GLUniformBufferIterator currentBuffer = mGLUniformBufferReferences.begin();
+        GLUniformBufferIterator endBuffer = mGLUniformBufferReferences.end();
+
+        const GpuProgramParameters::GpuSharedParamUsageList& sharedParams = params->getSharedParameters();
+
+        GpuProgramParameters::GpuSharedParamUsageList::const_iterator it, end = sharedParams.end();
+        for (it = sharedParams.begin(); it != end; ++it)
+        {
+            for (;currentBuffer != endBuffer; ++currentBuffer)
+            {
+                GL3PlusHardwareUniformBuffer* hwGlBuffer = static_cast<GL3PlusHardwareUniformBuffer*>(currentBuffer->get());
+                GpuSharedParametersPtr paramsPtr = it->getSharedParams();
+
+                // Block name is stored in mSharedParams->mName of GpuSharedParamUsageList items
+                GLint UniformTransform;
+                OGRE_CHECK_GL_ERROR(UniformTransform = glGetUniformBlockIndex(mGLProgramHandle, it->getName().c_str()));
+                OGRE_CHECK_GL_ERROR(glUniformBlockBinding(mGLProgramHandle, UniformTransform, hwGlBuffer->getGLBufferBinding()));
+
+                hwGlBuffer->writeData(0, hwGlBuffer->getSizeInBytes(), &paramsPtr->getFloatConstantList().front());
+            }
+        }
+    }
+
+
+    void GLSLMonolithicProgram::updatePassIterationUniforms(GpuProgramParametersSharedPtr params)
+    {
+        if (params->hasPassIterationNumber())
+        {
+            size_t index = params->getPassIterationNumberIndex();
+
+            GLUniformReferenceIterator currentUniform = mGLUniformReferences.begin();
+            GLUniformReferenceIterator endUniform = mGLUniformReferences.end();
+
+            // Need to find the uniform that matches the multi pass entry
+            for (;currentUniform != endUniform; ++currentUniform)
+            {
+                // Get the index in the parameter real list
+                if (index == currentUniform->mConstantDef->physicalIndex)
+                {
+                    OGRE_CHECK_GL_ERROR(glUniform1fv(currentUniform->mLocation, 1, params->getFloatPointer(index)));
+                    // There will only be one multipass entry
+                    return;
+                }
+            }
+        }
     }
 
 } // namespace Ogre

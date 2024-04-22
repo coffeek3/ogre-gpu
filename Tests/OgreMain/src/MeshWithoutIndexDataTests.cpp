@@ -33,9 +33,10 @@ THE SOFTWARE.
 #include "OgreArchiveManager.h"
 #include "MeshWithoutIndexDataTests.h"
 #include "OgreLodStrategyManager.h"
+#include "OgreLodConfig.h"
+
 
 #ifdef OGRE_BUILD_COMPONENT_MESHLODGENERATOR
-#include "OgreLodConfig.h"
 #include "OgreMeshLodGenerator.h"
 #endif
 
@@ -268,7 +269,7 @@ TEST_F(MeshWithoutIndexDataTests,CreateLineWithMaterial)
     mMeshMgr->remove(fileName, "General");
 }
 //--------------------------------------------------------------------------
-static void createMeshWithMaterial(const String& fileName)
+static void createMeshWithMaterial(String fileName)
 {
     String matFileNameSuffix = ".material";
     String matName1 = "red";
@@ -481,8 +482,6 @@ TEST_F(MeshWithoutIndexDataTests,GenerateLodLevels)
     remove(fileName.c_str());
 
     mMeshMgr->remove(fileName, "General");
-#else
-    GTEST_SKIP() << "MeshLodGenerator is not built";
 #endif
 }
 //--------------------------------------------------------------------------//--------------------------------------------------------------------------

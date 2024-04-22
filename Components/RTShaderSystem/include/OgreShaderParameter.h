@@ -28,7 +28,7 @@ THE SOFTWARE.
 #define _ShaderParameter_
 
 #include "OgreShaderPrerequisites.h"
-#include "OgreVector.h"
+#include "OgreVector2.h"
 #include "OgreMatrix4.h"
 #include "OgreGpuProgramParams.h"
 
@@ -67,9 +67,7 @@ public:
         /// Binormal (Y axis if normal is Z)
         SPS_BINORMAL = 8,
         /// Tangent (X axis if normal is Z)
-        SPS_TANGENT = 9,
-        /// VFACE
-        SPS_FRONT_FACING
+        SPS_TANGENT = 9
     };
 
     /** Shader parameter content
@@ -113,6 +111,9 @@ public:
         /// Normal in view space
         SPC_NORMAL_VIEW_SPACE,
 
+        /// Normal in tangent space
+        SPC_NORMAL_TANGENT_SPACE,
+
         /// View vector in object space
         SPC_POSTOCAMERA_OBJECT_SPACE,
 
@@ -121,6 +122,122 @@ public:
 
         /// View vector in view space
         SPC_POSTOCAMERA_VIEW_SPACE,
+
+        /// View vector in tangent space
+        SPC_POSTOCAMERA_TANGENT_SPACE,
+
+        /// Light vector in object space index 0-7
+        SPC_POSTOLIGHT_OBJECT_SPACE0,
+        SPC_POSTOLIGHT_OBJECT_SPACE1,
+        SPC_POSTOLIGHT_OBJECT_SPACE2,
+        SPC_POSTOLIGHT_OBJECT_SPACE3,
+        SPC_POSTOLIGHT_OBJECT_SPACE4,
+        SPC_POSTOLIGHT_OBJECT_SPACE5,
+        SPC_POSTOLIGHT_OBJECT_SPACE6,
+        SPC_POSTOLIGHT_OBJECT_SPACE7,
+
+        /// Light vector in world space index 0-7
+        SPC_POSTOLIGHT_WORLD_SPACE0,
+        SPC_POSTOLIGHT_WORLD_SPACE1,
+        SPC_POSTOLIGHT_WORLD_SPACE2,
+        SPC_POSTOLIGHT_WORLD_SPACE3,
+        SPC_POSTOLIGHT_WORLD_SPACE4,
+        SPC_POSTOLIGHT_WORLD_SPACE5,
+        SPC_POSTOLIGHT_WORLD_SPACE6,
+        SPC_POSTOLIGHT_WORLD_SPACE7,
+
+        /// Light vector in view space index 0-7
+        SPC_POSTOLIGHT_VIEW_SPACE0,
+        SPC_POSTOLIGHT_VIEW_SPACE1,
+        SPC_POSTOLIGHT_VIEW_SPACE2,
+        SPC_POSTOLIGHT_VIEW_SPACE3,
+        SPC_POSTOLIGHT_VIEW_SPACE4,
+        SPC_POSTOLIGHT_VIEW_SPACE5,
+        SPC_POSTOLIGHT_VIEW_SPACE6,
+        SPC_POSTOLIGHT_VIEW_SPACE7,
+
+        /// Light vector in tangent space index 0-7
+        SPC_POSTOLIGHT_TANGENT_SPACE0,
+        SPC_POSTOLIGHT_TANGENT_SPACE1,
+        SPC_POSTOLIGHT_TANGENT_SPACE2,
+        SPC_POSTOLIGHT_TANGENT_SPACE3,
+        SPC_POSTOLIGHT_TANGENT_SPACE4,
+        SPC_POSTOLIGHT_TANGENT_SPACE5,
+        SPC_POSTOLIGHT_TANGENT_SPACE6,
+        SPC_POSTOLIGHT_TANGENT_SPACE7,
+
+        /// Light direction in object space index 0-7
+        SPC_LIGHTDIRECTION_OBJECT_SPACE0,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE1,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE2,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE3,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE4,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE5,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE6,
+        SPC_LIGHTDIRECTION_OBJECT_SPACE7,
+
+        /// Light direction in world space index 0-7
+        SPC_LIGHTDIRECTION_WORLD_SPACE0,
+        SPC_LIGHTDIRECTION_WORLD_SPACE1,
+        SPC_LIGHTDIRECTION_WORLD_SPACE2,
+        SPC_LIGHTDIRECTION_WORLD_SPACE3,
+        SPC_LIGHTDIRECTION_WORLD_SPACE4,
+        SPC_LIGHTDIRECTION_WORLD_SPACE5,
+        SPC_LIGHTDIRECTION_WORLD_SPACE6,
+        SPC_LIGHTDIRECTION_WORLD_SPACE7,
+
+        /// Light direction in view space index 0-7
+        SPC_LIGHTDIRECTION_VIEW_SPACE0,
+        SPC_LIGHTDIRECTION_VIEW_SPACE1,
+        SPC_LIGHTDIRECTION_VIEW_SPACE2,
+        SPC_LIGHTDIRECTION_VIEW_SPACE3,
+        SPC_LIGHTDIRECTION_VIEW_SPACE4,
+        SPC_LIGHTDIRECTION_VIEW_SPACE5,
+        SPC_LIGHTDIRECTION_VIEW_SPACE6,
+        SPC_LIGHTDIRECTION_VIEW_SPACE7,
+
+        /// Light direction in tangent space index 0-7
+        SPC_LIGHTDIRECTION_TANGENT_SPACE0,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE1,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE2,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE3,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE4,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE5,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE6,
+        SPC_LIGHTDIRECTION_TANGENT_SPACE7,
+
+        /// Light position in object space index 0-7
+        SPC_LIGHTPOSITION_OBJECT_SPACE0,
+        SPC_LIGHTPOSITION_OBJECT_SPACE1,
+        SPC_LIGHTPOSITION_OBJECT_SPACE2,
+        SPC_LIGHTPOSITION_OBJECT_SPACE3,
+        SPC_LIGHTPOSITION_OBJECT_SPACE4,
+        SPC_LIGHTPOSITION_OBJECT_SPACE5,
+        SPC_LIGHTPOSITION_OBJECT_SPACE6,
+        SPC_LIGHTPOSITION_OBJECT_SPACE7,
+
+        /// Light position in world space index 0-7
+        SPC_LIGHTPOSITION_WORLD_SPACE0,
+        SPC_LIGHTPOSITION_WORLD_SPACE1,
+        SPC_LIGHTPOSITION_WORLD_SPACE2,
+        SPC_LIGHTPOSITION_WORLD_SPACE3,
+        SPC_LIGHTPOSITION_WORLD_SPACE4,
+        SPC_LIGHTPOSITION_WORLD_SPACE5,
+        SPC_LIGHTPOSITION_WORLD_SPACE6,
+        SPC_LIGHTPOSITION_WORLD_SPACE7,
+
+        /// Light position in view space index 0-7
+        SPC_LIGHTPOSITIONVIEW_SPACE0,
+        SPC_LIGHTPOSITIONVIEW_SPACE1,
+        SPC_LIGHTPOSITIONVIEW_SPACE2,
+        SPC_LIGHTPOSITIONVIEW_SPACE3,
+        SPC_LIGHTPOSITIONVIEW_SPACE4,
+        SPC_LIGHTPOSITIONVIEW_SPACE5,
+        SPC_LIGHTPOSITIONVIEW_SPACE6,
+        SPC_LIGHTPOSITIONVIEW_SPACE7,
+
+        /// Light position in tangent space index 0-7
+        SPC_LIGHTPOSITION_TANGENT_SPACE,
 
         /// Blending weights
         SPC_BLEND_WEIGHTS,
@@ -137,6 +254,9 @@ public:
         /// Tangent in view space
         SPC_TANGENT_VIEW_SPACE,
 
+        /// Tangent in tangent space
+        SPC_TANGENT_TANGENT_SPACE,
+
         /// Binormal in object space
         SPC_BINORMAL_OBJECT_SPACE,
 
@@ -146,11 +266,17 @@ public:
         /// Binormal in view space
         SPC_BINORMAL_VIEW_SPACE,
 
+        /// Binormal in tangent space
+        SPC_BINORMAL_TANGENT_SPACE,
+
         /// Diffuse color
         SPC_COLOR_DIFFUSE,
 
         /// Specular color
         SPC_COLOR_SPECULAR,
+
+        /// Depth in object space
+        SPC_DEPTH_OBJECT_SPACE,
 
         /// Depth in world space
         SPC_DEPTH_WORLD_SPACE,
@@ -176,9 +302,6 @@ public:
 
         /// point sprite size
         SPC_POINTSPRITE_SIZE,
-
-        /// gl_FrontFacing
-        SPC_FRONT_FACING,
 
         /// Reserved custom content range to be used by user custom shader extensions.
         SPC_CUSTOM_CONTENT_BEGIN    = 1000,
@@ -247,13 +370,6 @@ public:
     void setUsed(bool used) { mUsed = used; }
     bool isUsed() { return mUsed; }
 
-    /// Is highp needed when using GLSL ES
-    bool isHighP() const { return mIsHighP; }
-    void setHighP(bool highP) { mIsHighP = highP; }
-
-    const String& getStructType() const { return mStructType; }
-    void setStructType(const String& structType) { mStructType = structType; }
-
 // Attributes.
 protected:
     // Name of this parameter.
@@ -264,10 +380,6 @@ protected:
 
     // Type of this parameter.
     GpuConstantType mType;
-
-    // Type, if this is a struct
-    String mStructType;
-
     // Semantic of this parameter.
     Semantic mSemantic;
     // Index of this parameter.
@@ -278,7 +390,6 @@ protected:
     size_t mSize;
     
     bool mUsed;
-    bool mIsHighP;
 };
 
 typedef ShaderParameterList::iterator           ShaderParameterIterator;
@@ -309,7 +420,7 @@ public:
     @param fAutoConstantData The real data for this auto constant parameter.    
     @param size number of elements in the parameter.    
     */
-    UniformParameter(GpuProgramParameters::AutoConstantType autoType, float fAutoConstantData, size_t size);
+    UniformParameter(GpuProgramParameters::AutoConstantType autoType, Real fAutoConstantData, size_t size);
     
     /** Class constructor.
     @param autoType The auto type of this parameter.
@@ -317,14 +428,14 @@ public:
     @param size number of elements in the parameter.
     @param type The desired data type of this auto constant parameter.
     */
-    UniformParameter(GpuProgramParameters::AutoConstantType autoType, float fAutoConstantData, size_t size, GpuConstantType type);
+    UniformParameter(GpuProgramParameters::AutoConstantType autoType, Real fAutoConstantData, size_t size, GpuConstantType type);
 
     /** Class constructor.
     @param autoType The auto type of this parameter.
     @param nAutoConstantData The int data for this auto constant parameter. 
     @param size number of elements in the parameter.    
     */
-    UniformParameter(GpuProgramParameters::AutoConstantType autoType, uint32 nAutoConstantData, size_t size);
+    UniformParameter(GpuProgramParameters::AutoConstantType autoType, size_t nAutoConstantData, size_t size);
     
     /** Class constructor.
     @param autoType The auto type of this parameter.
@@ -332,20 +443,20 @@ public:
     @param size number of elements in the parameter.
     @param type The desired data type of this auto constant parameter.
     */
-    UniformParameter(GpuProgramParameters::AutoConstantType autoType, uint32 nAutoConstantData, size_t size, GpuConstantType type);
+    UniformParameter(GpuProgramParameters::AutoConstantType autoType, size_t nAutoConstantData, size_t size, GpuConstantType type);
 
     
     /** Get auto constant int data of this parameter, in case it is auto constant parameter. */
-    uint32 getAutoConstantIntData() const { return isArray() ? getSize() : mAutoConstantIntData; }
+    size_t getAutoConstantIntData() const { return mAutoConstantIntData; }  
 
     /** Get auto constant real data of this parameter, in case it is auto constant parameter. */
-    float getAutoConstantRealData() const { return mAutoConstantRealData; }
+    Real getAutoConstantRealData() const { return mAutoConstantRealData; }  
 
     /** Return true if this parameter is a floating point type, false otherwise. */
-    bool isFloat() const { return GpuConstantDefinition::isFloat(mType); }
+    bool isFloat() const;
 
     /** Return true if this parameter is a texture sampler type, false otherwise. */
-    bool isSampler() const { return GpuConstantDefinition::isSampler(mType); }
+    bool isSampler() const;
 
     /** Return true if this parameter is an auto constant parameter, false otherwise. */
     bool isAutoConstantParameter() const { return mIsAutoConstantReal || mIsAutoConstantInt; }
@@ -472,7 +583,7 @@ public:
     }
 
     /// light index or array size
-    void updateExtraInfo(uint32 data)
+    void updateExtraInfo(size_t data)
     {
         if (!mParamsPtr)
             return;
@@ -481,7 +592,7 @@ public:
                                         mElementSize);
     }
 
-private:
+protected:
     // Is it auto constant real based parameter.
     bool mIsAutoConstantReal;
     // Is it auto constant int based parameter.
@@ -490,9 +601,9 @@ private:
     union
     {
         // Auto constant int data.
-        uint32 mAutoConstantIntData;
+        size_t mAutoConstantIntData;
         // Auto constant real data.
-        float mAutoConstantRealData;
+        Real mAutoConstantRealData;
     };      
     // How this parameter varies (bitwise combination of GpuProgramVariability).
     uint16 mVariability;
@@ -501,7 +612,7 @@ private:
     // The physical index of this parameter in the GPU program.
     size_t mPhysicalIndex;
     // The size of this parameter in the GPU program
-    uint8 mElementSize;
+    size_t mElementSize;
 };
 
 typedef std::vector<UniformParameterPtr>       UniformParameterList;
@@ -532,12 +643,12 @@ public:
     /** 
     @see Parameter::isConstParameter.
     */
-    bool isConstParameter() const override { return true; }
+    virtual bool isConstParameter() const { return true; }
 
     /** 
     @see Parameter::toString.
     */
-    String toString() const override = 0;
+    virtual String toString() const = 0;
 
 protected:
     valueType mValue;
@@ -551,7 +662,7 @@ class _OgreRTSSExport ParameterFactory
     // Interface.
 public:
 
-    static ParameterPtr createInPosition(int index, Parameter::Content content = Parameter::SPC_POSITION_OBJECT_SPACE);
+    static ParameterPtr createInPosition(int index);    
     static ParameterPtr createOutPosition(int index);
 
     static ParameterPtr createInNormal(int index);
@@ -567,6 +678,14 @@ public:
 
     static ParameterPtr createInTexcoord(GpuConstantType type, int index, Parameter::Content content);
     static ParameterPtr createOutTexcoord(GpuConstantType type, int index, Parameter::Content content);
+    static ParameterPtr createInTexcoord1(int index, Parameter::Content content);
+    static ParameterPtr createOutTexcoord1(int index, Parameter::Content content);
+    static ParameterPtr createInTexcoord2(int index, Parameter::Content content);
+    static ParameterPtr createOutTexcoord2(int index, Parameter::Content content);
+    static ParameterPtr createInTexcoord3(int index, Parameter::Content content);
+    static ParameterPtr createOutTexcoord3(int index, Parameter::Content content);
+    static ParameterPtr createInTexcoord4(int index, Parameter::Content content);           
+    static ParameterPtr createOutTexcoord4(int index, Parameter::Content content);
 
     static ParameterPtr createConstParam(const Vector2& val);
     static ParameterPtr createConstParam(const Vector3& val);
