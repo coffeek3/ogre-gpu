@@ -36,6 +36,7 @@ THE SOFTWARE.
 #include "OgreEGLWindow.h"
 #include "OgreEGLContext.h"
 
+#include<sstream>
 #include <iostream>
 #include <algorithm>
 #include <climits>
@@ -56,7 +57,7 @@ namespace Ogre {
         mIsExternalGLControl = false;
         mClosed = false;
         mActive = true;//todo
-        mIsExternalGLControl = false;
+        // mIsExternalGLControl = true;
         mVisible = false;
         mVSync = false;
         mVSyncInterval = 1;
@@ -151,8 +152,21 @@ namespace Ogre {
 
         if (eglSwapBuffers(mEglDisplay, mEglSurface) == EGL_FALSE)
         {
-            EGL_CHECK_ERROR
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Fail to SwapBuffers");
+            // EGL_CHECK_ERROR
+            // OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Fail to SwapBuffers");
+            EGLint error = eglGetError();
+            std::stringstream ss;
+            ss << std::hex << error;    
+            Ogre::LogManager::getSingleton().logError("Error during eglSwapBuffers: 0x" + ss.str() );
+            if (error == EGL_BAD_SURFACE) {
+                // 处理无效的 surface 错误
+                Ogre::LogManager::getSingleton().logError("Error during eglSwapBuffers EGL_BAD_SURFACE ");
+            } else if (error == EGL_BAD_DISPLAY) {
+                // 处理无效的 display 错误
+                Ogre::LogManager::getSingleton().logError("Error during eglSwapBuffers EGL_BAD_DISPLAY ");
+            } else {
+                Ogre::LogManager::getSingleton().logError("Error during eglSwapBuffers Other Error: 0x" + ss.str());
+            }
         }
     }
 
